@@ -92,3 +92,24 @@ def plot_input_vectors(Ws,
              fontsize=15)
     fig.suptitle("GLM Weights: " + title, y=0.99, fontsize=14)
     fig.savefig(figure_directory + 'glm_weights_' + save_title + '.png')
+
+
+## Ines added
+def calculate_predictive_acc_glm(glm_weights, inpt, y, idx_to_exclude):
+    M = inpt.shape[1]
+    C = 2
+    # Calculate test loglikelihood
+    from GLM import glm
+    new_glm = glm(M, C)
+    # Set parameters to fit parameters:
+    new_glm.params = glm_weights
+    # time dependent logits:
+    prob_right = np.exp(new_glm.calculate_logits(inpt))
+    prob_right = prob_right[:, 0, 1]
+    # Get the predicted label for each time step:
+    predicted_label = np.around(prob_right, decimals=0).astype('int')
+    # Examine at appropriate idx
+    predictive_acc = np.sum(
+        y[idx_to_exclude,
+          0] == predicted_label[idx_to_exclude]) / len(idx_to_exclude)
+    return predictive_acc
