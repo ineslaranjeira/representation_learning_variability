@@ -1,5 +1,5 @@
 """
-Generic functionsto get learning data using ONE
+Generic functions to get learning data using ONE
 Jan 2023
 Inês Laranjeira
 """
@@ -22,7 +22,6 @@ one = ONE(base_url='https://alyx.internationalbrainlab.org')
 """
 GET TRIALS INFO INTO ONE TABLE
 """
-
 
 def get_trials(training_protocol='training', mouse_project='ibl_neuropixel_brainwide_01'):
 
@@ -109,6 +108,10 @@ def get_first_session(trials):
 
     return first_session
 
+
+"""
+CALCULATE SOME USEFUL GENERIC METRICS
+"""
 
 def performance_metrics(trials, session):
 
@@ -277,11 +280,6 @@ def training_time(trials):
     return training_time_df
 
 
-def learning_onset(trials):
-
-    return learning_onset
-
-
 def quartile(trials, criterion='training_time'):
 
     # crit can be 'training_time' or 'learning_onset'
@@ -305,22 +303,71 @@ def quartile(trials, criterion='training_time'):
     return quantile_df
 
 
+def prepro(trials):
+
+    """ Performance """
+    # Some preprocessing
+    trials['contrastLeft'] = trials['contrastLeft'].fillna(0)
+    trials['contrastRight'] = trials['contrastRight'].fillna(0)
+    trials['signed_contrast'] = - trials['contrastLeft'] + trials['contrastRight']
+    trials['contrast'] = trials['contrastLeft'] + trials['contrastRight']
+    trials['correct_easy'] = trials['feedbackType']
+    trials.loc[trials['correct_easy']==-1, 'correct_easy'] = 0
+    trials['correct'] = trials['feedbackType']
+    trials.loc[trials['contrast']<.5, 'correct_easy'] = np.nan
+    trials.loc[trials['correct']==-1, 'correct'] = 0
+
+    """ Response/ reaction times """
+    trials['response'] = trials['response_times'] - trials['stimOn_times']
+    trials['reaction'] = trials['firstMovement_times'] - trials['stimOn_times']
+    #TODO : trials['days_to_trained'] = trials['training_time']
+    
+    return trials
+
+
+"""
+DIFFERENT WAYS OF BINNING DATA
+"""
+
+def bin_frac(trials, bin_num):
+
+    subjects = trials.subject_nickname.unique()
+
+    # Create new empty dataframe
+    new_df = pd.DataFrame()
+
+    # Loop through subjects
+    for s, subject in enumerate(subjects):
+        # Get subject data
+        subject_data = trials.loc[trials['subject_nickname']==subject]
+        mouse_training_day = int(subject_data['training_time'].unique()[0]) + 1
+        subject_data = subject_data.loc[subject_data['training_day']<mouse_training_day]
+        subject_data = subject_data.sort_values(by=['training_day', 'trial_id'])
+        # Caltulate bin specifics
+        total_trials = len(subject_data)
+        bin_size = int(np.round(total_trials / bin_num))
+        bin_index = np.array([])
+        # Design bin number array
+        for n in range(bin_num):
+            this_bin_index = np.ones(bin_size) * (n+1)
+            bin_index = np.concatenate((bin_index, this_bin_index), axis=None)
+        # Add buffer to the end in case array is shorter than dataframe
+        bin_index = np.concatenate((bin_index, np.ones(bin_size) * 15), axis=None)
+        subject_data['bin_frac'] = bin_index[0:len(subject_data)]
+        # Append subject data to big dataframe
+        new_df = new_df.append(subject_data)
+        
+    return new_df
+
+
+# TODO
+
 def wheel(trials):
 
     return wheel_df
 
 
-def prepro(trials):
+def learning_onset(trials):
 
-    # Some preprocessing
-    trials.loc[trials['contrastLeft'] == np.nan, 'contrastLeft'] = 0
-    trials.loc[trials['contrastRight'] == np.nan, 'contrastRight'] = 0
-    trials['signed_contrast'] = - trials['contrastLeft'] + trials['contrastRight']
-    trials['contrast'] = trials['contrastLeft'] + trials['contrastRight']
-    trials['correct_easy'] = trials['feedbackType']
-    trials.loc[trials['correct_easy'] == -1, 'correct_easy'] = 0
-    trials.loc[trials['contrast'] < .5, 'correct_easy'] = np.nan
-    trials['response'] = trials['response_times'] - trials['stimOn_times']
-    trials['reaction'] = trials['firstMovement_times'] - trials['stimOn_times']
+    return learning_onset
 
-    return trials
