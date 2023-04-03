@@ -1,2 +1,8 @@
 
 DATA/
+
+*.npz
+
+*.png
+
+*.json
