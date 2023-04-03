@@ -39,7 +39,7 @@ def get_raw_data(eid, data_dir):
            bias_probs
 """
 
-
+"""  
 def get_raw_data(eid, trials_df):
     print(eid)
     # get session id:
@@ -77,19 +77,20 @@ def get_raw_data(animal, bin, trials_df):
 
     # Get data
     choice = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==int(bin)),'choice'])
+                            (trials_df['bin_frac']==float(bin+1)),'choice'])
+    #choice = np.array(remap_choice_vals(choice))
     stim_left = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==int(bin)),'contrastLeft'])
+                            (trials_df['bin_frac']==float(bin+1)),'contrastLeft'])
     stim_right = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==int(bin)),'contrastRight'])
+                            (trials_df['bin_frac']==float(bin+1)),'contrastRight'])
     rewarded = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==int(bin)),'feedbackType'])
+                            (trials_df['bin_frac']==float(bin+1)),'feedbackType'])
     bias_probs = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==int(bin)),'probabilityLeft'])
+                            (trials_df['bin_frac']==float(bin+1)),'probabilityLeft'])
     
     return animal, stim_left, stim_right, rewarded, choice, \
            bias_probs
-"""
+
 
 def create_stim_vector(stim_left, stim_right):
     # want stim_right - stim_left
@@ -198,7 +199,7 @@ def create_design_mat(choice, stim_left, stim_right, rewarded):
     design_mat[:, 2] = wsls
     return design_mat
 
-
+"""
 def get_all_unnormalized_data_this_session(eid, trials_df):
     # Load raw data
     animal, session_id, stim_left, stim_right, rewarded, choice, bias_probs \
@@ -233,7 +234,7 @@ def get_all_unnormalized_data_this_session(animal, bin, trials_df):
     trials_to_study = np.where(bias_probs == 0.5)[0]
     trials_to_study = np.where(bias_probs <=1)[0]  # redundant code, but makes sure all trials are used
     num_viols_50 = len(np.where(choice[trials_to_study] == 0)[0])  # viols are omissions
-    if num_viols_50 < 10:
+    if num_viols_50 < 100:
         # Create design mat = matrix of size T x 3, with entries for
         # stim/past choice/wsls
         unnormalized_inpt = create_design_mat(choice[trials_to_study],
@@ -241,15 +242,15 @@ def get_all_unnormalized_data_this_session(animal, bin, trials_df):
                                               stim_right[trials_to_study],
                                               rewarded[trials_to_study])
         y = np.expand_dims(remap_choice_vals(choice[trials_to_study]), axis=1)
-        bin = [session_id for i in range(y.shape[0])]
+        bin_array = [bin for i in range(y.shape[0])]
         rewarded = np.expand_dims(rewarded[trials_to_study], axis=1)
     else:
         unnormalized_inpt = np.zeros((90, 3))
         y = np.zeros((90, 1))
-        bin = []
+        bin_array = []
         rewarded = np.zeros((90, 1))
-    return animal, unnormalized_inpt, y, bin, num_viols_50, rewarded
-"""
+    return animal, unnormalized_inpt, y, bin_array, num_viols_50, rewarded
+
 
 def load_animal_list(file):
     container = np.load(file, allow_pickle=True)
@@ -273,7 +274,7 @@ def load_data(animal_file):
     session = data[2]
     return inpt, y, session
 
-
+"""
 def create_train_test_sessions(session, num_folds=5):
     # create a session-fold lookup table
     num_sessions = len(np.unique(session))
@@ -290,8 +291,21 @@ def create_train_test_sessions(session, num_folds=5):
     session_fold_lookup_table = np.transpose(
         np.vstack([sess_id, shuffled_folds]))
     return session_fold_lookup_table
+"""
 
-# Ines -specific
+def create_train_test_sessions(animal_bin, num_folds=5):
+    num_folds = 5
+    # create a session-fold lookup table
+    bin_len = len(animal_bin)
+
+    # Map trials to folds:
+    unshuffled_folds = np.repeat(np.arange(num_folds),
+                                    np.round(bin_len/ num_folds))
+    shuffled_folds = npr.permutation(unshuffled_folds)[:bin_len]
+    return shuffled_folds
+
+
+# Ines - specific
 def bin_frac(trials, bin_num):
 
     subjects = trials.subject_nickname.unique()
