@@ -269,13 +269,22 @@ def training_time(trials):
 
         """ Calculate training time for that mouse """
         # Note: 'untrainable' is not a training_status anymore
-        training_days = np.max(training_time_df.loc[(training_time_df['subject_nickname'] ==
-                                                     nickname) &
-                                                    (training_time_df['training_status'] ==
-                                                    'in training'), 'training_day'])
-        # Add training time to dataframe
-        training_time_df.loc[training_time_df['subject_nickname'] == nickname,
-                             'training_time'] = training_days
+        # Need to first check if animal ever got trained
+        mouse_training_status = training_time_df.loc[(training_time_df['subject_nickname'] == nickname),
+                                     'training_status'] 
+        if 'trained 1a' in mouse_training_status.unique() or 'trained 1b' in mouse_training_status.unique():
+            training_days = np.max(training_time_df.loc[(training_time_df['subject_nickname'] ==
+                                                        nickname) &
+                                                        (training_time_df['training_status'] ==
+                                                        'in training'), 'training_day'])
+            # Add training time to dataframe
+            training_time_df.loc[training_time_df['subject_nickname'] == nickname,
+                                'training_time'] = training_days
+        else:
+            # Add training time to dataframe
+            training_time_df.loc[training_time_df['subject_nickname'] == nickname,
+                                'training_time'] = np.nan
+
 
     return training_time_df
 
