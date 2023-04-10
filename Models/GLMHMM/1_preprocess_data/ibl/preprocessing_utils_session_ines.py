@@ -300,8 +300,11 @@ def create_train_test_sessions(animal_bin, num_folds=5):
 
     # Map trials to folds:
     unshuffled_folds = np.repeat(np.arange(num_folds),
-                                    np.round(bin_len/ num_folds))
+                                    np.ceil(bin_len/ num_folds))
     shuffled_folds = npr.permutation(unshuffled_folds)[:bin_len]
+    # make sure final size is the same
+    shuffled_folds = shuffled_folds[:bin_len]
+    
     return shuffled_folds
 
 
