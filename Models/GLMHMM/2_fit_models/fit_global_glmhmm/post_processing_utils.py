@@ -89,13 +89,14 @@ def partition_data_by_session(inpt, y, mask, session):
     for sess in unique_sessions:
         idx = np.where(session == sess)[0]
         counter += len(idx)
-        inputs.append(inpt[idx, :])
-        datas.append(y[idx, :])
+        inputs.append(inpt[0][idx, :])
+        datas.append(y[0][idx, :])
         masks.append(mask[idx])
-    assert counter == inpt.shape[0], "not all trials assigned to session!"
+    assert counter == inpt[0].shape[0], "not all trials assigned to session!"
     return inputs, datas, masks
 
 
+"""
 def get_train_test_dta(inpt, y, mask, session, session_fold_lookup_table,
                        fold):
     '''
@@ -114,6 +115,35 @@ def get_train_test_dta(inpt, y, mask, session, session_fold_lookup_table,
         session_fold_lookup_table[:, 1] != fold), 0]
     idx_test = [str(sess) in test_sessions for sess in session]
     idx_train = [str(sess) in train_sessions for sess in session]
+    test_inpt, test_y, test_mask, this_test_session = inpt[idx_test, :], y[
+                                                                         idx_test,
+                                                                         :], \
+                                                      mask[idx_test], session[
+                                                          idx_test]
+    train_inpt, train_y, train_mask, this_train_session = inpt[idx_train,
+                                                          :], y[idx_train,
+                                                              :], \
+                                                          mask[idx_train], \
+                                                          session[idx_train]
+    return test_inpt, test_y, test_mask, this_test_session, train_inpt, \
+           train_y, train_mask, this_train_session
+"""
+
+
+def get_train_test_dta(inpt, y, mask, session, session_fold_lookup_table,
+                       fold):
+    '''
+    Split inpt, y, mask, session arrays into train and test arrays
+    :param inpt:
+    :param y:
+    :param mask:
+    :param session:
+    :param session_fold_lookup_table:
+    :param fold:
+    :return:
+    '''
+    idx_test = np.where(session_fold_lookup_table == fold)
+    idx_train = np.where(session_fold_lookup_table != fold)
     test_inpt, test_y, test_mask, this_test_session = inpt[idx_test, :], y[
                                                                          idx_test,
                                                                          :], \
@@ -187,7 +217,9 @@ def calculate_baseline_test_ll(train_y, test_y, C):
     _, test_class_totals = np.unique(test_y, return_counts=True)
     ll0 = 0
     for c in range(C):
-        ll0 += test_class_totals[c] * np.log(train_class_probs[c])
+        # Ines added to make sure it works when there are only choices of one type
+        if len(test_class_totals) == c + 1:
+            ll0 += test_class_totals[c] * np.log(train_class_probs[c])
     return ll0
 
 
@@ -265,7 +297,8 @@ def calculate_glm_hmm_test_loglikelihood(glm_hmm_dir, test_datas, test_inputs,
     same for top initializations
     :return:
     """
-    this_file_name = glm_hmm_dir + '/iter_*/glm_hmm_raw_parameters_*.npz'
+    this_file_name = glm_hmm_dir + '/iter_*/glm_hmm_raw_parameters_*.npz'  # This seems wrong (Ines)
+    this_file_name = glm_hmm_dir + 'glm_hmm_raw_parameters_itr_*.npz' # Changed into the correct file name
     raw_files = glob.glob(this_file_name, recursive=True)
     train_ll_vals_across_iters = []
     test_ll_vals_across_iters = []
@@ -300,6 +333,7 @@ def calculate_glm_hmm_test_loglikelihood(glm_hmm_dir, test_datas, test_inputs,
            file_ordering_by_train
 
 
+"""
 def return_glmhmm_nll(inpt, y, session, session_fold_lookup_table, fold, K, D,
                       C, results_dir_glm_hmm):
     '''
@@ -364,6 +398,80 @@ def return_glmhmm_nll(inpt, y, session, session_fold_lookup_table, fold, K, D,
     return cvbt_thismodel_thisfold, train_cvbt_thismodel_thisfold, \
            ll_glm_hmm_this_K, \
            train_ll_vals_across_iters[0], init_ordering_by_train
+"""
+
+
+def return_glmhmm_nll(inpt, y, session, session_fold_lookup_table, fold, K, D,
+                      C, results_dir_glm_hmm):
+    '''
+    For a given fold, return NLL for both train and test datasets for
+    GLM-HMM model with K, D, C.  Requires reading in best
+    parameters over all initializations for GLM-HMM (hence why
+    results_dir_glm_hmm is required as an input)
+    :param inpt:
+    :param y:
+    :param session:
+    :param session_fold_lookup_table:
+    :param fold:
+    :param K:
+    :param D:
+    :param C:
+    :param results_dir_glm_hmm:
+    :return:
+    '''
+    test_inpt, test_y, test_nonviolation_mask, this_test_session, \
+    train_inpt, train_y, train_nonviolation_mask, this_train_session, M, \
+    n_test, n_train = prepare_data_for_cv(
+        inpt, y, session, session_fold_lookup_table, fold)
+    # Ines changed
+    ll0 = calculate_baseline_test_ll(
+            train_y[0, train_nonviolation_mask == 1],
+            test_y[0, test_nonviolation_mask == 1], C)
+    ll0_train = calculate_baseline_test_ll(
+            train_y[0, train_nonviolation_mask == 1],
+            train_y[0, train_nonviolation_mask == 1], C)
+    
+    # For GLM-HMM set values of y for violations to 1.  This value doesn't
+    # matter (as mask will ensure that these y values do not contribute to
+    # loglikelihood calculation
+    #test_y[test_nonviolation_mask == 0, :] = 1
+    #train_y[train_nonviolation_mask == 0, :] = 1
+    # Ines changed into
+    test_y[0, test_nonviolation_mask == 0] = 1
+    train_y[0, train_nonviolation_mask == 0] = 1
+    # For GLM-HMM, need to partition data by session (bins for Ines)
+    test_inputs, test_datas, test_nonviolation_masks = \
+        partition_data_by_session(
+            test_inpt, test_y,
+            np.expand_dims(test_nonviolation_mask, axis=1),
+            this_test_session)
+    train_inputs, train_datas, train_nonviolation_masks = \
+        partition_data_by_session(
+            train_inpt, train_y,
+            np.expand_dims(train_nonviolation_mask, axis=1),
+            this_train_session)
+    dir_to_check = results_dir_glm_hmm + '/'
+
+    test_ll_vals_across_iters, init_ordering_by_train, \
+    file_ordering_by_train = calculate_glm_hmm_test_loglikelihood(
+        dir_to_check, test_datas, test_inputs, test_nonviolation_masks, K, D,
+        M, C)
+    train_ll_vals_across_iters, _, _ = calculate_glm_hmm_test_loglikelihood(
+        dir_to_check, train_datas, train_inputs, train_nonviolation_masks, K,
+        D, M, C)
+
+    test_ll_vals_across_iters = test_ll_vals_across_iters[
+        file_ordering_by_train]
+    train_ll_vals_across_iters = train_ll_vals_across_iters[
+        file_ordering_by_train]
+    ll_glm_hmm_this_K = test_ll_vals_across_iters[0]
+    cvbt_thismodel_thisfold = calculate_cv_bit_trial(ll_glm_hmm_this_K, ll0,
+                                                     n_test)
+    train_cvbt_thismodel_thisfold = calculate_cv_bit_trial(
+        train_ll_vals_across_iters[0], ll0_train, n_train)
+    return cvbt_thismodel_thisfold, train_cvbt_thismodel_thisfold, \
+           ll_glm_hmm_this_K, \
+           train_ll_vals_across_iters[0], init_ordering_by_train
 
 
 def calculate_cv_bit_trial(ll_model, ll_0, n_trials):
@@ -393,6 +501,7 @@ def create_cv_frame_for_plotting(cv_file):
     return data_for_plotting_df, loc_best, best_val, glm_lapse_model
 
 
+"""
 def get_file_name_for_best_model_fold(cvbt_folds_model, K, overall_dir,
                                       best_init_cvbt_dict):
     '''
@@ -416,6 +525,32 @@ def get_file_name_for_best_model_fold(cvbt_folds_model, K, overall_dir,
     best_iter = best_init_cvbt_dict[key_for_dict]
     raw_file = base_path + '/iter_' + str(
         best_iter) + '/glm_hmm_raw_parameters_itr_' + str(best_iter) + '.npz'
+    return raw_file
+"""
+
+
+def get_file_name_for_best_model_fold(cvbt_folds_model, K, overall_dir,
+                                      best_init_cvbt_dict):
+    '''
+    Get the file name for the best initialization for the K value specified
+    :param cvbt_folds_model:
+    :param K:
+    :param models:
+    :param overall_dir:
+    :param best_init_cvbt_dict:
+    :return:
+    '''
+    # Identify best fold for best model:
+    # loc_best = K - 1
+    loc_best = 0
+    best_fold = np.where(cvbt_folds_model[loc_best, :] == max(cvbt_folds_model[
+                                                              loc_best, :]))[
+        0][0]
+    base_path = overall_dir + '/fold_' + str(
+        best_fold)
+    key_for_dict = '/GLM_HMM_K_' + str(K) + '/fold_' + str(best_fold)
+    best_iter = best_init_cvbt_dict[key_for_dict]
+    raw_file = base_path + '/glm_hmm_raw_parameters_itr_' + str(best_iter) + '.npz'
     return raw_file
 
 
