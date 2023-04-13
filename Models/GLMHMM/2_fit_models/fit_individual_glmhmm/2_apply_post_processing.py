@@ -105,6 +105,7 @@ if __name__ == '__main__':
                             fold)
                         best_init_cvbt_dict[key_for_dict] = int(
                             init_ordering_by_train[0])
+
         # Save best initialization directories across animals,
         # folds and models (only GLM-HMM):
         print(cvbt_folds_model)
