@@ -10,11 +10,15 @@ import numpy as np
 import datetime
 import pickle 
 import os
+import uuid
+from pathlib import Path
 
 from brainbox.task.trials import find_trial_ids
 from brainbox.behavior.training import get_sessions, get_training_status
 
 from one.api import ONE
+from one.alf.files import add_uuid_string
+from one.remote import aws
 # one = ONE(base_url='https://openalyx.internationalbrainlab.org')  # public database
 one = ONE(base_url='https://alyx.internationalbrainlab.org')
 
@@ -23,8 +27,150 @@ one = ONE(base_url='https://alyx.internationalbrainlab.org')
 GET TRIALS INFO INTO ONE TABLE
 """
 
+# Function written by Julia 
+def download_subjectTables(one, subject=None, trials=True, training=True,
+                           target_path=None, tag=None, overwrite=False, check_updates=True):
+    """
+    Function to download the aggregated clusters information associated with the given data release tag from AWS.
+    Parameters
+    ----------
+    one: one.api.ONE
+        Instance to be used to connect to database.
+    trials: bool
+        Whether to download the subjectTrials.table.pqt, default is True
+    training: bool
+        Whether to donwnload the subjectTraining.table.pqt, defaults is True
+    subject: str, uuid or None
+        Nickname or UUID of the subject to download all trials from. If None, download all available trials tables
+        (associated with 'tag' if one is given)
+    target_path: str or pathlib.Path
+        Directory to which files should be downloaded. If None, downloads to one.cache_dir/aggregates
+    tag: str
+        Data release tag to download _ibl_subjectTrials.table datasets from. Default is None.
+    overwrite : bool
+        If True, will re-download files even if file exists locally and file sizes match.
+    check_updates : bool
+        If True, will check if file sizes match and skip download if they do. If False, will just return the paths
+        and not check if the data was updated on AWS.
+    Returns
+    -------
+    trials_tables: list of pathlib.Path
+        Paths to the downloaded subjectTrials files
+    training_tables: list of pathlib.Path
+        Paths to the downloaded subjectTraining files
+    """
+
+    if target_path is None:
+        target_path = Path(one.cache_dir).joinpath('aggregates')
+        target_path.mkdir(exist_ok=True)
+    else:
+        assert target_path.exists(), 'The target_path you passed does not exist.'
+
+    # Get the datasets
+    trials_ds = []
+    training_ds = []
+    if subject:
+        try:
+            subject_id = uuid.UUID(subject)
+        except ValueError:
+            subject_id = one.alyx.rest('subjects', 'list', nickname=subject)[0]['id']
+        if trials:
+            trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt',
+                                           django=f'object_id,{subject_id}'))
+        if training:
+            training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt',
+                                             django=f'object_id,{subject_id}'))
+    else:
+        if tag:
+            if trials:
+                trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt', tag=tag))
+            if training:
+                training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt', tag=tag))
+        else:
+            if trials:
+                trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt'))
+            if training:
+                training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt'))
+
+    # Set up the bucket
+    s3, bucket_name = aws.get_s3_from_alyx(alyx=one.alyx)
+
+    all_out = []
+    for ds_list in [trials_ds, training_ds]:
+        out_paths = []
+        for ds in ds_list:
+            relative_path = add_uuid_string(ds['file_records'][0]['relative_path'], ds['url'][-36:])
+            src_path = 'aggregates/' + str(relative_path)
+            dst_path = target_path.joinpath(relative_path)
+            if check_updates:
+                out = aws.s3_download_file(src_path, dst_path, s3=s3, bucket_name=bucket_name, overwrite=overwrite)
+            else:
+                out = dst_path
+
+            if out and out.exists():
+                out_paths.append(out)
+            else:
+                print(f'Downloading of {src_path} table failed.')
+        all_out.append(out_paths)
+
+    return all_out[0], all_out[1]
+
+
+def query_subjects_interest(protocol='training', ibl_project='ibl_neuropixel_brainwide_01'):
+    
+    # Function to query subjects of interest based on task protocol and project
+    """ Download session data """
+    # Search sessions of interest
+    sessions = one.search(task_protocol=protocol, project=ibl_project, details=True)
+    session_details = sessions[1]
+
+    """ List animals of interest"""
+    subjects_interest = []
+    for s, ses in enumerate(session_details):
+        nickname = session_details[s]['subject']
+        subjects_interest = np.append(subjects_interest, nickname)
+
+    subjects_interest = np.unique(subjects_interest)
+    return subjects_interest
+
+
+def subjects_interest_data(subjects_interest):
+
+    all_data = pd.DataFrame()
+    # Loop through subjects and get data and training status for each
+    for s, subject in enumerate(subjects_interest):
+
+        subject_trials, subject_training = download_subjectTables(one, subject=subject, trials=True, training=True,
+                            target_path=None, tag=None, overwrite=False, check_updates=True)
+
+        dsets = [subject_trials[0], subject_training[0]]
+        files = [one.cache_dir.joinpath(x) for x in dsets]
+        trials, training = [pd.read_parquet(file) for file in files]
+
+        # Check if animal ever got trained
+        if 'trained 1a' in training['training_status'].unique():
+            training_date = list(training.loc[training['training_status']=='trained 1a'].reset_index()['date'])[0]
+        elif 'trained 1b' in training['training_status'].unique():
+            training_date = list(training.loc[training['training_status']=='trained 1b'].reset_index()['date'])[0]
+        else:
+            training_date = []
+
+        # Training data
+        if len(training_date) > 0:
+            subject_data = trials.loc[trials['session_start_time'] <= pd.to_datetime(training_date)]
+
+            # Save to main dataframe
+            if len(all_data) == 0:
+                all_data = subject_data
+            else:
+                all_data = all_data.append(subject_data)
+
+    return all_data
+
+    
 def get_trials(training_protocol='training', mouse_project='ibl_neuropixel_brainwide_01'):
 
+    # GETS DATA PER SESSION
     """ Download session data """
     # Search sessions of interest
     sessions = one.search(task_protocol=training_protocol, project=mouse_project, details=True)
