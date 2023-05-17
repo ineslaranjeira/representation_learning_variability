@@ -134,7 +134,10 @@ def query_subjects_interest(protocol='training', ibl_project='ibl_neuropixel_bra
     return subjects_interest
 
 
-def subjects_interest_data(subjects_interest):
+def subjects_interest_data(subjects_interest, phase):
+    
+    # Parameters
+    # phase can be 'learning' or 'profficient'
 
     all_data = pd.DataFrame()
     # Loop through subjects and get data and training status for each
@@ -143,27 +146,39 @@ def subjects_interest_data(subjects_interest):
         subject_trials, subject_training = download_subjectTables(one, subject=subject, trials=True, training=True,
                             target_path=None, tag=None, overwrite=False, check_updates=True)
 
-        dsets = [subject_trials[0], subject_training[0]]
-        files = [one.cache_dir.joinpath(x) for x in dsets]
-        trials, training = [pd.read_parquet(file) for file in files]
-
-        # Check if animal ever got trained
-        if 'trained 1a' in training['training_status'].unique():
-            training_date = list(training.loc[training['training_status']=='trained 1a'].reset_index()['date'])[0]
-        elif 'trained 1b' in training['training_status'].unique():
-            training_date = list(training.loc[training['training_status']=='trained 1b'].reset_index()['date'])[0]
-        else:
-            training_date = []
-
-        # Training data
-        if len(training_date) > 0:
-            subject_data = trials.loc[trials['session_start_time'] <= pd.to_datetime(training_date)]
-
-            # Save to main dataframe
-            if len(all_data) == 0:
-                all_data = subject_data
+        # Check if there is data for this mouse
+        if len(subject_trials) > 0:
+            dsets = [subject_trials[0], subject_training[0]]
+            files = [one.cache_dir.joinpath(x) for x in dsets]
+            trials, training = [pd.read_parquet(file) for file in files]
+            trials['subject_nickname'] = subject
+            
+            # Check if animal ever got trained
+            if 'trained 1a' in training['training_status'].unique():
+                training_date = list(training.loc[training['training_status']=='trained 1a'].reset_index()['date'])[0]
+            elif 'trained 1b' in training['training_status'].unique():
+                training_date = list(training.loc[training['training_status']=='trained 1b'].reset_index()['date'])[0]
             else:
-                all_data = all_data.append(subject_data)
+                training_date = []
+
+            # If animal got trained, include
+            if len(training_date) > 0:
+                # Check phase of interest
+                if phase == 'learning':
+                    # If learning keep all sessions until trained
+                    subject_data = trials.loc[trials['session_start_time'] <= pd.to_datetime(training_date)]
+                if phase == 'profficient':
+                    # If profficient keep all sessions after trained
+                    subject_data = trials.loc[trials['session_start_time'] > pd.to_datetime(training_date)]
+                # TODO: might want to expand this for other protocols to get e.g. to get neural data
+
+                # Save to main dataframe
+                if len(all_data) == 0:
+                    all_data = subject_data
+                else:
+                    all_data = all_data.append(subject_data)
+        else:
+            print(subject)
 
     return all_data
 
