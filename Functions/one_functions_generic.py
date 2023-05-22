@@ -167,9 +167,16 @@ def subjects_interest_data(subjects_interest, phase):
                 if phase == 'learning':
                     # If learning keep all sessions until trained
                     subject_data = trials.loc[trials['session_start_time'] <= pd.to_datetime(training_date)]
-                if phase == 'profficient':
-                    # If profficient keep all sessions after trained
-                    subject_data = trials.loc[trials['session_start_time'] > pd.to_datetime(training_date)]
+                if phase == 'proficient':
+                    # If proficient, take the date of trained_1b:
+                    # Check if animal ever got trained
+                    if 'trained 1b' in training['training_status'].unique():
+                        training_1b = list(training.loc[training['training_status']=='trained 1b'].reset_index()['date'])[0]
+                    else:
+                        training_1b = []
+                    # If profficient keep all biased sessions after 1b
+                    subject_data = trials.loc[(trials['session_start_time'] > pd.to_datetime(training_1b)) 
+                                              & (trials['task_protocol'].apply(lambda x: x[14:18])=='bias')]
                 # TODO: might want to expand this for other protocols to get e.g. to get neural data
 
                 # Save to main dataframe
