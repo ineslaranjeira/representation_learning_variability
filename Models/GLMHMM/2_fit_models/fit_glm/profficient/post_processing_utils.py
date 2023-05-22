@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import ssm
 
-sys.path.insert(0, '../fit_glm/')
-sys.path.insert(0, '../fit_lapse_model/')
+sys.path.insert(0, '../../fit_glm/')
+sys.path.insert(0, '../../fit_lapse_model/')
 from GLM import glm
 from LapseModel import lapse_model
 
@@ -96,7 +96,7 @@ def partition_data_by_session(inpt, y, mask, session):
     return inputs, datas, masks
 
 
-    """
+    
 def get_train_test_dta(inpt, y, mask, session, session_fold_lookup_table,
                        fold):
     '''
@@ -127,36 +127,7 @@ def get_train_test_dta(inpt, y, mask, session, session_fold_lookup_table,
                                                           session[idx_train]
     return test_inpt, test_y, test_mask, this_test_session, train_inpt, \
            train_y, train_mask, this_train_session
-    """
     
-    
-def get_train_test_dta(inpt, y, mask, session, session_fold_lookup_table,
-                       fold):
-    '''
-    Split inpt, y, mask, session arrays into train and test arrays
-    :param inpt:
-    :param y:
-    :param mask:
-    :param session:
-    :param session_fold_lookup_table:
-    :param fold:
-    :return:
-    '''
-    idx_test = np.where(session_fold_lookup_table == fold)
-    idx_train = np.where(session_fold_lookup_table != fold)
-    test_inpt, test_y, test_mask, this_test_session = inpt[idx_test, :], y[
-                                                                         idx_test,
-                                                                         :], \
-                                                      mask[idx_test], session[
-                                                          idx_test]
-    train_inpt, train_y, train_mask, this_train_session = inpt[idx_train,
-                                                          :], y[idx_train,
-                                                              :], \
-                                                          mask[idx_train], \
-                                                          session[idx_train]
-    return test_inpt, test_y, test_mask, this_test_session, train_inpt, \
-           train_y, train_mask, this_train_session
-
 
 def create_violation_mask(violation_idx, T):
     """

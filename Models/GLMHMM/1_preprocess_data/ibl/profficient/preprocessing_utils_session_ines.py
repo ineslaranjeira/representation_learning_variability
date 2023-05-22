@@ -39,56 +39,20 @@ def get_raw_data(eid, data_dir):
            bias_probs
 """
 
-"""  
-def get_raw_data(eid, trials_df):
-    print(eid)
-    # get session id:
-    raw_session_id = eid.split('Subjects/')[1]
-    # Get animal:
-    animal = raw_session_id.split('/')[0]
-    # replace '/' with dash in session ID
-    session_id = raw_session_id.replace('/', '-')
-    # Get session info
-    session_no = raw_session_id[-1:]
-    date = raw_session_id[-14:-4]
-    
-    # Get data
-    choice = np.array(trials_df.loc[(trials_df['session_date']==date) &
-                            (trials_df['subject_nickname']==animal) &
-                            (trials_df['session_number']==int(session_no)),'choice'])
-    stim_left = np.array(trials_df.loc[(trials_df['session_date']==date) &
-                            (trials_df['subject_nickname']==animal) &
-                            (trials_df['session_number']==int(session_no)),'contrastLeft'])
-    stim_right = np.array(trials_df.loc[(trials_df['session_date']==date) &
-                            (trials_df['subject_nickname']==animal) &
-                            (trials_df['session_number']==int(session_no)),'contrastRight'])
-    rewarded = np.array(trials_df.loc[(trials_df['session_date']==date) &
-                            (trials_df['subject_nickname']==animal) &
-                            (trials_df['session_number']==int(session_no)),'feedbackType'])
-    bias_probs = np.array(trials_df.loc[(trials_df['session_date']==date) &
-                            (trials_df['subject_nickname']==animal) &
-                            (trials_df['session_number']==int(session_no)),'probabilityLeft'])
-    return animal, session_id, stim_left, stim_right, rewarded, choice, \
-           bias_probs
-"""
 
-def get_raw_data(animal, bin, trials_df):
-    print(animal, bin)
+def get_raw_data(animal, trials_df):
+    #print(animal)
 
     # Get data
-    choice = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==float(bin+1)),'choice'])
+    choice = np.array(trials_df.loc[trials_df['subject_nickname']==animal,'choice'])
     #choice = np.array(remap_choice_vals(choice))
-    stim_left = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==float(bin+1)),'contrastLeft'])
-    stim_right = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==float(bin+1)),'contrastRight'])
-    rewarded = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==float(bin+1)),'feedbackType'])
-    bias_probs = np.array(trials_df.loc[(trials_df['subject_nickname']==animal) &
-                            (trials_df['bin_frac']==float(bin+1)),'probabilityLeft'])
+    stim_left = np.array(trials_df.loc[trials_df['subject_nickname']==animal,'contrastLeft'])
+    stim_right = np.array(trials_df.loc[trials_df['subject_nickname']==animal,'contrastRight'])
+    rewarded = np.array(trials_df.loc[trials_df['subject_nickname']==animal,'feedbackType'])
+    bias_probs = np.array(trials_df.loc[trials_df['subject_nickname']==animal,'probabilityLeft'])
+    session_id = np.unique(trials_df.loc[trials_df['subject_nickname']==animal,'session'])[0]
     
-    return animal, stim_left, stim_right, rewarded, choice, \
+    return animal, session_id, stim_left, stim_right, rewarded, choice, \
            bias_probs
 
 
@@ -226,15 +190,15 @@ def get_all_unnormalized_data_this_session(eid, trials_df):
     return animal, unnormalized_inpt, y, session, num_viols_50, rewarded
 """
 
-def get_all_unnormalized_data_this_session(animal, bin, trials_df):
+def get_all_unnormalized_data_this_session(animal, trials_df):
     # Load raw data
-    animal, stim_left, stim_right, rewarded, choice, bias_probs \
-        = get_raw_data(animal, bin, trials_df)
+    animal, session_id, stim_left, stim_right, rewarded, choice, bias_probs \
+        = get_raw_data(animal, trials_df)
     # Subset choice and design_mat to 50-50 entries:
     trials_to_study = np.where(bias_probs == 0.5)[0]
     trials_to_study = np.where(bias_probs <=1)[0]  # redundant code, but makes sure all trials are used
     num_viols_50 = len(np.where(choice[trials_to_study] == 0)[0])  # viols are omissions
-    if num_viols_50 < 100:
+    if num_viols_50 < 10:
         # Create design mat = matrix of size T x 3, with entries for
         # stim/past choice/wsls
         unnormalized_inpt = create_design_mat(choice[trials_to_study],
@@ -242,14 +206,14 @@ def get_all_unnormalized_data_this_session(animal, bin, trials_df):
                                               stim_right[trials_to_study],
                                               rewarded[trials_to_study])
         y = np.expand_dims(remap_choice_vals(choice[trials_to_study]), axis=1)
-        bin_array = [bin for i in range(y.shape[0])]
+        session = [session_id for i in range(y.shape[0])]
         rewarded = np.expand_dims(rewarded[trials_to_study], axis=1)
     else:
         unnormalized_inpt = np.zeros((90, 3))
         y = np.zeros((90, 1))
-        bin_array = []
+        session = []
         rewarded = np.zeros((90, 1))
-    return animal, unnormalized_inpt, y, bin_array, num_viols_50, rewarded
+    return animal, unnormalized_inpt, y, session, num_viols_50, rewarded
 
 
 def load_animal_list(file):
@@ -274,7 +238,7 @@ def load_data(animal_file):
     session = data[2]
     return inpt, y, session
 
-"""
+
 def create_train_test_sessions(session, num_folds=5):
     # create a session-fold lookup table
     num_sessions = len(np.unique(session))
@@ -306,35 +270,4 @@ def create_train_test_sessions(animal_bin, num_folds=5):
     shuffled_folds = shuffled_folds[:bin_len]
     
     return shuffled_folds
-
-
-# Ines - specific
-def bin_frac(trials, bin_num):
-
-    subjects = trials.subject_nickname.unique()
-
-    # Create new empty dataframe
-    new_df = pd.DataFrame()
-
-    # Loop through subjects
-    for s, subject in enumerate(subjects):
-        # Get subject data
-        subject_data = trials.loc[trials['subject_nickname']==subject]
-        mouse_training_day = int(subject_data['training_time'].unique()[0]) + 1
-        subject_data = subject_data.loc[subject_data['training_day']<mouse_training_day]
-        subject_data = subject_data.sort_values(by=['training_day', 'trial_id'])
-        # Caltulate bin specifics
-        total_trials = len(subject_data)
-        bin_size = int(np.round(total_trials / bin_num))
-        bin_index = np.array([])
-        # Design bin number array
-        for n in range(bin_num):
-            this_bin_index = np.ones(bin_size) * (n+1)
-            bin_index = np.concatenate((bin_index, this_bin_index), axis=None)
-        # Add buffer to the end in case array is shorter than dataframe
-        bin_index = np.concatenate((bin_index, np.ones(bin_size) * 15), axis=None)
-        subject_data['bin_frac'] = bin_index[0:len(subject_data)]
-        # Append subject data to big dataframe
-        new_df = new_df.append(subject_data)
-        
-    return new_df
+"""

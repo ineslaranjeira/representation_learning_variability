@@ -8,7 +8,7 @@ D = 1  # data (observations) dimension
 C = 2  # number of output types/categories
 N_em_iters = 300  # number of EM iterations
 
-USE_CLUSTER = False
+USE_CLUSTER = True
 
 if __name__ == '__main__':
     data_dir = '../../data/ibl/data_for_cluster/'

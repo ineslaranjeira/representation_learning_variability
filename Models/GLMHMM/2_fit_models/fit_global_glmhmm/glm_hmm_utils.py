@@ -78,7 +78,6 @@ def load_animal_list(file):
     return animal_list
 
 
-"""
 def launch_glm_hmm_job(inpt, y, session, mask, session_fold_lookup_table, K, D,
                        C, N_em_iters, transition_alpha, prior_sigma, fold,
                        iter, global_fit, init_param_file, save_directory):
@@ -97,54 +96,6 @@ def launch_glm_hmm_job(inpt, y, session, mask, session_fold_lookup_table, K, D,
     this_y[np.where(this_y == -1), :] = 1
     inputs, datas, masks = partition_data_by_session(
         this_inpt, this_y, this_mask, this_session)
-    # Read in GLM fit if global_fit = True:
-    if global_fit == True:
-        _, params_for_initialization = load_glm_vectors(init_param_file)
-    else:
-        params_for_initialization = load_global_params(init_param_file)
-    M = this_inpt.shape[1]
-    npr.seed(iter)
-    fit_glm_hmm(datas,
-                inputs,
-                masks,
-                K,
-                D,
-                M,
-                C,
-                N_em_iters,
-                transition_alpha,
-                prior_sigma,
-                global_fit,
-                params_for_initialization,
-                save_title=save_directory + 'glm_hmm_raw_parameters_itr_' +
-                           str(iter) + '.npz')
-"""
-
-def launch_glm_hmm_job(inpt, y, bin_data, mask, bin_fold_lookup_table, K, D,
-                       C, N_em_iters, transition_alpha, prior_sigma, fold,
-                       iter, global_fit, init_param_file, save_directory):
-    print("Starting inference with K = " + str(K) + "; Fold = " + str(fold) +
-          "; Iter = " + str(iter))
-    sys.stdout.flush()
-    # Subset to trials of interest for fold
-    trials_idx = np.arange(len(y))
-    keep_fold = trials_idx[
-        np.where(bin_fold_lookup_table != fold)]  # TODO: what is y == -1?
-    keep_y = [y[id, 0] != -1
-        for id, binn in enumerate(trials_idx)]
-    keep_y = trials_idx[keep_y]
-    idx_to_keep = np.sort(np.intersect1d(keep_y, keep_fold))
-    idx_this_fold = trials_idx[idx_to_keep]
-    
-    this_inpt, this_y, this_bin, this_mask = inpt[idx_this_fold, :], \
-                                        y[idx_this_fold, :], \
-                                        bin_data[idx_this_fold], \
-                                            mask[idx_this_fold]
-    # Only do this so that errors are avoided - these y values will not
-    # actually be used for anything (due to violation mask)
-    this_y[np.where(this_y == -1), :] = 1
-    inputs, datas, masks = partition_data_by_session(
-        this_inpt, this_y, this_mask, this_bin)
     # Read in GLM fit if global_fit = True:
     if global_fit == True:
         _, params_for_initialization = load_glm_vectors(init_param_file)
