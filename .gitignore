@@ -7,3 +7,7 @@ DATA/
 
 *.json
 *.pdf
+
+Video/subject_intersection
+
+Video/good_naive_sessions
