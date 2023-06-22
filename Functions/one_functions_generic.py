@@ -134,7 +134,7 @@ def query_subjects_interest(protocol='training', ibl_project='ibl_neuropixel_bra
     return subjects_interest
 
 
-def subjects_interest_data(subjects_interest, phase):
+def subjects_interest_data(subjects_interest, phase, protocol):
     
     # Parameters
     # phase can be 'learning' or 'profficient'
@@ -147,7 +147,7 @@ def subjects_interest_data(subjects_interest, phase):
                             target_path=None, tag=None, overwrite=False, check_updates=True)
 
         # Check if there is data for this mouse
-        if len(subject_trials) > 0:
+        if (len(subject_trials) > 0) & (len(subject_training) > 0):
             dsets = [subject_trials[0], subject_training[0]]
             files = [one.cache_dir.joinpath(x) for x in dsets]
             trials, training = [pd.read_parquet(file) for file in files]
@@ -174,10 +174,19 @@ def subjects_interest_data(subjects_interest, phase):
                         training_1b = list(training.loc[training['training_status']=='trained 1b'].reset_index()['date'])[0]
                     else:
                         training_1b = []
-                    # If profficient keep all biased sessions after 1b
-                    subject_data = trials.loc[(trials['session_start_time'] > pd.to_datetime(training_1b)) 
-                                              & (trials['task_protocol'].apply(lambda x: x[14:18])=='bias')]
-                # TODO: might want to expand this for other protocols to get e.g. to get neural data
+                        
+                    # Select protocol
+                    if protocol == 'biased':
+                        # If profficient keep all biased sessions after 1b
+                        subject_data = trials.loc[(trials['session_start_time'] > pd.to_datetime(training_1b)) 
+                                                & (trials['task_protocol'].apply(lambda x: x[14:18])=='bias')]
+                    elif protocol == 'ephys':
+                        # If profficient keep all biased sessions after 1b
+                        subject_data = trials.loc[(trials['session_start_time'] > pd.to_datetime(training_1b)) 
+                                                & (trials['task_protocol'].apply(lambda x: x[14:18])=='ephy')]
+                    else:
+                        print('Protocol not contemplated yet')
+                        
 
                 # Save to main dataframe
                 if len(all_data) == 0:
