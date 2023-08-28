@@ -546,14 +546,71 @@ def bin_frac(trials, bin_num):
     return new_df
 
 
-# TODO
+"""
+STACK TIME SERIES DATA FOR psth
+"""
+def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_baseline):
+    
+    # subtract_baseline can be True, False, or pupil
+    
+    series_df = pd.DataFrame({'time':time, 'position':position})
+    onset_times = trials[event]
 
-def wheel(trials):
+    # Start a matrix with #trials x # wheel bins
+    time_step = np.median(np.diff(time))
+    interval_length = int((t_end+t_init)/time_step + .25 * 
+                          (t_end+t_init)/time_step) # This serves as an estimation for size of data
+    series_stack = np.zeros((len(onset_times), interval_length)) * np.nan
 
-    return wheel_df
+    # Loop through trials
+    for t, trial_onset in enumerate(onset_times):
+        if np.isnan(trial_onset) == False:
+            if len(series_df.loc[series_df['time'] > trial_onset, 'time']) > 0:
+                trial_onset_index = series_df.loc[series_df['time'] > trial_onset, 
+                                                  'time'].reset_index()['index'][0]
+                # Get time from first trial (only once to avoid the last trial)
+                if t == 1:
+                    onset_time = series_df['time'][trial_onset_index]
+                    time_window = series_df.loc[(series_df['time']> trial_onset-t_init) & 
+                                                (series_df['time'] <= trial_onset+t_end), 'time'] - onset_time
+                
+                # Subtract baseline if requested
+                if subtract_baseline == True:
+                    onset_position = series_df['position'][trial_onset_index]
+                    # Populate dataframe with useful trial-aligned information
+                    window_values = series_df.loc[(series_df['time']> trial_onset-t_init) & 
+                                                (series_df['time'] <= trial_onset+t_end), 
+                                                'position'] - onset_position 
+                elif subtract_baseline == False:
+                    window_values = series_df.loc[(series_df['time']> trial_onset-t_init) & 
+                                                  (series_df['time'] <= trial_onset+t_end), 'position']
+                    
+                elif subtract_baseline == 'pupil':
+                    max_pupil = np.max(series_df['position'])
+                    min_pupil = np.min(series_df['position'])
+                    series_df['norm_position'] = (series_df['position']) * 100 / (max_pupil - min_pupil)  #  (series_df['position'] - min_pupil) * 100 / (max_pupil - min_pupil)
+                    baseline = np.mean(series_df.loc[(series_df['time'] > trial_onset-t_init) & 
+                                                     (series_df['time'] < trial_onset), 'norm_position'])
+                    window_values = series_df.loc[(series_df['time']> trial_onset-t_init) & 
+                                                (series_df['time'] <= trial_onset+t_end), 
+                                                'norm_position'] - baseline 
 
+                series_stack[t, :len(window_values)] = window_values
+                
+    # Build data frame with extra info
+    preprocessed_trials = prepro(trials)
+    df_stack = pd.DataFrame(series_stack[:, :len(window_values)])
+    df_stack['correct'] = preprocessed_trials['correct']
+    df_stack['feedback'] = preprocessed_trials['feedbackType']
+    df_stack['choice'] = preprocessed_trials['choice']
+    df_stack['contrast'] = preprocessed_trials['contrast']
+    
+    df_melted = pd.melt(df_stack, id_vars=['feedback', 'choice', 'contrast', 
+                                           'correct'], value_vars=np.array(df_stack.keys()[1:-4]))
+    
+    # Rename variable to reflect event-aligned time
+    df_melted['variable'] = df_melted['variable'].replace(np.arange(1, int(np.max(df_melted['variable'])+1)), 
+                                                          np.array(list(time_window)[:int(np.max(df_melted['variable']))]))
 
-def learning_onset(trials):
-
-    return learning_onset
+    return df_melted
 
