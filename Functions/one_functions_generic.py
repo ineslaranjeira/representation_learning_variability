@@ -600,13 +600,15 @@ def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_basel
     # Build data frame with extra info
     preprocessed_trials = prepro(trials)
     df_stack = pd.DataFrame(series_stack[:, :len(window_values)])
-    df_stack['correct'] = preprocessed_trials['correct']
     df_stack['feedback'] = preprocessed_trials['feedbackType']
     df_stack['choice'] = preprocessed_trials['choice']
     df_stack['contrast'] = preprocessed_trials['contrast']
-    
+    df_stack['response_time'] = preprocessed_trials['response_times'] - preprocessed_trials['stimOn_times']
+    df_stack['feedback_time'] = preprocessed_trials['feedback_times'] - preprocessed_trials['stimOn_times']
+
     df_melted = pd.melt(df_stack, id_vars=['feedback', 'choice', 'contrast', 
-                                           'correct'], value_vars=np.array(df_stack.keys()[1:-4]))
+                                           'response_time', 'feedback_time'], 
+                        value_vars=np.array(df_stack.keys()[1:-5]))
     
     # Rename variable to reflect event-aligned time
     df_melted['variable'] = df_melted['variable'].replace(np.arange(1, int(np.max(df_melted['variable'])+1)), 
