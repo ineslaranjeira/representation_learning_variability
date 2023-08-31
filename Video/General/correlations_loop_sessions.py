@@ -15,7 +15,7 @@ from scipy import stats
 
 # Get my functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+#functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 
 os.chdir(functions_path)
 from one_functions_generic import query_subjects_interest, subjects_interest_data, prepro, timeseries_PSTH
@@ -27,7 +27,7 @@ one = ONE()
 
 # Choose a session with good QC
 data_path = '/home/ines/repositories/representation_learning_variability/Video/'
-data_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Video/'
+#data_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Video/'
 
 os.chdir(data_path)
 pass_qc = pickle.load(open(data_path + "good_brainwide_sessions", "rb"))
@@ -37,11 +37,12 @@ pass_qc = pickle.load(open(data_path + "good_brainwide_sessions", "rb"))
 bin_size = 0.1  # seconds
 video_type = 'left'
 save_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Exported figures/'
+save_path = '/home/ines/repositories/representation_learning_variability/Exported figures/'
 
 # %% 
 # Loop over sessions
 
-for s, session in enumerate(pass_qc):
+for s, session in enumerate(list(pass_qc)):
 
     # Trials data
     session_trials = one.load_object(session, obj='trials', namespace='ibl')
@@ -66,7 +67,7 @@ for s, session in enumerate(pass_qc):
     try: # TODO: need to solve individual issues and remove try
         # Initialize dataframe
         wheel_vel = wheel_velocity(bin_size, wheel_times, pos, session_trials)
-        pupil = pupil_diam(pupil_t, pupil_dia_smooth, session_trials, bin_size, onset_subtraction=False)
+        pupil = pupil_diam(pupil_t, pupil_dia_smooth, session_trials, bin_size, onset_subtraction=True)
         wheel_disp = wheel_displacement(wheel_times, pos, session_trials, bin_size, onset_subtraction=False)
 
         pupil = pupil.rename(columns={'pupil_final':'pupil_diameter'})
@@ -77,14 +78,10 @@ for s, session in enumerate(pass_qc):
 
         # Remove wheel disp (was used just to get onset times alignment with bins)
         data_df = all_metrics.dropna().drop_duplicates()
-
+        
         # Bin data on both axes
-        bin_edges = np.arange(0, 100, 2.5)
-        data_df['pupil_bin'] = pd.cut(data_df['pupil_diameter'], bins=bin_edges)
-
-        #data_df = data_df.groupby(['pupil_bin'])['avg_wheel_vel'].mean()
-        #data_df = data_df.reset_index(level=[0])
-
+        bin_edges = np.arange(-100, 100, 2.5)
+        data_df['pupil_bin'] = pd.cut(data_df['pupil_diameter'], bins=bin_edges, labels=bin_edges[:-1])
         data_df['avg_wheel_vel'] = np.abs(data_df['avg_wheel_vel'])
 
         # Plot per session
@@ -93,7 +90,12 @@ for s, session in enumerate(pass_qc):
         plt.ylabel('Wheel velocity')
         plt.title(session)
         plt.xticks(rotation=90)
-        
+        # Plot only where there is data
+        b = np.arange(0, len(bin_edges), 1)
+        min = b[np.where(bin_edges==np.min(data_df['pupil_bin']))][0]
+        max = b[np.where(bin_edges==np.max(data_df['pupil_bin']))][0]
+        plt.xlim([min-1, max+1])
+
         plt.tight_layout()
 
         # Save the plot as a PNG file
