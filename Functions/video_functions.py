@@ -754,6 +754,70 @@ def get_raw_and_smooth_position(eid, video_type, ephys, position_function):
     return X_center0, X_center_sm1, Y_center0, Y_center_sm1
 
 
+def get_raw_and_smooth_ME(X_center0, video_type, ephys):
+    """Params
+    position_function: get_pupil_diameter, keypoint, ..."""
+
+    # likelihood threshold
+    l_thresh = 0.9
+
+    # camera view
+    view = video_type
+
+    # threshold (in standard deviations) beyond which a point is labeled as an outlier
+    std_thresh = 5
+
+    # threshold (in seconds) above which we will not interpolate nans, but keep them
+    # (for long stretches interpolation may not be appropriate)
+    nan_thresh = 1
+
+    # compute framerate of camera
+    if view == 'left':
+        if ephys == True:
+            fr = 60  # set by hardware
+            window = 31  # works well empirically
+        else:
+            fr = 30
+            window = 31 # TODO: need to validate this
+    elif view == 'right':
+        fr = 150  # set by hardware
+        window = 75  # works well empirically
+    else:
+        raise NotImplementedError
+    
+    # Save Y vars as empty arrays
+    Y_center0 = []
+    Y_center_sm1 = []
+        
+    """ Smooth XXs """
+    # run savitzy-golay filter on non-nan timepoints to denoise
+    X_center_sm0 = smooth_interpolate_signal_sg(
+        X_center0, window=window, order=3, interp_kind='linear')
+
+    # find outliers, set to nan
+    errors = X_center0 - X_center_sm0
+    std = np.nanstd(errors)
+    X_center1 = np.copy(X_center0)
+    X_center1[(errors < (-std_thresh * std)) | (errors > (std_thresh * std))] = np.nan
+    # run savitzy-golay filter again on (possibly reduced) non-nan timepoints to denoise
+    X_center_sm1 = smooth_interpolate_signal_sg(
+        X_center1, window=window, order=3, interp_kind='linear')
+
+    # don't interpolate long strings of nans
+    t = np.diff(1 * np.isnan(X_center1))
+    begs = np.where(t == 1)[0]
+    ends = np.where(t == -1)[0]
+    if begs.shape[0] > ends.shape[0]:
+        begs = begs[:ends.shape[0]]
+    for b, e in zip(begs, ends):
+        if (e - b) > (fr * nan_thresh):
+            X_center_sm1[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
+        
+            
+    # diam_sm1 is the final smoothed pupil diameter estimate
+    return X_center0, X_center_sm1, Y_center0, Y_center_sm1
+ 
+    
 def SNR(diam0, diam_sm1):
 
     # compute signal to noise ratio between raw and smooth dia
