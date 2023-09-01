@@ -65,11 +65,16 @@ def wheel_displacement(wheel_times, wheel_positions, trials, bin_size, onset_sub
             'Wheel position': wheel_positions}
     df = pd.DataFrame(data)
 
+
     session_length = list(trials['stimOff_times'][-1:])[0]
     #session_length = len(trials['stimOff_times'])
 
+    # Trim wheel data after end of session
+    df = df.loc[df['Wheel times'] < session_length]
+    
     # Define the number of bins and create the bins
     bins = np.arange(0, np.floor(session_length), bin_size)
+    bins = pd.cut(df['Wheel times'], bins=bins, labels=False)
 
     # Create a new column with the bin number
     df['Bin'] = bins

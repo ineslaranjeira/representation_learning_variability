@@ -16,7 +16,7 @@ from scipy import signal
 
 # Get my functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+#functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 
 os.chdir(functions_path)
 from one_functions_generic import query_subjects_interest, subjects_interest_data, prepro, timeseries_PSTH
@@ -27,7 +27,7 @@ one = ONE()
 
 # Choose a session with good QC
 data_path = '/home/ines/repositories/representation_learning_variability/Video/'
-data_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Video/'
+#data_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Video/'
 
 os.chdir(data_path)
 pass_qc = pickle.load(open(data_path + "good_brainwide_sessions", "rb"))
@@ -36,7 +36,7 @@ pass_qc = pickle.load(open(data_path + "good_brainwide_sessions", "rb"))
 bin_size = 0.1  # seconds
 video_type = 'left'
 save_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Exported figures/'
-#save_path = '/home/ines/repositories/representation_learning_variability/Exported figures/'
+save_path = '/home/ines/repositories/representation_learning_variability/Exported figures/'
 
 
 # %%
