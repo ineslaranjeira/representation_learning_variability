@@ -189,3 +189,17 @@ def cont_bin(times, metric, trials, bin_size):
         df_binned = df_binned.reset_index(level=[0, 1])
 
         return df_binned
+
+
+def align_stimOn(df, trials):
+
+    # Define the bin edges array
+    trial_edges = list(trials['stimOn_times'])
+
+    onsets = pd.DataFrame({'onset_times': trial_edges,
+                          'Trial': np.arange(0, len(trial_edges), 1)})
+    
+    # Merge dataframes
+    df = df.merge(onsets, on='Trial')
+        
+    return df
