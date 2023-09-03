@@ -564,13 +564,26 @@ def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_basel
 
     # Loop through trials
     for t, trial_onset in enumerate(onset_times):
+        
+        if t < len(onset_times)-1:
+            # Get next trial
+            next_onset = onset_times[t+1]
+        else:
+            next_onset = trial_onset + t_end + 1
+        
         if np.isnan(trial_onset) == False:
             if len(series_df.loc[series_df['time'] > trial_onset, 'time']) > 0:
+                
                 trial_onset_index = series_df.loc[series_df['time'] > trial_onset, 
-                                                  'time'].reset_index()['index'][0]
+                                                    'time'].reset_index()['index'][0]
+                next_onset_index = series_df.loc[series_df['time'] > next_onset, 
+                                                    'time'].reset_index()['index'][0]
+                onset_time = series_df['time'][trial_onset_index]
+                next_onset_time = series_df['time'][next_onset_index]
+                
                 # Get time from first trial (only once to avoid the last trial)
-                if t == 1:
-                    onset_time = series_df['time'][trial_onset_index]
+                if t == 0:
+                    
                     time_window = series_df.loc[(series_df['time']> trial_onset-t_init) & 
                                                 (series_df['time'] <= trial_onset+t_end), 'time'] - onset_time
                 
@@ -595,8 +608,12 @@ def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_basel
                                                 (series_df['time'] <= trial_onset+t_end), 
                                                 'norm_position'] - baseline 
 
+                # Trim values of next trial
+                window_values = np.array(window_values)
+                time_window = np.array(time_window)
+                window_values[np.where(time_window > (next_onset_time - trial_onset))] = np.nan
                 series_stack[t, :len(window_values)] = window_values
-                
+                        
     # Build data frame with extra info
     preprocessed_trials = prepro(trials)
     df_stack = pd.DataFrame(series_stack[:, :len(window_values)])
