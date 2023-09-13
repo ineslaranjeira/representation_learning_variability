@@ -571,7 +571,7 @@ def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_basel
         else:
             next_onset = trial_onset + t_end + 1
         
-        if np.isnan(trial_onset) == False:
+        if (np.isnan(trial_onset) == False) & (np.isnan(next_onset) == False):
             if len(series_df.loc[series_df['time'] > trial_onset, 'time']) > 0:
                 
                 trial_onset_index = series_df.loc[series_df['time'] > trial_onset, 
