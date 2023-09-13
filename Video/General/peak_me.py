@@ -46,8 +46,9 @@ save_path = '/home/ines/repositories/representation_learning_variability/Exporte
 # %% 
 # Loop over sessions
 
-for s, session in enumerate(list(pass_qc)):
+for s, session in enumerate(list(pass_qc)[0:1]):
 
+    session = '288bfbf3-3700-4abe-b6e4-130b5c541e61'
     # Trials data
     session_trials = one.load_object(session, obj='trials', namespace='ibl')
     session_trials = prepro(session_trials.to_df())
