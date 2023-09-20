@@ -384,7 +384,7 @@ def states_per_trial_phase(reduced_design_matrix, session_trials):
 def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_size, trials_to_plot):
 
     # PLOT
-    fig, axs = plt.subplots(nrows=trials_to_plot, ncols=1, sharex=True, sharey=True, figsize=[10, 9])
+    fig, axs = plt.subplots(nrows=trials_to_plot, ncols=1, sharex=True, sharey=True, figsize=[8, 9])
 
     plt.rc('font', size=12)
     use_data = empirical_data.dropna()
@@ -419,7 +419,7 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
                       trial_bin + 10, -1, 1, label='Quiescence start', color='Purple')
 
     axs[t].set_yticks([] ,[])
-    axs[t].set_xticks([0, 10, 19] ,[-0.9, 0, 0.9])
+    axs[t].set_xticks([0, 9, 19] ,[-0.9, 0, 1])
     axs[t].set_xlabel(str('Time from event (s)'))
     axs[t].set_xlim([0, 24])
 
