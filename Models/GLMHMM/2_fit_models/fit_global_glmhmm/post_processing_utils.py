@@ -290,7 +290,7 @@ def return_lapse_nll(inpt, y, session, session_fold_lookup_table, fold,
 
 
 def calculate_glm_hmm_test_loglikelihood(glm_hmm_dir, test_datas, test_inputs,
-                                         test_nonviolation_masks, K, D, M, C):
+                                        abstractions test_nonviolation_masks, K, D, M, C):
     """
     calculate test loglikelihood for GLM-HMM model.  Loop through all
     initializations for fold of interest, and check that final train LL is
