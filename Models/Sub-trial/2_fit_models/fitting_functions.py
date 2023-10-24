@@ -29,10 +29,10 @@ from one_functions_generic import prepro
 
 """ DYNAMAC FUNCTIONS """
 
-def cross_validate_model(model, key, train_emissions, num_train_batches, num_iters=100):
+def cross_validate_model(model, key, all_emissions, train_emissions, method_to_use, num_train_batches, num_iters=100):
     # Initialize the parameters using K-Means on the full training set
-    init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
-    init_params, props = model.initialize(key=key, method="prior", emissions=train_emissions)
+    #init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
+    init_params, props = model.initialize(key=key, method=method_to_use, emissions=train_emissions)
 
     # Split the training data into folds.
     # Note: this is memory inefficient but it highlights the use of vmap.
@@ -42,19 +42,28 @@ def cross_validate_model(model, key, train_emissions, num_train_batches, num_ite
 
     # Baseline model has the same number of states but random initialization
     def _fit_fold_baseline(y_train, y_val):
-        return model.marginal_log_prob(init_params, y_val)
+        return model.marginal_log_prob(init_params, y_val)/ len(y_val) # np.shape(y_val)[1]
     
     # Then actually fit the model to data
     def _fit_fold(y_train, y_val):
         fit_params, train_lps = model.fit_em(init_params, props, y_train, 
                                              num_iters=num_iters, verbose=False)
-        return model.marginal_log_prob(fit_params, y_val), fit_params
+        return model.marginal_log_prob(fit_params, y_val)/len(y_val) , fit_params  # np.shape(y_val)[1]
+    
+    # Get log likelihood without cross-validation
+    def _train_ll(all_emissions):
+        fit_params_non_cv, _ = model.fit_em(init_params, props, all_emissions,
+                                            num_iters=num_iters, verbose=False)
+        ll_train = model.marginal_log_prob(fit_params_non_cv, all_emissions)/len(all_emissions)
+        return ll_train
 
+    ll_train = _train_ll(all_emissions)
+    
     val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions)
     
     baseline_val_lls = vmap(_fit_fold_baseline)(folds, train_emissions)
-    
-    return val_lls, fit_params, init_params, baseline_val_lls
+
+    return val_lls, fit_params, init_params, baseline_val_lls, ll_train
 
 
 def find_permutation(z1, z2):
@@ -426,7 +435,7 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
     axs[t].legend(loc='upper left', bbox_to_anchor=(1, 0.2))
     plt.show()
     
-def traces_over_sates (init, design_matrix, most_likely_states, session_trials):
+def traces_over_sates (init, design_matrix, most_likely_states, session_trials, columns_to_standardize):
     # Compute the most likely states
 
     end = init + 200
@@ -434,9 +443,6 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials):
     fig, axs = plt.subplots(3, 1, sharex=True, sharey=True, figsize=(15, 8))
 
     use_data = design_matrix.copy()
-    columns_to_standardize = ['avg_wheel_vel', 'pupil_diameter', 'whisker_me', 'nose_speed_X',
-        'nose_speed_Y', 'l_paw_speed_X', 'l_paw_speed_Y', 'pupil_speed_X',
-        'pupil_speed_Y', 'Gaussian_licks']
 
     # Standardization using StandardScaler
     scaler = StandardScaler()
