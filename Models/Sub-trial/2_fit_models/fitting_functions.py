@@ -133,4 +133,3 @@ def softmax(x, class_num, num_timesteps):
 
 
 """ INES FUNCTIONS """
-

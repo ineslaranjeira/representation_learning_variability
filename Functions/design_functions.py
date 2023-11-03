@@ -161,36 +161,36 @@ def pupil_diam(pupil_times, pupil_dia_smooth, trials, bin_size, onset_subtractio
 
 def cont_bin(times, metric, trials, bin_size):
 
-        # Bins continuous data types
-    
-        # Create a sample DataFrame with values
-        data = {'Times': times,
-                'Values': metric}
+    # Bins continuous data types
 
-        df = pd.DataFrame(data)
-        session_length = list(trials['stimOff_times'][-1:])[0]
+    # Create a sample DataFrame with values
+    data = {'Times': times,
+            'Values': metric}
 
-        # Define the number of bins and create the bins
-        bins = np.arange(0, np.floor(session_length), bin_size)
-        bins = pd.cut(df['Times'], bins=bins, labels=False)
+    df = pd.DataFrame(data)
+    session_length = list(trials['stimOff_times'][-1:])[0]
 
-        # Create a new column with the bin number
-        df['Bin'] = bins
+    # Define the number of bins and create the bins
+    bins = np.arange(0, np.floor(session_length), bin_size)
+    bins = pd.cut(df['Times'], bins=bins, labels=False)
 
-        # Define the bin edges array
-        trial_edges = list(trials['stimOn_times'])
-        df['Trial'] = pd.cut(df['Times'], bins=trial_edges, labels=False)
+    # Create a new column with the bin number
+    df['Bin'] = bins
 
-        onsets = pd.DataFrame({'Onset times': trial_edges,
-                'Trial': np.arange(0, len(trial_edges), 1)})
+    # Define the bin edges array
+    trial_edges = list(trials['stimOn_times'])
+    df['Trial'] = pd.cut(df['Times'], bins=trial_edges, labels=False)
 
-        # Merge dataframes
-        df = df.merge(onsets, on='Trial')
+    onsets = pd.DataFrame({'Onset times': trial_edges,
+            'Trial': np.arange(0, len(trial_edges), 1)})
 
-        df_binned = df.groupby(['Bin', 'Trial'])['Values'].mean()
-        df_binned = df_binned.reset_index(level=[0, 1])
+    # Merge dataframes
+    df = df.merge(onsets, on='Trial')
 
-        return df_binned
+    df_binned = df.groupby(['Bin', 'Trial'])['Values'].mean()
+    df_binned = df_binned.reset_index(level=[0, 1])
+
+    return df_binned
 
 
 def align_stimOn(df, trials):
