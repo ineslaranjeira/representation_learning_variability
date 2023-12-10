@@ -2,30 +2,21 @@
 IMPORTS
 """
 import os
-import sys
 import autograd.numpy as np
-import pickle
 import pandas as pd
 
-from itertools import count
 from one.api import ONE
 import brainbox.behavior.wheel as wh
 
-from functools import partial
-from jax import vmap
-from pprint import pprint
-import jax.numpy as jnp
-import jax.random as jr
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-#functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability//Models/Sub-trial//2_fit_models/'
+functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
-
 
 
 ################################################### INES's FUNCTIONS ############################################################
