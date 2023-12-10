@@ -36,10 +36,16 @@ def get_dlc_XYs(eid, view, likelihood_thresh=0.9):
 def get_dlc_XYs_lick(eid, video_type, query_type='remote'):
 
     #video_type = 'left'    
-    Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy',
-                             query_type=query_type) 
-    cam = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.dlc.pqt', 
-                           query_type=query_type)
+    # Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy',
+    #                          query_type=query_type) 
+    # cam = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.dlc.pqt', 
+    #                        query_type=query_type)
+    try:
+        Times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % video_type)
+        cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % video_type)
+    except KeyError:
+        print('not all dlc data available')
+        return None, None
     points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
 
     # Set values to nan if likelyhood is too low # for pqt: .to_numpy()
@@ -244,8 +250,10 @@ def get_ME(eid, video_type):
     one = ONE()       
     
     
-    Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy') 
+    #Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy') 
+    Times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % video_type)
     ME = one.load_dataset(eid,f'alf/{video_type}Camera.ROIMotionEnergy.npy')
+    
 
     return Times, ME
 
