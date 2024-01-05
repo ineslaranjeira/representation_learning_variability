@@ -312,7 +312,7 @@ def bins_per_trial_phase(design_matrix, session_trials):
 
     # ITI
     iti_init_correct = session_trials['feedback_times'] + 1
-    iti_init_incorrect = session_trials['feedback_times'] + 2
+    iti_init_incorrect = session_trials['feedback_times'] + 1
     iti_end = session_trials['intervals_1']
     ITI_states_correct = []
     ITI_states_incorrect = []
@@ -320,7 +320,7 @@ def bins_per_trial_phase(design_matrix, session_trials):
     # Feedback
     feedback_init = session_trials['feedback_times']
     correct_end = session_trials['feedback_times'] + 1
-    incorrect_end = session_trials['feedback_times'] + 2
+    incorrect_end = session_trials['feedback_times'] + 1
     correct_states = []
     incorrect_states = []
 
