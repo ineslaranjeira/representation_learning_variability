@@ -66,6 +66,56 @@ def cross_validate_model(model, key, all_emissions, train_emissions, method_to_u
     return val_lls, fit_params, init_params, baseline_val_lls, ll_train
 
 
+def cross_validate_armodel(model, key, all_emissions, train_emissions, train_inputs, method_to_use, num_train_batches, num_iters=100):
+    # Initialize the parameters using K-Means on the full training set
+    #init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
+    init_params, props = model.initialize(key=key, method=method_to_use, emissions=train_emissions)
+
+    # Split the training data and the training inputs matrix_all[ses][0]into folds.
+    # Note: this is memory inefficient but it highlights the use of vmap.
+    folds = jnp.stack([
+        jnp.concatenate([train_emissions[:i], train_emissions[i+1:]])
+        for i in range(num_train_batches)])
+    
+    inpt_folds = jnp.stack([
+        jnp.concatenate([train_inputs[:i], train_inputs[i+1:]])
+        for i in range(num_train_batches)])
+    
+    # Baseline model has the same number of states but random initialization
+    def _fit_fold_baseline(y_val, inpts):
+        return model.marginal_log_prob(init_params, y_val, inpts) # np.shape(y_val)[1]
+
+    baseline_val_lls = vmap(_fit_fold_baseline)(train_emissions, train_inputs)
+    
+    # Then actually fit the model to data
+    def _fit_fold(y_train, y_val, inpt_folds, inpts):
+        fit_params, train_lps = model.fit_em(init_params, props, y_train, inpt_folds, 
+                                             num_iters=num_iters, verbose=False)
+        return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params  # np.shape(y_val)[1]
+    
+    val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions, inpt_folds, train_inputs)
+    
+    return val_lls, fit_params, init_params, baseline_val_lls
+
+
+def compute_inputs(emissions, num_lags, emission_dim):
+    """Helper function to compute the matrix of lagged emissions.
+
+    Args:
+        emissions: $(T \times N)$ array of emissions
+        prev_emissions: $(L \times N)$ array of previous emissions. Defaults to zeros.
+
+    Returns:
+        $(T \times N \cdot L)$ array of lagged emissions. These are the inputs to the fitting functions.
+    """
+    prev_emissions = jnp.zeros((num_lags, emission_dim))
+
+    padded_emissions = jnp.vstack((prev_emissions, emissions))
+    num_timesteps = len(emissions)
+    return jnp.column_stack([padded_emissions[lag:lag+num_timesteps]
+                                for lag in reversed(range(num_lags))])
+    
+    
 def find_permutation(z1, z2):
     K1 = z1.max() + 1
     K2 = z2.max() + 1
