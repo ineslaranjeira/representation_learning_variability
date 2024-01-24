@@ -290,6 +290,6 @@ def Viewer(eid, video_type, trial_range, save_video=True, eye_zoom=False):
 
 # %%
 
-session_eid = '288bfbf3-3700-4abe-b6e4-130b5c541e61'
-Viewer(session_eid, 'right', [5,10])
+session_eid = '7af49c00-63dd-4fed-b2e0-1b3bd945b20b'
+Viewer(session_eid, 'left', [5,10])
 # %%
