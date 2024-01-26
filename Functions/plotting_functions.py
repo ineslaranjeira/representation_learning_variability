@@ -11,6 +11,7 @@ import brainbox.behavior.wheel as wh
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from dynamax.utils.plotting import gradient_cmap
 
 # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
@@ -234,7 +235,7 @@ def states_per_trial_phase(reduced_design_matrix, session_trials):
             
             # ITI correct
             ITI_data_correct = use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > iti_init_correct[t]*10)]
-            ITI_states_correct = np.append(ITI_states_correct, ITI_data_correct['Bin'])
+            ITI_states_correct = np.append(ITI_states_correct, ITI_data_correct['most_likely_states'])
         
         elif session_trials['feedbackType'][t] == -1.:
             incorrect_data = use_data.loc[(use_data['Bin'] <= incorrect_end[t]*10) & (use_data['Bin'] > feedback_init[t]*10)]
@@ -242,7 +243,7 @@ def states_per_trial_phase(reduced_design_matrix, session_trials):
 
             # ITI incorrect
             ITI_data_incorrect = use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > iti_init_incorrect[t]*10)]
-            ITI_states_incorrect = np.append(ITI_states_incorrect, ITI_data_incorrect['Bin'])
+            ITI_states_incorrect = np.append(ITI_states_incorrect, ITI_data_incorrect['most_likely_states'])
         
         # Move
         move_data = use_data.loc[(use_data['Bin'] <= move_end[t]*10) & (use_data['Bin'] > move_init[t]*10)]
@@ -522,8 +523,8 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
 
     # Plot original values
     axs[0].plot(df_normalized['Bin'], df_normalized['whisker_me'], label='Whisker ME', linewidth=2)
-    axs[0].plot(df_normalized['Bin'], df_normalized['nose_speed_X'], label='Nose speed', linewidth=2)
-    axs[0].plot(df_normalized['Bin'], df_normalized['Gaussian_licks'], label='Licks', linewidth=2)
+    axs[0].plot(df_normalized['Bin'], df_normalized['nose_speed'], label='Nose speed', linewidth=2)
+    axs[0].plot(df_normalized['Bin'], df_normalized['Lick count'], label='Licks', linewidth=2)
 
     axs[1].imshow(
         most_likely_states[None,:], 
@@ -542,7 +543,7 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
 
     # Plot original values
     axs[1].plot(df_normalized['Bin'], df_normalized['avg_wheel_vel'], label='Wheel velocity', linewidth=2)
-    axs[1].plot(df_normalized['Bin'], df_normalized['l_paw_speed_X'], label='Paw speed', linewidth=2)
+    axs[1].plot(df_normalized['Bin'], df_normalized['l_paw_speed'], label='Paw speed', linewidth=2)
 
     axs[2].imshow(
         most_likely_states[None,:], 
@@ -561,7 +562,7 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
 
     # Plot original values
     axs[2].plot(df_normalized['Bin'], df_normalized['pupil_diameter'], label='Pupil diameter', linewidth=2)
-    axs[2].plot(df_normalized['Bin'], df_normalized['pupil_speed_X'], label='Pupil speed', linewidth=2)
+    axs[2].plot(df_normalized['Bin'], df_normalized['pupil_speed'], label='Pupil speed', linewidth=2)
 
 
     axs[0].set_ylim(0, 1)
