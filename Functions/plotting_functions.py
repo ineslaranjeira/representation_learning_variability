@@ -503,6 +503,11 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
     normalized_data = min_max_scaler.fit_transform(df_standardized)
     df_normalized = pd.DataFrame(normalized_data, columns=columns_to_standardize)
 
+
+    df_normalized = design_matrix
+
+
+
     df_normalized['Bin'] = design_matrix['Bin']
 
     shw = axs[0].imshow(
@@ -522,9 +527,8 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
     axs[0].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
-    axs[0].plot(df_normalized['Bin'], df_normalized['whisker_me'], label='Whisker ME', linewidth=2)
-    axs[0].plot(df_normalized['Bin'], df_normalized['nose_speed'], label='Nose speed', linewidth=2)
-    axs[0].plot(df_normalized['Bin'], df_normalized['Lick count'], label='Licks', linewidth=2)
+    axs[0].plot(df_normalized['Bin'], df_normalized['avg_wheel_vel'], label='Wheel velocity', linewidth=2)
+    axs[0].plot(df_normalized['Bin'], df_normalized['l_paw_speed'], label='Paw speed', linewidth=2)
 
     axs[1].imshow(
         most_likely_states[None,:], 
@@ -542,8 +546,9 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
     axs[1].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
-    axs[1].plot(df_normalized['Bin'], df_normalized['avg_wheel_vel'], label='Wheel velocity', linewidth=2)
-    axs[1].plot(df_normalized['Bin'], df_normalized['l_paw_speed'], label='Paw speed', linewidth=2)
+    axs[1].plot(df_normalized['Bin'], df_normalized['whisker_me'], label='Whisker ME', linewidth=2)
+    axs[1].plot(df_normalized['Bin'], df_normalized['nose_speed'], label='Nose speed', linewidth=2)
+    axs[1].plot(df_normalized['Bin'], df_normalized['Lick count'], label='Licks', linewidth=2)
 
     axs[2].imshow(
         most_likely_states[None,:], 
@@ -556,7 +561,7 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
     axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10), -1, 1, color='Green', linewidth=2)
     axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10), -1, 1, color='Red', linewidth=2)
     axs[2].vlines(np.array(session_trials['firstMovement_times'] * 10), -1, 1, color='Blue')
-    axs[2].vlines(np.array(session_trials['intervals_0'] * 10), -1, 1, label='Trial end',linewidth=2)
+    axs[2].vlines(np.array(session_trials['intervals_0'] * 10), -1, 1, color='Grey', linewidth=2)
     axs[2].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10), -1, 1, color='Pink', linewidth=2)
     axs[2].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
@@ -565,7 +570,7 @@ def traces_over_sates (init, design_matrix, most_likely_states, session_trials, 
     axs[2].plot(df_normalized['Bin'], df_normalized['pupil_speed'], label='Pupil speed', linewidth=2)
 
 
-    axs[0].set_ylim(0, 1)
+    axs[0].set_ylim(-1, 1)
 
     axs[0].set_ylabel("emissions")
     axs[1].set_ylabel("emissions")
