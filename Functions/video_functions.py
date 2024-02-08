@@ -131,26 +131,7 @@ def lick_psth(trials, licks, t_init, t_end, event='feedback_times'):
 
 
 """ PUPIL """
-"""
-def get_dlc_XYs_pupil(one, eid, view, likelihood_thresh=0.9):
-    dataset_types = ['camera.dlc', 'camera.times']
-    try:
-        times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % view)
-        cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % view)
-    except KeyError:
-        print('not all dlc data available')
-        return None, None
-    points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
-    # Set values to nan if likelyhood is too low # for pqt: .to_numpy()
-    XYs = {}
-    for point in points:
-        x = np.ma.masked_where(cam[point + '_likelihood'] < likelihood_thresh, cam[point + '_x'])
-        x = x.filled(np.nan)
-        y = np.ma.masked_where(cam[point + '_likelihood'] < likelihood_thresh, cam[point + '_y'])
-        y = y.filled(np.nan)
-        XYs[point] = np.array([x, y]).T
-    return times, XYs
-"""
+
 # Brainbox
 
 def motion_energy_PSTH(eid):
@@ -512,125 +493,6 @@ def right_paw(XYs):
 
     return Y, X
 
-"""
-def get_raw_and_smooth_position(eid, video_type, ephys, position_function):
-
-    # likelihood threshold
-    l_thresh = 0.9
-
-    # camera view
-    view = video_type
-
-    # threshold (in standard deviations) beyond which a point is labeled as an outlier
-    std_thresh = 5
-
-    # threshold (in seconds) above which we will not interpolate nans, but keep them
-    # (for long stretches interpolation may not be appropriate)
-    nan_thresh = 1
-
-    # compute framerate of camera
-    if view == 'left':
-        if ephys == True:
-            fr = 60  # set by hardware
-            window = 31  # works well empirically
-        else:
-            fr = 30
-            window = 31 # TODO: need to validate this
-    elif view == 'right':
-        fr = 150  # set by hardware
-        window = 75  # works well empirically
-    else:
-        raise NotImplementedError
-
-    # load markers
-    _, markers = get_dlc_XYs(eid, view, likelihood_thresh=l_thresh)
-
-    # compute diameter using raw values of 4 markers (will be noisy and have missing data)
-    if position_function == get_pupil_diameter:
-        
-        X_center0 = position_function(markers)
-        
-        # XX
-        # run savitzy-golay filter on non-nan timepoints to denoise
-        X_center_sm0 = smooth_interpolate_signal_sg(
-            X_center0, window=window, order=3, interp_kind='linear')
-
-        # find outliers, set to nan
-        errors = X_center0 - X_center_sm0
-        std = np.nanstd(errors)
-        X_center1 = np.copy(X_center0)
-        X_center1[(errors < (-std_thresh * std)) | (errors > (std_thresh * std))] = np.nan
-        # run savitzy-golay filter again on (possibly reduced) non-nan timepoints to denoise
-        X_center_sm1 = smooth_interpolate_signal_sg(
-            X_center1, window=window, order=3, interp_kind='linear')
-
-        # don't interpolate long strings of nans
-        t = np.diff(1 * np.isnan(X_center1))
-        begs = np.where(t == 1)[0]
-        ends = np.where(t == -1)[0]
-        if begs.shape[0] > ends.shape[0]:
-            begs = begs[:ends.shape[0]]
-        for b, e in zip(begs, ends):
-            if (e - b) > (fr * nan_thresh):
-                X_center_sm1[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
-                
-        Y_center0 = []
-        Y_center_sm1 = []
-    else:
-        X_center0, Y_center0 = position_function(markers)
-
-        # XX
-        # run savitzy-golay filter on non-nan timepoints to denoise
-        X_center_sm0 = smooth_interpolate_signal_sg(
-            X_center0, window=window, order=3, interp_kind='linear')
-
-        # find outliers, set to nan
-        errors = X_center0 - X_center_sm0
-        std = np.nanstd(errors)
-        X_center1 = np.copy(X_center0)
-        X_center1[(errors < (-std_thresh * std)) | (errors > (std_thresh * std))] = np.nan
-        # run savitzy-golay filter again on (possibly reduced) non-nan timepoints to denoise
-        X_center_sm1 = smooth_interpolate_signal_sg(
-            X_center1, window=window, order=3, interp_kind='linear')
-
-        # don't interpolate long strings of nans
-        t = np.diff(1 * np.isnan(X_center1))
-        begs = np.where(t == 1)[0]
-        ends = np.where(t == -1)[0]
-        if begs.shape[0] > ends.shape[0]:
-            begs = begs[:ends.shape[0]]
-        for b, e in zip(begs, ends):
-            if (e - b) > (fr * nan_thresh):
-                X_center_sm1[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
-            
-        # YY
-        # run savitzy-golay filter on non-nan timepoints to denoise
-        Y_center_sm0 = smooth_interpolate_signal_sg(
-            Y_center0, window=window, order=3, interp_kind='linear')
-
-        # find outliers, set to nan
-        errors = Y_center0 - Y_center_sm0
-        std = np.nanstd(errors)
-        Y_center1 = np.copy(Y_center0)
-        Y_center1[(errors < (-std_thresh * std)) | (errors > (std_thresh * std))] = np.nan
-        # run savitzy-golay filter again on (possibly reduced) non-nan timepoints to denoise
-        Y_center_sm1 = smooth_interpolate_signal_sg(
-            Y_center1, window=window, order=3, interp_kind='linear')
-
-        # don't interpolate long strings of nans
-        t = np.diff(1 * np.isnan(Y_center1))
-        begs = np.where(t == 1)[0]
-        ends = np.where(t == -1)[0]
-        if begs.shape[0] > ends.shape[0]:
-            begs = begs[:ends.shape[0]]
-        for b, e in zip(begs, ends):
-            if (e - b) > (fr * nan_thresh):
-                Y_center_sm1[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
-            
-            
-    # diam_sm1 is the final smoothed pupil diameter estimate
-    return X_center0, X_center_sm1, Y_center0, Y_center_sm1
-"""
 
 def get_raw_and_smooth_position(eid, video_type, ephys, position_function):
     """Params
@@ -874,37 +736,6 @@ def stack_pupil(position, time, trials, event, t_init, t_end):
                 stack_time[t, 0:len(temp_time)] = temp_time
     return stack, stack_time
 
-"""
-def keypoint_speed(eid, body_part):
-
-    fs = {'right':150,'left':60}   
-
-    # if it is the paw, take speed from right paw only, i.e. closer to cam  
-    # for each video
-    speeds = {}
-    for video_type in ['right','left']:
-        times, XYs = get_dlc_XYs(eid, video_type)
-        
-        # Pupil requires averaging 4 keypoints
-        if body_part == 'pupil':
-            x, y = pupil_center(XYs)
-        else:
-            x = XYs[body_part].T[0]
-            y = XYs[body_part].T[1]   
-            
-        if video_type == 'left': #make resolution same
-            x = x/2
-            y = y/2
-        
-        # get speed in px/sec [half res]
-        # Speed vector is given by the Pitagorean theorem
-        s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
-        
-        speeds[video_type] = [times,s]   
-        
-    return speeds
-    """
-
 
 def keypoint_speed(eid, ephys, body_part, split):
 
@@ -946,6 +777,48 @@ def keypoint_speed(eid, ephys, body_part, split):
                 speeds[video_type] = [times,s]
         
     return speeds
+
+
+def keypoint_speed_one_camera(eid, ephys, video_type, body_part, split):
+
+    if ephys ==True:
+        fs = {'right':150,'left':60}   
+    else:
+        fs = {'right':150,'left':30}
+
+    # if it is the paw, take speed from right paw only, i.e. closer to cam  
+    # for each video
+    speeds = {}
+    times, _ = get_dlc_XYs(eid, video_type)
+    
+    # Pupil requires averaging 4 keypoints
+    _, x, _, y = get_raw_and_smooth_position(eid, video_type, ephys, body_part)
+    if body_part == get_pupil_diameter:
+        if video_type == 'left': #make resolution same
+            x = x/2
+            
+        # get speed in px/sec [half res]    
+        s = np.diff(x)*fs[video_type]
+        speeds[video_type] = [times,s]
+    
+    else:
+        if video_type == 'left': #make resolution same
+            x = x/2
+            y = y/2
+        
+        # Calculate velocity for x and y separately if split is true
+        if split == True:
+            s_x = np.diff(x)*fs[video_type]
+            s_y = np.diff(y)*fs[video_type]
+            speeds[video_type] = [times, s_x, s_y]
+
+        else:
+            # Speed vector is given by the Pitagorean theorem
+            s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
+            speeds[video_type] = [times,s]
+        
+    return speeds
+
 
 
 def downsample (metric, to_shorten, reference):
