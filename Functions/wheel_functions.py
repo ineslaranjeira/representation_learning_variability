@@ -39,8 +39,8 @@ def stack_trials(time, position, trials, event, t_init, t_end):
 """
 
 
-def wheel_interval(t_init, t_end, interval_length, sessions):
-    one = ONE()
+def wheel_interval(one, t_init, t_end, interval_length, sessions):
+    # one = ONE()
     all_wheel = pd.DataFrame()
     # Loop through sessions (could put this inside an animal loop)
     for s, session in enumerate(sessions):

@@ -8,10 +8,13 @@ from scipy.interpolate import interp1d
 import math
 import matplotlib.pyplot as plt
 
-one = ONE() 
+from brainbox.io.one import SessionLoader
 
 
-def get_dlc_XYs(eid, view, likelihood_thresh=0.9):
+# one = ONE(base_url='https://alyx.internationalbrainlab.org')
+
+
+def get_dlc_XYs(one, eid, view, likelihood_thresh=0.9):
 
     try:
         times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % view)
@@ -33,7 +36,7 @@ def get_dlc_XYs(eid, view, likelihood_thresh=0.9):
 
 """ LICKs """
 
-def get_dlc_XYs_lick(eid, video_type, query_type='remote'):
+def get_dlc_XYs_lick(one, eid, video_type, query_type='remote'):
 
     #video_type = 'left'    
     # Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy',
@@ -79,13 +82,13 @@ def get_licks(XYs):
     return sorted(list(set.union(*licks))) 
 
 
-def get_lick_times(eid, combine=False, video_type='left'):
+def get_lick_times(one, eid, combine=False, video_type='left'):
     
     if combine:    
         # combine licking events from left and right cam
         lick_times = []
         for video_type in ['right','left']:
-            times, XYs = get_dlc_XYs_lick(eid, video_type, query_type='remote')
+            times, XYs = get_dlc_XYs_lick(one, eid, video_type, query_type='remote')
             r = get_licks(XYs)
             # cover case that there are less times than DLC points            
             idx = np.where(np.array(r)<len(times))[0][-1]            
@@ -94,7 +97,7 @@ def get_lick_times(eid, combine=False, video_type='left'):
         lick_times = sorted(np.concatenate(lick_times))
         
     else:
-        times, XYs = get_dlc_XYs_lick(eid, video_type, query_type='remote')    
+        times, XYs = get_dlc_XYs_lick(one, eid, video_type, query_type='remote')    
         r = get_licks(XYs)
         # cover case that there are less times than DLC points
         idx = np.where(np.array(r)<len(times))[0][-1]              
@@ -134,7 +137,7 @@ def lick_psth(trials, licks, t_init, t_end, event='feedback_times'):
 
 # Brainbox
 
-def motion_energy_PSTH(eid):
+def motion_energy_PSTH(one, eid):
 
     '''
     ME PSTH
@@ -147,14 +150,13 @@ def motion_energy_PSTH(eid):
     stype = 'stimOn_times'
 
     ME = {}
-    one = ONE()
     trials = one.load_object(eid,'trials')
     ts = trials.intervals[0][0]
     te = trials.intervals[-1][1]
 
     try:
         for video_type in ['left','right','body']:
-            t,m = get_ME(eid, video_type)       
+            t,m = get_ME(one, eid, video_type)       
             m = zscore(m,nan_policy='omit') 
 
             sta, end = find_nearest(t,ts), find_nearest(t,te) 
@@ -225,11 +227,9 @@ def motion_energy_PSTH(eid):
         plt.title('No motion energy available!')
 
 
-def get_ME(eid, video_type):
+def get_ME(one, eid, video_type):
 
-    #video_type = 'left'    
-    one = ONE()       
-    
+    #video_type = 'left'        
     
     #Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy') 
     Times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % video_type)
@@ -494,7 +494,7 @@ def right_paw(XYs):
     return Y, X
 
 
-def get_raw_and_smooth_position(eid, video_type, ephys, position_function):
+def get_raw_and_smooth_position(one, eid, video_type, ephys, position_function):
     """Params
     position_function: get_pupil_diameter, keypoint, ..."""
 
@@ -526,7 +526,7 @@ def get_raw_and_smooth_position(eid, video_type, ephys, position_function):
         raise NotImplementedError
 
     """ Load markers"""
-    _, markers = get_dlc_XYs(eid, view, likelihood_thresh=l_thresh)
+    _, markers = get_dlc_XYs(one, eid, view, likelihood_thresh=l_thresh)
 
     # Get XY position directly based on string
     if type(position_function) == str:
@@ -737,7 +737,7 @@ def stack_pupil(position, time, trials, event, t_init, t_end):
     return stack, stack_time
 
 
-def keypoint_speed(eid, ephys, body_part, split):
+def keypoint_speed(one, eid, ephys, body_part, split):
 
     if ephys ==True:
         fs = {'right':150,'left':60}   
@@ -748,7 +748,7 @@ def keypoint_speed(eid, ephys, body_part, split):
     # for each video
     speeds = {}
     for video_type in ['right','left']:
-        times, _ = get_dlc_XYs(eid, video_type)
+        times, _ = get_dlc_XYs(one, eid, video_type)
         
         # Pupil requires averaging 4 keypoints
         _, x, _, y = get_raw_and_smooth_position(eid, video_type, ephys, body_part)
@@ -779,7 +779,7 @@ def keypoint_speed(eid, ephys, body_part, split):
     return speeds
 
 
-def keypoint_speed_one_camera(eid, ephys, video_type, body_part, split):
+def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split):
 
     if ephys ==True:
         fs = {'right':150,'left':60}   
@@ -789,10 +789,10 @@ def keypoint_speed_one_camera(eid, ephys, video_type, body_part, split):
     # if it is the paw, take speed from right paw only, i.e. closer to cam  
     # for each video
     speeds = {}
-    times, _ = get_dlc_XYs(eid, video_type)
+    times, _ = get_dlc_XYs(one, eid, video_type)
     
     # Pupil requires averaging 4 keypoints
-    _, x, _, y = get_raw_and_smooth_position(eid, video_type, ephys, body_part)
+    _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part)
     if body_part == get_pupil_diameter:
         if video_type == 'left': #make resolution same
             x = x/2
