@@ -304,6 +304,10 @@ def bins_per_trial_phase(design_matrix, session_trials):
     # Split session into trial phases and gather most likely states of those trial phases
     use_data = design_matrix.dropna()
     use_data['Trial'] = use_data['Bin'] * np.nan
+    use_data['correct'] = use_data['Bin'] * np.nan
+    use_data['signed_contrast'] = use_data['Bin'] * np.nan
+    use_data['choice'] = use_data['Bin'] * np.nan
+
     trial_num = len(session_trials)
     
     # Quiescence
@@ -341,6 +345,18 @@ def bins_per_trial_phase(design_matrix, session_trials):
         
         # Trial number   
         use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'Trial'] = trial
+        
+        # Choice   
+        choice = session_trials['choice'][t]
+        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'choice'] = choice
+        
+        # Correct   
+        correct = prepro(session_trials)['correct'][t]
+        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'correct'] = correct
+        
+        # Sided contrast  
+        contrast = prepro(session_trials)['signed_contrast'][t]
+        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'signed_contrast'] = contrast
         
         # Quiescence
         quiescence_data = use_data.loc[(use_data['Bin'] <= qui_end[t]*10) & (use_data['Bin'] > qui_init[t]*10)]
@@ -419,7 +435,7 @@ def bins_per_trial_phase(design_matrix, session_trials):
     
     all_df = all_df.rename(columns={0: "Bin"})
     # Merge trials
-    all_df = all_df.merge(use_data[['Bin', 'Trial']], on='Bin')
+    all_df = all_df.merge(use_data[['Bin', 'Trial', 'correct', 'signed_contrast', 'choice']], on='Bin')
     return all_df
 
     

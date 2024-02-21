@@ -20,7 +20,7 @@ from one.api import ONE
 from one.alf.files import add_uuid_string
 from one.remote import aws
 # one = ONE(base_url='https://openalyx.internationalbrainlab.org')  # public database
-one = ONE(base_url='https://alyx.internationalbrainlab.org')
+# one = ONE(base_url='https://alyx.internationalbrainlab.org')
 
 # %%
 """
@@ -116,7 +116,7 @@ def download_subjectTables(one, subject=None, trials=True, training=True,
     return all_out[0], all_out[1]
 
 
-def query_subjects_interest(protocol='training', ibl_project='ibl_neuropixel_brainwide_01'):
+def query_subjects_interest(one, protocol='training', ibl_project='ibl_neuropixel_brainwide_01'):
     
     # Function to query subjects of interest based on task protocol and project
     """ Download session data """
@@ -134,7 +134,7 @@ def query_subjects_interest(protocol='training', ibl_project='ibl_neuropixel_bra
     return subjects_interest
 
 
-def subjects_interest_data(subjects_interest, phase, protocol):
+def subjects_interest_data(one, subjects_interest, phase, protocol):
     
     # Parameters
     # phase can be 'learning' or 'profficient'
@@ -199,7 +199,7 @@ def subjects_interest_data(subjects_interest, phase, protocol):
     return all_data
 
     
-def get_trials(training_protocol='training', mouse_project='ibl_neuropixel_brainwide_01'):
+def get_trials(one, training_protocol='training', mouse_project='ibl_neuropixel_brainwide_01'):
 
     # GETS DATA PER SESSION
     """ Download session data """
