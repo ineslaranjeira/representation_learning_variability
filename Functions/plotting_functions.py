@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 
@@ -437,7 +437,23 @@ def bins_per_trial_phase(design_matrix, session_trials):
     all_df = all_df.merge(use_data[['Bin', 'Trial', 'correct', 'signed_contrast', 'choice']], on='Bin')
     return all_df
 
+
+def broader_label(df):
     
+    df['broader_label'] = df['label']
+    df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Stimulus'
+    df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Stimulus'
+    df.loc[df['broader_label']=='Quiescence', 'broader_label'] = 'Quiescence'
+    df.loc[df['broader_label']=='Left choice', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Right choice', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Correct feedback', 'broader_label'] = 'ITI'
+    df.loc[df['broader_label']=='Incorrect feedback', 'broader_label'] = 'ITI'
+    df.loc[df['broader_label']=='ITI_correct', 'broader_label'] = 'ITI'
+    df.loc[df['broader_label']=='ITI_incorrect', 'broader_label'] = 'ITI'
+    
+    return df
+
+
 def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_size, trials_to_plot, num_states):
 
     # PLOT
