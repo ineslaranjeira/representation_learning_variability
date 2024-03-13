@@ -211,7 +211,8 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size):
     
     use_data = prepro(session_trials.reset_index())
 
-    df = pd.DataFrame(columns=['trial', 'time', 'wheel', 'movement', 'trial_epoch', 'feedback', 'next_feedback', 'signed_contrast'])
+    df = pd.DataFrame(columns=['trial', 'time', 'wheel', 'movement', 'trial_epoch', 
+                               'feedback', 'next_feedback', 'signed_contrast', 'response', 'reaction'])
 
     # Wheel
     wheel_data = one.load_object(session_eid, 'wheel', collection='alf')
@@ -260,6 +261,8 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size):
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'next_feedback'] = list(next_trial['feedbackType'])[0]
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'signed_contrast'] =  list(trial_data['signed_contrast'])[0]
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'trial'] =  trial
+        df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'response'] =  list(trial_data['response'])[0]
+        df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'reaction'] =  list(trial_data['reaction'])[0]
         
     return df
 

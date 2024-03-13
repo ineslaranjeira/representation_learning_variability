@@ -136,7 +136,9 @@ def time_intervals(session_trials):
 def process_quiescence(df):
     
     # Process data
-    new = df[['trial', 'trial_epoch', 'feedback', 'next_feedback', 'signed_contrast', 'movement']]
+    new = df[['trial', 'trial_epoch', 'feedback', 
+              'next_feedback', 'signed_contrast', 
+              'movement', 'response', 'reaction']]
 
     # Identify consecutive duplicates
     consecutive_duplicates_mask = new.eq(new.shift())
@@ -164,8 +166,11 @@ def process_quiescence(df):
 
     for t, trial in enumerate(new_df['trial'].unique()[:-1]):
         
-        trial_data = new_df.loc[new_df['trial']==t]
-        next_trial = new_df.loc[new_df['trial']==t+1]
+        # trial_data = new_df.loc[new_df['trial']==t]
+        # next_trial = new_df.loc[new_df['trial']==t+1]
+
+        trial_data = new_df.loc[new_df['trial']==trial]
+        next_trial = new_df.loc[new_df['trial']==trial+1]
         
         # Some timepoints
         # next_onset = list(next_trial.loc[next_trial['trial_epoch']=='trial_start', 'epoch_onset'])[0]
