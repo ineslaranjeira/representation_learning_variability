@@ -15,7 +15,7 @@ import brainbox.behavior.wheel as wh
 
 # Get my functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from plotting_functions import bins_per_trial_phase, broader_label
 from one_functions_generic import prepro
