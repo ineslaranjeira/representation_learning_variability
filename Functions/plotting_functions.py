@@ -303,7 +303,7 @@ def bins_per_trial_phase(design_matrix, session_trials):
     # Split session into trial phases and gather most likely states of those trial phases
     use_data = design_matrix.dropna()
     use_data['Trial'] = use_data['Bin'] * np.nan
-    use_data['correct'] = use_data['Bin'] * np.nan
+    use_data['feedback'] = use_data['Bin'] * np.nan
     use_data['signed_contrast'] = use_data['Bin'] * np.nan
     use_data['choice'] = use_data['Bin'] * np.nan
 
@@ -351,7 +351,7 @@ def bins_per_trial_phase(design_matrix, session_trials):
         
         # Correct   
         correct = prepro(session_trials)['correct'][t]
-        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'correct'] = correct
+        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'feedback'] = correct
         
         # Sided contrast  
         contrast = prepro(session_trials)['signed_contrast'][t]
@@ -434,7 +434,7 @@ def bins_per_trial_phase(design_matrix, session_trials):
     
     all_df = all_df.rename(columns={0: "Bin"})
     # Merge trials
-    all_df = all_df.merge(use_data[['Bin', 'Trial', 'correct', 'signed_contrast', 'choice']], on='Bin')
+    all_df = all_df.merge(use_data[['Bin', 'Trial', 'feedback', 'signed_contrast', 'choice']], on='Bin')
     return all_df
 
 
