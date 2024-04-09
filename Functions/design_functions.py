@@ -9,7 +9,7 @@ import pandas as pd
 
 def lick_rate(bin_size, lick_times, trials):
     
-    session_length = list(trials['stimOff_times'][-1:])[0]
+    session_length = list(trials['intervals_1'][-1:])[0]
 
     # Create a sample DataFrame with values
     data = {'Lick times': lick_times}
@@ -33,7 +33,7 @@ def lick_rate(bin_size, lick_times, trials):
 
 def wheel_velocity(bin_size, wheel_times, wheel_pos, trials):
     
-    session_length = list(trials['stimOff_times'][-1:])[0]
+    session_length = list(trials['intervals_1'][-1:])[0]
 
     # Create a sample DataFrame with values
     data = {'Wheel times': wheel_times,
@@ -66,7 +66,7 @@ def wheel_displacement(wheel_times, wheel_positions, trials, bin_size, onset_sub
     df = pd.DataFrame(data)
 
 
-    session_length = list(trials['stimOff_times'][-1:])[0]
+    session_length = list(trials['intervals_1'][-1:])[0]
     #session_length = len(trials['stimOff_times'])
 
     # Trim wheel data after end of session
@@ -120,7 +120,7 @@ def pupil_diam(pupil_times, pupil_dia_smooth, trials, bin_size, onset_subtractio
     
     df = pd.DataFrame(data)
 
-    session_length = list(trials['stimOff_times'][-1:])[0]
+    session_length = list(trials['intervals_1'][-1:])[0]
 
     # Define the number of bins and create the bins
     bins = np.arange(0, np.floor(session_length), bin_size)
@@ -168,7 +168,7 @@ def cont_bin(times, metric, trials, bin_size):
             'Values': metric}
 
     df = pd.DataFrame(data)
-    session_length = list(trials['stimOff_times'][-1:])[0]
+    session_length = list(trials['intervals_1'][-1:])[0]
 
     # Define the number of bins and create the bins
     bins = np.arange(0, np.floor(session_length), bin_size)

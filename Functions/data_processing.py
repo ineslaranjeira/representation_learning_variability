@@ -8,9 +8,14 @@ import pandas as pd
 from one.api import ONE
 import brainbox.behavior.wheel as wh
 
+# Plotting tools
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# ML tools
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from scipy.interpolate import interp1d
 
 # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
@@ -111,6 +116,7 @@ def group_per_phase(data, label = 'broader_label'):
     return grouped, grouped_mean
 
 
+""" Processing of timeseries data """
 def time_intervals(session_trials):
     
     session_trials = prepro(session_trials)
@@ -133,12 +139,170 @@ def time_intervals(session_trials):
     return session_trials
 
 
-def process_quiescence(df):
+# def process_quiescence(df):
     
+#     # Process data
+#     new = df[['trial', 'trial_epoch', 'feedback', 
+#               'next_feedback', 'signed_contrast', 
+#               'movement', 'response', 'reaction']]
+
+#     # Identify consecutive duplicates
+#     consecutive_duplicates_mask = new.eq(new.shift())
+
+#     # Filter DataFrame to remove consecutive duplicates
+#     df_no_consecutive_duplicates = new[~consecutive_duplicates_mask.all(axis=1)].reset_index()
+
+#     time_df = df[['time']].reset_index()
+#     merged_df = df_no_consecutive_duplicates.merge(time_df, on='index')
+#     merged_df = merged_df.rename(columns={'time': 'movement_onset'})
+
+#     # Get trial onset
+#     epoch_onset = pd.DataFrame(merged_df.groupby(['trial', 'trial_epoch'])['movement_onset'].min())
+#     epoch_onset = epoch_onset.reset_index(level=[0, 1])
+#     epoch_onset = epoch_onset.rename(columns={'movement_onset': 'epoch_onset'})
+
+#     new_df = merged_df.merge(epoch_onset)
+#     new_df['movement_duration'] = new_df['movement_onset'] * np.NaN
+#     new_df['movement_duration'][1:] = np.diff(new_df['movement_onset'])
+        
+        
+#     actual_quiescence = pd.DataFrame(columns=['trial', 'quiesc_length', 'time_to_quiesc', 
+#                                             'pre_quiesc_move_duration', 'pre_quiesc_move_count'], 
+#                                     index=new_df['trial'].unique())
+
+#     for t, trial in enumerate(new_df['trial'].unique()[:-1]):
+        
+#         # trial_data = new_df.loc[new_df['trial']==t]
+#         # next_trial = new_df.loc[new_df['trial']==t+1]
+
+#         trial_data = new_df.loc[new_df['trial']==trial]
+#         next_trial = new_df.loc[new_df['trial']==trial+1]
+        
+#         # Some timepoints
+#         # next_onset = list(next_trial.loc[next_trial['trial_epoch']=='trial_start', 'epoch_onset'])[0]
+#         next_quiescence = list(next_trial.loc[next_trial['trial_epoch']=='quiescence', 'epoch_onset'])[0]
+        
+#         post_choice_stillness = trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+#                                                 (trial_data['movement']==0), 'movement_onset']
+#         next_trial_init_stillness = next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+#                                                 (next_trial['movement']==0), 'movement_onset']
+        
+#         if len(next_trial_init_stillness) > 0:
+#             last_stillness_onset = list(next_trial_init_stillness)[-1]
+#         else:
+#             last_stillness_onset = list(post_choice_stillness)[-1]
+            
+#         response_time = list(trial_data.loc[trial_data['trial_epoch']=='post_choice', 'epoch_onset'])[0]
+#         # trial_data['movement_duration'] = trial_data['movement_onset'] * np.NaN
+#         # trial_data['movement_duration'][1:] = np.diff(trial_data['movement_onset'])
+        
+#         # Save data
+#         actual_quiescence['trial'][t] = trial
+#         actual_quiescence['quiesc_length'][t] = next_quiescence - last_stillness_onset
+#         actual_quiescence['time_to_quiesc'][t] = last_stillness_onset - response_time
+#         actual_quiescence['pre_quiesc_move_duration'][t] = np.sum(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+#                                                                         (trial_data['movement']==1), 'movement_duration']) + np.sum(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+#                                                                         (next_trial['movement']==1), 'movement_duration']) 
+        
+#         actual_quiescence['pre_quiesc_move_count'][t] = len(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+#                                                                         (trial_data['movement']==1)]) + len(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+#                                                                         (trial_data['movement']==1)])
+
+#     processed_df = new_df.merge(actual_quiescence)
+    
+#     return processed_df
+
+
+# def process_quiescence(df):
+#     # Process data
+#     new = df[['trial', 'trial_epoch', 'feedback', 
+#                 'next_feedback', 'signed_contrast', 
+#                 'movement', 'response', 'reaction', 'choice']]
+
+#     # Identify consecutive duplicates
+#     consecutive_duplicates_mask = new.eq(new.shift())
+
+#     # Filter DataFrame to remove consecutive duplicates
+#     df_no_consecutive_duplicates = new[~consecutive_duplicates_mask.all(axis=1)].reset_index()
+
+#     time_df = df[['time']].reset_index()
+#     merged_df = df_no_consecutive_duplicates.merge(time_df, on='index')
+#     merged_df = merged_df.rename(columns={'time': 'movement_onset'})
+
+#     # Get trial onset
+#     epoch_onset = pd.DataFrame(merged_df.groupby(['trial', 'trial_epoch'])['movement_onset'].min())
+#     epoch_onset = epoch_onset.reset_index(level=[0, 1])
+#     epoch_onset = epoch_onset.rename(columns={'movement_onset': 'epoch_onset'})
+
+#     new_df = merged_df.merge(epoch_onset)
+#     new_df['movement_duration'] = new_df['movement_onset'] * np.NaN
+#     new_df['movement_duration'][1:] = np.diff(new_df['movement_onset'])
+        
+        
+#     actual_quiescence = pd.DataFrame(columns=['trial', 'quiesc_length', 'time_to_quiesc', 
+#                                             'pre_quiesc_move_duration', 'pre_quiesc_move_count'], 
+#                                     index=new_df['trial'].unique())
+
+#     for t, trial in enumerate(new_df['trial'].unique()[:-1]):
+        
+#         # trial_data = new_df.loc[new_df['trial']==t]
+#         # next_trial = new_df.loc[new_df['trial']==t+1]
+
+#         trial_data = new_df.loc[new_df['trial']==trial]
+#         next_trial = new_df.loc[new_df['trial']==trial+1]
+        
+#         # Some timepoints
+#         # next_onset = list(next_trial.loc[next_trial['trial_epoch']=='trial_start', 'epoch_onset'])[0]
+#         next_quiescence = list(next_trial.loc[next_trial['trial_epoch']=='quiescence', 'epoch_onset'])[0]
+        
+#         next_stimOn = next_trial.loc[next_trial['trial_epoch']=='stim_on', 'epoch_onset']
+#         next_movement_init = next_trial.loc[next_trial['trial_epoch']=='movement', 'epoch_onset']
+        
+#         post_choice_stillness = trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+#                                                 (trial_data['movement']==0), 'movement_onset']
+#         next_trial_init_stillness = next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+#                                                 (next_trial['movement']==0), 'movement_onset']
+        
+#         if len(next_trial_init_stillness) > 0:
+#             last_stillness_onset = list(next_trial_init_stillness)[-1]
+#         elif len(post_choice_stillness) > 0:
+#             last_stillness_onset = list(post_choice_stillness)[-1]
+#         else:
+#             last_stillness_onset = next_quiescence  # Not sure if this makes sense...
+            
+#         response_time = list(trial_data.loc[trial_data['trial_epoch']=='post_choice', 'epoch_onset'])[0]
+#         # trial_data['movement_duration'] = trial_data['movement_onset'] * np.NaN
+#         # trial_data['movement_duration'][1:] = np.diff(trial_data['movement_onset'])
+        
+#         # Save data
+#         actual_quiescence['trial'][t] = trial
+#         # actual_quiescence['quiesc_length'][t] = next_quiescence - last_stillness_onset
+#         if len(next_stimOn) > 0:
+#             actual_quiescence['quiesc_length'][t] = list(next_stimOn)[0] - last_stillness_onset
+#         else:
+#             # If movement was detected before Stimulus onset
+#             actual_quiescence['quiesc_length'][t] = list(next_movement_init)[0] - last_stillness_onset
+            
+#         actual_quiescence['time_to_quiesc'][t] = last_stillness_onset - response_time
+#         actual_quiescence['pre_quiesc_move_duration'][t] = np.sum(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+#                                                                         (trial_data['movement']==1), 'movement_duration']) + np.sum(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+#                                                                         (next_trial['movement']==1), 'movement_duration']) 
+        
+#         actual_quiescence['pre_quiesc_move_count'][t] = len(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+#                                                                         (trial_data['movement']==1)]) + len(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+#                                                                         (trial_data['movement']==1)])
+
+#     processed_df = new_df.merge(actual_quiescence)
+    
+#     return processed_df
+
+
+def process_quiescence(df):
+
     # Process data
     new = df[['trial', 'trial_epoch', 'feedback', 
-              'next_feedback', 'signed_contrast', 
-              'movement', 'response', 'reaction']]
+                'next_feedback', 'signed_contrast', 
+                'movement', 'response', 'reaction', 'choice']]
 
     # Identify consecutive duplicates
     consecutive_duplicates_mask = new.eq(new.shift())
@@ -160,48 +324,177 @@ def process_quiescence(df):
     new_df['movement_duration'][1:] = np.diff(new_df['movement_onset'])
         
         
-    actual_quiescence = pd.DataFrame(columns=['trial', 'quiesc_length', 'time_to_quiesc', 
+    actual_quiescence = pd.DataFrame(columns=['trial', 'quiesc_length', 'time_to_quiesc', 'time_to_quiesc_2', 
                                             'pre_quiesc_move_duration', 'pre_quiesc_move_count'], 
                                     index=new_df['trial'].unique())
 
-    for t, trial in enumerate(new_df['trial'].unique()[:-1]):
+    for t, trial in enumerate(new_df['trial'].unique()):
         
-        # trial_data = new_df.loc[new_df['trial']==t]
-        # next_trial = new_df.loc[new_df['trial']==t+1]
-
         trial_data = new_df.loc[new_df['trial']==trial]
         next_trial = new_df.loc[new_df['trial']==trial+1]
         
-        # Some timepoints
-        # next_onset = list(next_trial.loc[next_trial['trial_epoch']=='trial_start', 'epoch_onset'])[0]
-        next_quiescence = list(next_trial.loc[next_trial['trial_epoch']=='quiescence', 'epoch_onset'])[0]
-        
-        post_choice_stillness = trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
-                                                (trial_data['movement']==0), 'movement_onset']
-        next_trial_init_stillness = next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
-                                                (next_trial['movement']==0), 'movement_onset']
-        
-        if len(next_trial_init_stillness) > 0:
-            last_stillness_onset = list(next_trial_init_stillness)[-1]
-        else:
-            last_stillness_onset = list(post_choice_stillness)[-1]
+        try:
+            # If next trial exists
+            if len(next_trial) > 0:
+                
+                # Some timepoints
+                response_time = list(trial_data.loc[trial_data['trial_epoch']=='post_choice', 'epoch_onset'])[0]
+                next_quiescence = next_trial.loc[next_trial['trial_epoch']=='quiescence', 'epoch_onset']
+                next_stimOn = next_trial.loc[next_trial['trial_epoch']=='stim_on', 'epoch_onset']
+                next_movement_init = next_trial.loc[next_trial['trial_epoch']=='movement', 'epoch_onset']
+                next_trial_onset = next_trial.loc[next_trial['trial_epoch']=='trial_start', 'epoch_onset']
+                
+                # Get inter-trial data
+                iti_data_current = new_df.loc[((new_df['trial']==trial) & (new_df['trial_epoch']=='post_choice'))]
+                # iti_data_next = new_df.loc[((new_df['trial']==trial+1) & (new_df['trial_epoch'].isin(['trial_start', 'quiescence'])))]
+                iti_data_next = new_df.loc[((new_df['trial']==trial+1) & (new_df['trial_epoch']=='trial_start'))]
+                
+                # Find last stillness onset
+                # If there is no stillness until quiescence, consider quiescence
+                if list(iti_data_next['movement'])[-1] == 1.:
+                    last_stillness_onset = list(next_quiescence)[0]
+                else:
+                    if 1 in list(iti_data_next['movement']):
+                        # If there is a movement in the new trial but it doesn't preceed quiescence, look for last stillness
+                        where_last_move = np.where(iti_data_next['movement']==1)[0][-1]
+                        last_stillness_onset = list(iti_data_next['movement_onset'])[where_last_move+1]
+                    elif 1 in list(iti_data_current['movement']):
+                        where_last_move = np.where(iti_data_current['movement']==1)[0][-1]
+                        last_stillness_onset = list(iti_data_current['movement_onset'])[where_last_move+1]
+                    else:
+                        # if there is no movement after choice, consider response
+                        last_stillness_onset = response_time
+                        
             
-        response_time = list(trial_data.loc[trial_data['trial_epoch']=='post_choice', 'epoch_onset'])[0]
-        # trial_data['movement_duration'] = trial_data['movement_onset'] * np.NaN
-        # trial_data['movement_duration'][1:] = np.diff(trial_data['movement_onset'])
-        
-        # Save data
-        actual_quiescence['trial'][t] = trial
-        actual_quiescence['quiesc_length'][t] = next_quiescence - last_stillness_onset
-        actual_quiescence['time_to_quiesc'][t] = last_stillness_onset - response_time
-        actual_quiescence['pre_quiesc_move_duration'][t] = np.sum(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
-                                                                        (trial_data['movement']==1), 'movement_duration']) + np.sum(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
-                                                                        (next_trial['movement']==1), 'movement_duration']) 
-        
-        actual_quiescence['pre_quiesc_move_count'][t] = len(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
-                                                                        (trial_data['movement']==1)]) + len(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
-                                                                        (trial_data['movement']==1)])
+                # Save data
+                actual_quiescence['trial'][t] = trial
+                if len(next_stimOn) > 0:
+                    actual_quiescence['quiesc_length'][t] = list(next_stimOn)[0] - last_stillness_onset
+                else:
+                    # If movement was detected before Stimulus onset
+                    actual_quiescence['quiesc_length'][t] = list(next_movement_init)[0] - last_stillness_onset 
+                
+                # Time to quiescence goes from end of last 
+                actual_quiescence['time_to_quiesc'][t] = last_stillness_onset - response_time
+                if last_stillness_onset >= list(next_trial_onset)[0]:
+                    actual_quiescence['time_to_quiesc_2'][t] = last_stillness_onset - list(next_trial_onset)[0]
+                else:
+                    actual_quiescence['time_to_quiesc_2'][t] = 0.
+                
+                actual_quiescence['pre_quiesc_move_duration'][t] = np.sum(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+                                                                                (trial_data['movement']==1), 'movement_duration']) + np.sum(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+                                                                                (next_trial['movement']==1), 'movement_duration']) 
+                
+                actual_quiescence['pre_quiesc_move_count'][t] = len(trial_data.loc[(trial_data['trial_epoch']=='post_choice') & 
+                                                                                (trial_data['movement']==1)]) + len(next_trial.loc[(next_trial['trial_epoch']=='trial_start') & 
+                                                                                (trial_data['movement']==1)])
+                                                                        
+            else:
+                # Save data
+                actual_quiescence['trial'][t] = trial
+            
+        except:
+            print(trial)
+        processed_df = new_df.merge(actual_quiescence)
 
-    processed_df = new_df.merge(actual_quiescence)
-    
     return processed_df
+
+
+def interpolate(time_snippet, snippet, size, plot):
+    x = np.arange(0, len(time_snippet))
+    y = snippet
+    f = interp1d(x, y, 'cubic')
+    
+    # New grid coordinates
+    new_x = np.linspace(0, len(x)-1, size)  # Upscale to 6 columns
+
+    # Interpolate values at new grid coordinates
+    rescaled_array = f(new_x)
+    
+    if plot == True:
+        plt.plot(x, y, 'o', new_x, rescaled_array, '-')
+        plt.plot(x, snippet)
+        plt.xlabel('Time')
+        plt.ylabel('Data')
+        plt.show()
+            
+    return rescaled_array
+
+
+""" DIMENSIONALITY REDUCTION FUNCTIONS """
+
+def pca_behavior(use_mat, keep_pc, plot=False):
+    
+    """
+    PRINCIPLE COMPONENT ANALYSES
+    """
+    # use_mat = epoch_matrix[var_names]
+    X = np.array(use_mat) # (n_samples, n_features)
+
+    # Mean centered and equal variance (redundant code)
+    scaler = StandardScaler()
+    new_X = scaler.fit_transform(X)
+    
+    # scaler = StandardScaler()
+    # standardized = scaler.fit_transform(X)
+    # # Normalize between 0 and 1
+    # normalizer = Normalizer().fit(standardized)
+    # new_X = normalizer.transform(standardized)
+    
+    pca = PCA() # svd_solver='full'
+    X_reduced = pca.fit_transform(new_X)
+
+    if plot == True:
+        # Plot variance explained per principle component
+        fig, ax = plt.subplots(figsize=[6,5])
+        plt.rc('font', size=18)
+        plt.bar(np.arange(1, keep_pc+1, 1), pca.explained_variance_ratio_[0:keep_pc], color='steelblue')
+        plt.xticks(np.arange(1, keep_pc, 1))
+        plt.xlabel('PCs')
+        plt.ylabel('% Variance explained')
+        plt.show()
+    
+    return X_reduced, X
+
+
+def augment_data(X_reduced, epoch_matrix, keep_pc):
+    
+    if np.shape(X_reduced)[0] == np.shape(epoch_matrix)[0]:
+        # Plot projections of datapoints into first 3 principal components
+        augmented_data = pd.DataFrame(columns=['Bin'], index=range(np.shape(X_reduced)[0]))
+        augmented_data['Bin'] = epoch_matrix['Bin']
+        augmented_data['label'] = epoch_matrix['label']
+        augmented_data['Trial'] = epoch_matrix['Trial']
+        augmented_data['feedback'] = epoch_matrix['feedback']
+        augmented_data['signed_contrast'] = epoch_matrix['signed_contrast']
+        augmented_data['choice'] = epoch_matrix['choice']
+        augmented_data['broader_label'] = epoch_matrix['broader_label']
+        
+        for p in range(keep_pc):
+            augmented_data[str('pc' + str(p+1))] = X_reduced[:, p].transpose()
+    else:
+        print('Size does not match')
+
+    return augmented_data
+
+
+def plot_timeseries_pcs(X, augmented_data, var_names, init, range):
+    scaler = StandardScaler()
+    new_X = scaler.fit_transform(X)
+    
+    # scaler = StandardScaler()
+    # standardized = scaler.fit_transform(X)
+    # # Normalize between 0 and 1
+    # normalizer = Normalizer().fit(standardized)
+    # new_X = normalizer.transform(standardized)
+
+    for v , var in enumerate(var_names):
+        plt.plot(new_X[init:init+range, v], color='black', label='Data')
+        plt.plot(augmented_data['pc1'], color='red', label='PC 1', alpha=0.5)
+        plt.plot(augmented_data['pc2'], color='green', label='PC 2', alpha=0.5)
+        plt.plot(augmented_data['pc3'], color='blue', label='PC 3', alpha=0.5)
+        plt.legend()
+        plt.title(var)
+
+        plt.xlim([init, init+range])
+        plt.show()

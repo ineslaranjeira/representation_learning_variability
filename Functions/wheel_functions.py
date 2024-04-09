@@ -21,6 +21,11 @@ from plotting_functions import bins_per_trial_phase, broader_label
 from one_functions_generic import prepro
 from design_functions import wheel_velocity
 
+
+# Define some constants
+ENC_RES = 1024 * 4  # Rotary encoder resolution, assumes X4 encoding
+WHEEL_DIAMETER = 3.1 * 2  # Wheel diameter in cm
+
 # %%
 
 # This function is redundant, use timeseries_PSTH from one_functions_generic
@@ -207,12 +212,12 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
 def wheel_trial_epoch(one, session_trials, session_eid, bin_size):
 
     threshold = 0.25 # Need to check if this makes sense
-    min_period = 200 # This is approximately 200 ms
+    min_period = 400 # This is approximately 200 ms
     
     use_data = prepro(session_trials.reset_index())
 
     df = pd.DataFrame(columns=['trial', 'time', 'wheel', 'movement', 'trial_epoch', 
-                               'feedback', 'next_feedback', 'signed_contrast', 'response', 'reaction'])
+                               'feedback', 'next_feedback', 'signed_contrast', 'response', 'reaction', 'choice'])
 
     # Wheel
     wheel_data = one.load_object(session_eid, 'wheel', collection='alf')
@@ -263,7 +268,8 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size):
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'trial'] =  trial
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'response'] =  list(trial_data['response'])[0]
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'reaction'] =  list(trial_data['reaction'])[0]
-        
+        df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'choice'] =  list(trial_data['choice'])[0]
+    
     return df
 
 
