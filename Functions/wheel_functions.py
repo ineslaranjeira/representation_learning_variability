@@ -209,10 +209,7 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
     plt.show()
 
 
-def wheel_trial_epoch(one, session_trials, session_eid, bin_size):
-
-    threshold = 0.25 # Need to check if this makes sense
-    min_period = 400 # This is approximately 200 ms
+def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min_period):
     
     use_data = prepro(session_trials.reset_index())
 
