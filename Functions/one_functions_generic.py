@@ -504,8 +504,8 @@ def prepro(trials):
     trials.loc[trials['correct']==-1, 'correct'] = 0
 
     """ Response/ reaction times """
-    trials['response'] = trials['response_times'] - trials['stimOn_times']
-    trials['reaction'] = trials['firstMovement_times'] - trials['stimOn_times']
+    trials['response'] = trials['response_times'] - trials['goCue_times']
+    trials['reaction'] = trials['firstMovement_times'] - trials['goCue_times']
     #TODO : trials['days_to_trained'] = trials['training_time']
     
     return trials
