@@ -144,7 +144,8 @@ def process_quiescence(df):
     # Process data
     new = df[['trial', 'trial_epoch', 'feedback', 
                 'next_feedback', 'signed_contrast', 
-                'movement', 'response', 'reaction', 'choice']]
+                'movement', 'response', 'reaction', 
+                'choice', 'probabilityLeft']]
 
     # Identify consecutive duplicates
     consecutive_duplicates_mask = new.eq(new.shift())
