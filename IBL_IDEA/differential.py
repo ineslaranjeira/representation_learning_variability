@@ -52,12 +52,17 @@ position_2023 = reduced_df['Membership Type'][keep_2023]
 position_2022 = reduced_df['Membership Type'][keep_2022]
 
 # Position of the respondents 
-respondent_position_2024 = df_3.loc[df_3['What role best describes your position in IBL?'
-                                    ]!='Prefer not to say', 'What role best describes your position in IBL?']
-respondent_position_2023 = df_2.loc[df_2['What role best describes your position in IBL?'
-                                    ]!='Prefer not to say', 'What role best describes your position in IBL?']
-respondent_position_2022 = df_1.loc[df_1['What role best describes your position in IBL?'
-                                    ]!='Prefer not to say', 'What role best describes your position in IBL?']
+# respondent_position_2024 = df_3.loc[df_3['What role best describes your position in IBL?'
+#                                     ]!='Prefer not to say', 'What role best describes your position in IBL?']
+# respondent_position_2023 = df_2.loc[df_2['What role best describes your position in IBL?'
+#                                     ]!='Prefer not to say', 'What role best describes your position in IBL?']
+# respondent_position_2022 = df_1.loc[df_1['What role best describes your position in IBL?'
+#                                     ]!='Prefer not to say', 'What role best describes your position in IBL?']
+
+# Position of the respondents 
+respondent_position_2024 = df_3['What role best describes your position in IBL?']
+respondent_position_2023 = df_2['What role best describes your position in IBL?']
+respondent_position_2022 = df_1['What role best describes your position in IBL?']
 
 positions = ['PI', 'Postdoc', 'Staff', 'Student']
 
@@ -74,27 +79,31 @@ positions = ['PI', 'Postdoc', 'Staff', 'Technician']
 position_count_2022 = position_2022.value_counts()
 respondent_position_2022_count = respondent_position_2022.value_counts()
 fraction_respondents_per_position_2022 = respondent_position_2022_count[positions] / position_count_2022[positions]
-
+#%%
 # Merge
-fraction_respondents_per_position_2022.name = '2022'
-fraction_respondents_per_position_2023.name = '2023'
-fraction_respondents_per_position_2024.name = '2024'
+fraction_respondents_per_position_2022.name = '2022 - N='+ str(len(respondent_position_2022))
+fraction_respondents_per_position_2023.name = '2023 - N='+ str(len(respondent_position_2023))
+fraction_respondents_per_position_2024.name = '2024 - N='+ str(len(respondent_position_2024))
 
 merged_ts = pd.merge(fraction_respondents_per_position_2022, 
                      fraction_respondents_per_position_2023, left_index=True, right_index=True, how='outer')
 merged = pd.merge(merged_ts, 
                      fraction_respondents_per_position_2024, left_index=True, right_index=True, how='outer')
 
-melted = pd.melt(merged.reset_index(), id_vars=['index'], value_vars=['2022', '2023', '2024'])
+melted = pd.melt(merged.reset_index(), id_vars=['index'], value_vars=['2022 - N='+ str(len(respondent_position_2022)), 
+                                                                      '2023 - N='+ str(len(respondent_position_2023)), 
+                                                                      '2024 - N='+ str(len(respondent_position_2024))])
 #%%
 # Plot
-sns.barplot(x='index', y='value', hue='variable', data=melted)
+color_palette = sns.color_palette("hls", 8)
+melted = melted.rename(columns={'variable': 'Year'})
+sns.barplot(x='index', y='value', hue='Year', data=melted, palette=color_palette)
 sns.despine()
 plt.ylim([0, 1])
 plt.xticks(fontsize=fs-5)
 plt.yticks(fontsize=fs-5)
 plt.xlabel('Role in the IBL', fontsize=fs)
-plt.ylabel('Fraction respondents (%)', fontsize=fs)
+plt.ylabel('Fraction of respondents', fontsize=fs)
 plt.title('Responsiveness to the survey', fontsize=fs)
 # %%
 
@@ -146,7 +155,8 @@ def plot(df_1, df_2, df_3,col_1,col_2,col_3,color_dict, question, min, max, curr
     plt.close()
 
 # extract all response to 'What role best describes your position in IBL?' 
-def extract_color_schemes_per_role_in_IBL(df1,df2,df3):df_demo
+def extract_color_schemes_per_role_in_IBL(df1,df2,df3):
+    df_demo
     question = 'What role best describes your position in IBL?'
     responses_df1 = df1[question]
     responses_df2 = df2[question]
