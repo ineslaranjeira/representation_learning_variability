@@ -119,6 +119,13 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
     min_period = 200 # This is approximately 200 ms
 
     use_data = session_trials.reset_index()
+    
+    # Account for naming differences in how data was loaded
+    if 'quiescencePeriod' in use_data.keys():
+        quiescence_name = 'quiescencePeriod'
+    elif 'quiescence' in use_data.keys():
+        quiescence_name = 'quiescence'
+    
     for t, trial in enumerate(range(trials_to_plot)):
 
         trial_start = use_data.loc[use_data['index']==t, 'intervals_0']
@@ -134,40 +141,40 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
             axs[t].fill_betweenx(y, list(trial_data['firstMovement_times'])[0]-list(trial_start)[0], 
                           list(trial_data['feedback_times'])[0]-list(trial_start)[0], color='green', alpha=0.3)
             axs[t].fill_betweenx(y, list(trial_data['feedback_times'])[0]-list(trial_start)[0], 
-                          list(trial_data['stimOff_times'])[0]-list(trial_start)[0], color='green', alpha=0.6)
+                          list(trial_data['feedback_times'])[0]-list(trial_start)[0], color='green', alpha=0.6)
         else:
             axs[t].vlines(np.array(trial_data['feedback_times']) - trial_start,
                         -10, 10, label='Incorrect', color='Red', linewidth=2)
             axs[t].fill_betweenx(y, list(trial_data['firstMovement_times'])[0]-list(trial_start)[0], 
                           list(trial_data['feedback_times'])[0]-list(trial_start)[0], color='red', alpha=0.3)
             axs[t].fill_betweenx(y, list(trial_data['feedback_times'])[0]-list(trial_start)[0], 
-                          list(trial_data['stimOff_times'])[0]-list(trial_start)[0], color='red', alpha=0.6)
+                          list(trial_data['feedback_times'])[0]-list(trial_start)[0], color='red', alpha=0.6)
             
         axs[t].vlines(np.array(trial_data['firstMovement_times']) - trial_start, -10, 10, 
                         label='First movement', color='Blue')
-        axs[t].vlines(np.array((trial_data['goCueTrigger_times'] - trial_data['quiescencePeriod'])) - trial_start,
+        axs[t].vlines(np.array((trial_data['goCue_times'] - trial_data[quiescence_name])) - trial_start,
                         -10, 10, label='Quiescence start', color='Purple')
-        axs[t].vlines(np.array(trial_data['stimOff_times']) - trial_start,
+        axs[t].vlines(np.array(trial_data['feedback_times']) - trial_start,
                         -10, 10, label='Stim Off', color='Brown')
         axs[t].vlines(np.array(trial_data['intervals_1']) - trial_start,
                         -10, 10, label='Trial end', color='Orange')
         axs[t].vlines(np.array(next_trial['intervals_0']) - trial_start,
                         -10, 10, label='Next trial start', color='Grey')  
-        axs[t].vlines(np.array((next_trial['goCueTrigger_times'] - next_trial['quiescencePeriod'])) - trial_start,
+        axs[t].vlines(np.array((next_trial['goCue_times'] - next_trial[quiescence_name])) - trial_start,
                         -10, 10, label='Quiescence start', color='Purple')
 
-        axs[t].fill_betweenx(y, 0, list(trial_data['goCueTrigger_times'] - 
-                          trial_data['quiescencePeriod'])[0]-list(trial_start)[0], color='purple', alpha=0.6)
-        axs[t].fill_betweenx(y, list(trial_data['goCueTrigger_times'] - 
-                          trial_data['quiescencePeriod'])[0]-list(trial_start)[0], 
+        axs[t].fill_betweenx(y, 0, list(trial_data['goCue_times'] - 
+                          trial_data[quiescence_name])[0]-list(trial_start)[0], color='purple', alpha=0.6)
+        axs[t].fill_betweenx(y, list(trial_data['goCue_times'] - 
+                          trial_data[quiescence_name])[0]-list(trial_start)[0], 
                           list(trial_data['stimOn_times'])[0]-list(trial_start)[0], color='purple', alpha=0.3)
         axs[t].fill_betweenx(y, list(trial_data['stimOn_times'])[0]-list(trial_start)[0],
                              list(trial_data['firstMovement_times'])[0]-list(trial_start)[0], color='blue', alpha=0.3)
-        axs[t].fill_betweenx(y, list(trial_data['stimOff_times'])[0]-list(trial_start)[0],
+        axs[t].fill_betweenx(y, list(trial_data['feedback_times'])[0]-list(trial_start)[0],
                              list(trial_data['intervals_1'])[0]-list(trial_start)[0], color='orange', alpha=0.3)
         axs[t].fill_betweenx(y, list(next_trial['intervals_0'])[0] - list(trial_start)[0], 
-                             list(next_trial['goCueTrigger_times'] - 
-                          next_trial['quiescencePeriod'])[0]-list(trial_start)[0], color='purple', alpha=0.6)
+                             list(next_trial['goCue_times'] - 
+                          next_trial[quiescence_name])[0]-list(trial_start)[0], color='purple', alpha=0.6)
         
         # Wheel
         wheel_data = one.load_object(session_eid, 'wheel', collection='alf')
@@ -179,8 +186,8 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
         xx = wheel_times - list(trial_start)[0]
         yy = wheel_trace
 
-        trial_time_max = list(np.array(next_trial['goCueTrigger_times'] - 
-                                        next_trial['quiescencePeriod']) - trial_start)[0]
+        trial_time_max = list(np.array(next_trial['goCue_times'] - 
+                                        next_trial[quiescence_name]) - trial_start)[0]
         mask = np.where((xx <trial_time_max) & (xx> time_min))
         wheel_max = np.max(wheel_trace[mask])
         wheel_min = np.min(wheel_trace[mask])
@@ -210,7 +217,15 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
 
 def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min_period):
     
-    use_data = prepro(session_trials.reset_index())
+    #TODO need to accout for this commented out line in code outside function
+    # use_data = prepro(session_trials.reset_index())
+
+    use_data = session_trials
+    # Account for differences in how data was loaded
+    if 'quiescencePeriod' in use_data.keys():
+        quiescence_name = 'quiescencePeriod'
+    elif 'quiescence' in use_data.keys():
+        quiescence_name = 'quiescence'
 
     df = pd.DataFrame(columns=['trial', 'time', 'wheel', 'movement', 'trial_epoch', 
                                'feedback', 'next_feedback', 'signed_contrast', 
@@ -231,7 +246,7 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min
     df['time'] = wheel_times
     df['wheel'] = wheel_trace
     df['movement'] = movement_array
-        
+
     for t, trial in enumerate(range(len(use_data)-1)):
 
         
@@ -240,12 +255,12 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min
             
         # Compute timings
         trial_start = list(trial_data['intervals_0'])[0]
-        quiescence_start = list(trial_data['goCueTrigger_times'] - trial_data['quiescencePeriod'])[0]
+        quiescence_start = list(trial_data['goCue_times'] - trial_data[quiescence_name])[0]
         stim_on = list(trial_data['stimOn_times'])[0]
         first_movement = list(trial_data['firstMovement_times'])[0]
         response_time = list(trial_data['response_times'])[0]
-        stim_off = list(trial_data['stimOff_times'])[0]
-        trial_end = list(trial_data['intervals_1'])[0]
+        # stim_off = list(trial_data['feedback_times'])[0]
+        # trial_end = list(trial_data['intervals_1'])[0]
         next_trial_start = list(next_trial['intervals_0'])[0]
 
         # Compute intervals
@@ -253,11 +268,8 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min
         df.loc[(df['time'] >= quiescence_start) & (df['time'] < stim_on), 'trial_epoch'] = 'quiescence'
         df.loc[(df['time'] >= stim_on) & (df['time'] < first_movement), 'trial_epoch'] = 'stim_on'
         df.loc[(df['time'] >= first_movement) & (df['time'] < response_time), 'trial_epoch'] = 'movement'
-        # df.loc[(df['time'] >= response_time) & (df['time'] < stim_off), 'trial_epoch'] = 'feedback'
-        # df.loc[(df['time'] >= response_time) & (df['time'] < (response_time+2)), 'trial_epoch'] = 'short_feedback'
         df.loc[(df['time'] >= response_time) & (df['time'] < next_trial_start), 'trial_epoch'] = 'post_choice'
-        # df.loc[(df['time'] >= stim_off) & (df['time'] < trial_end), 'trial_epoch'] = 'iti'
-        # df.loc[(df['time'] >= trial_end) & (df['time'] < next_trial_start), 'trial_epoch'] = 'iti+'
+
         
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'feedback'] = list(trial_data['feedbackType'])[0]
         df.loc[(df['time'] >= trial_start) & (df['time'] < next_trial_start), 'next_feedback'] = list(next_trial['feedbackType'])[0]
