@@ -176,7 +176,12 @@ def subjects_interest_data(one, subjects_interest, phase, protocol):
                         training_1b = []
                         
                     # Select protocol
-                    if protocol == 'biased':
+                    if protocol == 'training':
+                        # If profficient keep all biased sessions after 1b
+                        subject_data = trials.loc[(trials['session_start_time'] > pd.to_datetime(training_1b)) 
+                                                  & (trials['task_protocol'].apply(lambda x: x[14:18])=='trai')]
+        
+                    elif protocol == 'biased':
                         # If profficient keep all biased sessions after 1b
                         subject_data = trials.loc[(trials['session_start_time'] > pd.to_datetime(training_1b)) 
                                                 & (trials['task_protocol'].apply(lambda x: x[14:18])=='bias')]
@@ -187,6 +192,17 @@ def subjects_interest_data(one, subjects_interest, phase, protocol):
                     else:
                         print('Protocol not contemplated yet')
                         
+                # Compute training day      
+                subject_data = (subject_data
+                                .set_index('session')
+                                .sort_values(by=['session_start_time', 'intervals_0'])
+                                .fillna(method='ffill')).reset_index()
+                number_sessions = len(subject_data['session'].unique())
+                training_day = pd.DataFrame(columns=['session', 'training_day'], index=range(number_sessions))
+                training_day['session'] = subject_data['session'].unique()
+                training_day['training_day'] = np.arange(1, number_sessions + 1)
+
+                subject_data = subject_data.merge(training_day, on='session')
 
                 # Save to main dataframe
                 if len(all_data) == 0:
@@ -198,78 +214,80 @@ def subjects_interest_data(one, subjects_interest, phase, protocol):
 
     return all_data
 
-    
-def get_trials(one, training_protocol='training', mouse_project='ibl_neuropixel_brainwide_01'):
 
-    # GETS DATA PER SESSION
-    """ Download session data """
-    # Search sessions of interest
-    sessions = one.search(task_protocol=training_protocol, project=mouse_project, details=True)
-    session_eids = sessions[0]
-    session_details = sessions[1]
+# Deprecated??
 
-    # Initialize dataframe to collect all data
-    all_trials = pd.DataFrame()
-    # Loop through sessions
-    for s, sess in enumerate(session_eids):
+# def get_trials(one, training_protocol='training', mouse_project='ibl_neuropixel_brainwide_01'):
 
-        # Try to donwload data or print a warning
-        try:
-            # Download trial data
-            trials = one.load_object(sess, obj='trials', namespace='ibl')
-            trials_df = trials.to_df()
+#     # GETS DATA PER SESSION
+#     """ Download session data """
+#     # Search sessions of interest
+#     sessions = one.search(task_protocol=training_protocol, project=mouse_project, details=True)
+#     session_eids = sessions[0]
+#     session_details = sessions[1]
 
-            # Compute trial id information
-            trials_df['trial_id'] = find_trial_ids(trials)[0]
-            # Save session details
-            trials_df['subject_nickname'] = session_details[s]['subject']
-            trials_df['session_date'] = session_details[s]['date']
-            trials_df['session_number'] = session_details[s]['number']
-            trials_df['task_protocol'] = session_details[s]['task_protocol']
-            trials_df['session_uuid'] = sess
+#     # Initialize dataframe to collect all data
+#     all_trials = pd.DataFrame()
+#     # Loop through sessions
+#     for s, sess in enumerate(session_eids):
 
-            # Save session data to big dataframe
-            if s == 0:
-                all_trials = trials_df.copy()
-            else:
-                all_trials = all_trials.append(trials_df)
+#         # Try to donwload data or print a warning
+#         try:
+#             # Download trial data
+#             trials = one.load_object(sess, obj='trials', namespace='ibl')
+#             trials_df = trials.to_df()
 
-        # Throw warning in case data can't be downloaded
-        except:
-            print(str('Problems with session:' + str(sess)))
+#             # Compute trial id information
+#             trials_df['trial_id'] = find_trial_ids(trials)[0]
+#             # Save session details
+#             trials_df['subject_nickname'] = session_details[s]['subject']
+#             trials_df['session_date'] = session_details[s]['date']
+#             trials_df['session_number'] = session_details[s]['number']
+#             trials_df['task_protocol'] = session_details[s]['task_protocol']
+#             trials_df['session_uuid'] = sess
 
-    """ Compute training day """
-    # Initialize dataframe for training days of all subejcts
-    all_subjects = pd.DataFrame()
+#             # Save session data to big dataframe
+#             if s == 0:
+#                 all_trials = trials_df.copy()
+#             else:
+#                 all_trials = all_trials.append(trials_df)
 
-    # Loop through subjects data
-    subjects = all_trials['subject_nickname'].unique()
-    for sub, subject in enumerate(subjects):
+#         # Throw warning in case data can't be downloaded
+#         except:
+#             print(str('Problems with session:' + str(sess)))
 
-        # Get subject data
-        subject_data = all_trials.loc[all_trials['subject_nickname'] == subject]
-        # Group by date
-        subject_sessions = pd.DataFrame(subject_data.groupby(['subject_nickname',
-                                                              'session_uuid'])
-                                        ['session_date'].max())
-        subject_sessions = subject_sessions.reset_index(level=[0, 1])
-        # Get rid of repeated dates (sessions of the same day have the same training day)
-        subject_sessions = subject_sessions[['subject_nickname', 'session_date']].drop_duplicates()
-        # TODO: this is not very good code; shoulds find a better way
-        # Sort dates and write corresponding training days
-        subject_sessions = subject_sessions.sort_values(by='session_date')
-        subject_sessions['training_day'] = np.arange(1, len(subject_sessions) + 1)
+#     """ Compute training day """
+#     # Initialize dataframe for training days of all subejcts
+#     all_subjects = pd.DataFrame()
 
-        # Save data in big dataframe
-        if sub == 0:
-            all_subjects = subject_sessions.copy()
-        else:
-            all_subjects = all_subjects.append(subject_sessions)
+#     # Loop through subjects data
+#     subjects = all_trials['subject_nickname'].unique()
+#     for sub, subject in enumerate(subjects):
 
-    # Merge training days dataframe with trials dataframe
-    df = all_trials.merge(all_subjects, on=['subject_nickname', 'session_date'], how='outer')
+#         # Get subject data
+#         subject_data = all_trials.loc[all_trials['subject_nickname'] == subject]
+#         # Group by date
+#         subject_sessions = pd.DataFrame(subject_data.groupby(['subject_nickname',
+#                                                               'session_uuid'])
+#                                         ['session_date'].max())
+#         subject_sessions = subject_sessions.reset_index(level=[0, 1])
+#         # Get rid of repeated dates (sessions of the same day have the same training day)
+#         subject_sessions = subject_sessions[['subject_nickname', 'session_date']].drop_duplicates()
+#         # TODO: this is not very good code; shoulds find a better way
+#         # Sort dates and write corresponding training days
+#         subject_sessions = subject_sessions.sort_values(by='session_date')
+#         subject_sessions['training_day'] = np.arange(1, len(subject_sessions) + 1)
 
-    return df
+#         # Save data in big dataframe
+#         if sub == 0:
+#             all_subjects = subject_sessions.copy()
+#         else:
+#             all_subjects = all_subjects.append(subject_sessions)
+
+#     # Merge training days dataframe with trials dataframe
+#     df = all_trials.merge(all_subjects, on=['subject_nickname', 'session_date'], how='outer')
+
+#     return df
 
 
 def get_first_session(trials):
