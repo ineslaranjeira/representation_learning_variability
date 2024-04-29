@@ -107,7 +107,7 @@ def create_movement_array(velocity, periods_below_threshold):
     return movement_array
 
 
-def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_max):
+def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_max, start_trial):
 
     # PLOT
     fig, axs = plt.subplots(nrows=trials_to_plot, ncols=1, sharex=True, sharey=False, figsize=[18, 14])
@@ -128,9 +128,9 @@ def stack_trial_events(one, session_trials, trials_to_plot, session_eid, time_ma
     
     for t, trial in enumerate(range(trials_to_plot)):
 
-        trial_start = use_data.loc[use_data['index']==t, 'intervals_0']
-        next_trial = use_data.loc[use_data['index']==t+1]
-        trial_data = use_data.loc[use_data['index']==t]
+        trial_start = use_data.loc[use_data['index']==t+start_trial, 'intervals_0']
+        next_trial = use_data.loc[use_data['index']==t+start_trial+1]
+        trial_data = use_data.loc[use_data['index']==t+start_trial]
         trial_feedback = trial_data['feedbackType']
 
         axs[t].vlines(np.array(trial_data['stimOn_times']) - trial_start,
@@ -227,13 +227,14 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min
     elif 'quiescence' in use_data.keys():
         quiescence_name = 'quiescence'
 
-    df = pd.DataFrame(columns=['trial', 'time', 'wheel', 'movement', 'trial_epoch', 
+    df = pd.DataFrame(columns=['trial', 'time', 'wheel_pos', 'wheel_vel', 'movement', 'trial_epoch', 
                                'feedback', 'next_feedback', 'signed_contrast', 
                                'response', 'reaction', 'choice', 'probabilityLeft'])
 
     # Wheel
     wheel_data = one.load_object(session_eid, 'wheel', collection='alf')
     pos, wheel_times = wh.interpolate_position(wheel_data.timestamps, wheel_data.position)
+
     # Calculate wheel velocity
     wheel_vel = wheel_velocity(bin_size, wheel_times, pos, use_data)
     wheel_trace = np.array(wheel_vel['avg_wheel_vel'])
@@ -244,7 +245,8 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min
 
     # Save data on dataframe
     df['time'] = wheel_times
-    df['wheel'] = wheel_trace
+    df['wheel_pos'] = pos
+    df['wheel_vel'] = wheel_trace
     df['movement'] = movement_array
 
     for t, trial in enumerate(range(len(use_data)-1)):
@@ -259,8 +261,6 @@ def wheel_trial_epoch(one, session_trials, session_eid, bin_size, threshold, min
         stim_on = list(trial_data['stimOn_times'])[0]
         first_movement = list(trial_data['firstMovement_times'])[0]
         response_time = list(trial_data['response_times'])[0]
-        # stim_off = list(trial_data['feedback_times'])[0]
-        # trial_end = list(trial_data['intervals_1'])[0]
         next_trial_start = list(next_trial['intervals_0'])[0]
 
         # Compute intervals
