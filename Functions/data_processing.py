@@ -117,26 +117,26 @@ def group_per_phase(data, label = 'broader_label'):
 
 
 """ Processing of timeseries data """
-def time_intervals(session_trials):
+# def time_intervals(session_trials):
     
-    session_trials = prepro(session_trials)
-    session_trials['ITI'] = session_trials['intervals_1'] - session_trials['stimOff_times']
-    session_trials['feedback_time'] = session_trials['stimOff_times'] - session_trials['feedback_times']
-    session_trials['movement_time'] = session_trials['feedback_times'] - session_trials['firstMovement_times']
-    session_trials['failing_quiescence'] = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod'] - session_trials['intervals_0']
-    session_trials['full_ITI'] = session_trials['ITI']*np.NaN
-    session_trials['full_ITI'][:-1] = np.array(session_trials['intervals_0'][1:]) - np.array(session_trials['stimOff_times'][:-1])
-    session_trials['feedback_ITI'] = session_trials['ITI']*np.NaN
-    session_trials['feedback_ITI'][:-1] = np.array(session_trials['intervals_0'][1:]) - np.array(session_trials['feedback_times'][:-1])
-    session_trials['prev_feedback'] = session_trials['feedbackType'] * np.nan
-    session_trials['prev_feedback'][1:] = session_trials['feedbackType'][:-1]   
-    session_trials['long_ITI'] =  session_trials['ITI']*np.NaN
-    session_trials['long_ITI'][:-1] =  np.array(session_trials['goCueTrigger_times'][1:]) - np.array(session_trials['feedback_times'][:-1])
-    session_trials['elongated_quiesc'] = session_trials['failing_quiescence']
-    session_trials.loc[session_trials['elongated_quiesc'] < 0.1, 'elongated_quiesc'] = 0
-    session_trials.loc[session_trials['elongated_quiesc'] >= 0.1, 'elongated_quiesc'] = 1
+#     session_trials = prepro(session_trials)
+#     session_trials['ITI'] = session_trials['intervals_1'] - session_trials['stimOff_times']
+#     session_trials['feedback_time'] = session_trials['stimOff_times'] - session_trials['feedback_times']
+#     session_trials['movement_time'] = session_trials['feedback_times'] - session_trials['firstMovement_times']
+#     session_trials['failing_quiescence'] = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod'] - session_trials['intervals_0']
+#     session_trials['full_ITI'] = session_trials['ITI']*np.NaN
+#     session_trials['full_ITI'][:-1] = np.array(session_trials['intervals_0'][1:]) - np.array(session_trials['stimOff_times'][:-1])
+#     session_trials['feedback_ITI'] = session_trials['ITI']*np.NaN
+#     session_trials['feedback_ITI'][:-1] = np.array(session_trials['intervals_0'][1:]) - np.array(session_trials['feedback_times'][:-1])
+#     session_trials['prev_feedback'] = session_trials['feedbackType'] * np.nan
+#     session_trials['prev_feedback'][1:] = session_trials['feedbackType'][:-1]   
+#     session_trials['long_ITI'] =  session_trials['ITI']*np.NaN
+#     session_trials['long_ITI'][:-1] =  np.array(session_trials['goCueTrigger_times'][1:]) - np.array(session_trials['feedback_times'][:-1])
+#     session_trials['elongated_quiesc'] = session_trials['failing_quiescence']
+#     session_trials.loc[session_trials['elongated_quiesc'] < 0.1, 'elongated_quiesc'] = 0
+#     session_trials.loc[session_trials['elongated_quiesc'] >= 0.1, 'elongated_quiesc'] = 1
     
-    return session_trials
+#     return session_trials
 
 
 def process_quiescence(df):
