@@ -19,7 +19,7 @@ from scipy.interpolate import interp1d
 
 # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 
@@ -255,7 +255,8 @@ def interpolate(time_snippet, snippet, size, plot):
     rescaled_array = f(new_x)
     
     if plot == True:
-        plt.plot(x, y, 'o', new_x, rescaled_array, '-')
+        # plt.plot(x, y, 'o', new_x, rescaled_array, '-')
+        plt.plot(new_x, rescaled_array, '-')
         plt.plot(x, snippet)
         plt.xlabel('Time')
         plt.ylabel('Data')
