@@ -18,6 +18,7 @@ from copy import deepcopy
 
 one = ONE()
 
+# %%
 def Find(pattern, path):
 
     '''
@@ -90,7 +91,7 @@ def load_lp(eid, cam, masked=True, paws=True,
 #            if 'likelihood' in k:
 #                del d[k]    
 
-    
+    d = {}  # Ines added
     d['times'] = np.load(one.eid2path(eid) / 'alf'
                     / f'_ibl_leftCamera.times.npy')
                     
@@ -105,9 +106,11 @@ def load_lp(eid, cam, masked=True, paws=True,
 
     if (not paws and reso == '128x102_128x128'):
         # load old complete lp file        
-        pth = ('/mnt/616e7cfa-ba4d-4fbf-9400-dc0640f8238f/lp_ens'
-              f'/{reso}/{eid}/_ibl_{cam}Camera.lightningPose.pqt') 
-
+        # pth = ('/mnt/616e7cfa-ba4d-4fbf-9400-dc0640f8238f/lp_ens'
+        #       f'/{reso}/{eid}/_ibl_{cam}Camera.lightningPose.pqt') 
+        # pth = ('/home/ines/Downloads/_ibl_leftCamera.lightningPose.30a17aa2-1c01-4b29-a28c-2ab4f13bce7e.pqt') 
+        pth = ('/home/ines/Downloads/_ibl_leftCamera.lightningPose.6129d18a-61ca-48f7-990a-c93552674db6.pqt') 
+        # pth = ('/home/ines/Downloads/_ibl_leftCamera.lightningPose.b6f15e64-4311-4500-ac52-aebcfa8eb528.pqt')
         d = pd.read_parquet(pth)    
 
         if masked:
@@ -210,7 +213,7 @@ def Viewer(eid, video_type, frame_start, frame_stop, save_video=True,
      
     if lp:
 
-        cam = load_lp(eid, video_type, paws=True,
+        cam = load_lp(eid, video_type, paws=False,
               reso=res, flav='multi')
               
               
@@ -538,10 +541,12 @@ def Viewer(eid, video_type, frame_start, frame_stop, save_video=True,
     #return XYs, Times
 
 # %%
-session_eid = '616e7cfa-ba4d-4fbf-9400-dc0640f8238f'
+session_eid = 'c4a4d9d8-a5f6-48b6-b4b6-a23f3f76e9ee'
+# session_eid = '7330f879-8dfc-4344-af84-cd422199bddc'
 # Viewer(eid, video_type, frame_start, frame_stop, save_video=True, 
 #            eye_zoom=False, lp=False, ens=False,
 #            res = '128x102_128x128', masked=True, paws_only=False,
 #            smooth_dlc = False)
-Viewer(session_eid, 'left', 1, 100, lp=True)
+Viewer(session_eid, 'left', 1, 10000, lp=True)
+
 # %%
