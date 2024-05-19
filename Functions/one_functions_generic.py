@@ -195,8 +195,7 @@ def subjects_interest_data(one, subjects_interest, phase, protocol):
                 # Compute training day      
                 subject_data = (subject_data
                                 .set_index('session')
-                                .sort_values(by=['session_start_time', 'intervals_0'])
-                                .fillna(method='ffill')).reset_index()
+                                .sort_values(by=['session_start_time', 'intervals_0'])).reset_index()
                 number_sessions = len(subject_data['session'].unique())
                 training_day = pd.DataFrame(columns=['session', 'training_day'], index=range(number_sessions))
                 training_day['session'] = subject_data['session'].unique()
