@@ -14,6 +14,8 @@ from datetime import datetime
 
 current_path="/Volumes/ctessereau/Backup_USB_Charline/PostdocSwap/IBL/IDEA/"
 current_path='/home/ines/repositories/representation_learning_variability/IBL_IDEA/'
+current_path='/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/IBL_IDEA/'
+
 # current_path="C:/proj/int-brain-lab/survey-analysis/"
 df_1 = pd.read_csv(current_path+"Anonymous IBL Survey 2022.csv")
 df_2 = pd.read_csv(current_path+"Anonymous IBL Survey 2023.csv")
@@ -95,8 +97,13 @@ melted = pd.melt(merged.reset_index(), id_vars=['index'], value_vars=['2022 - N=
                                                                       '2024 - N='+ str(len(respondent_position_2024))])
 #%%
 # Plot
-color_palette = sns.color_palette("hls", 8)
+melted.loc[(melted['Year'] =='2022 - N='+ str(len(respondent_position_2022))), 'value'] = np.nan
+melted.loc[(melted['Year'] =='2023 - N='+ str(len(respondent_position_2023))), 'value'] = np.nan
+
+color_palette = sns.color_palette("hls", 3)
+color_palette = sns.dark_palette("#69d", 3)
 melted = melted.rename(columns={'variable': 'Year'})
+plt.figure(figsize=(8, 5))
 sns.barplot(x='index', y='value', hue='Year', data=melted, palette=color_palette)
 sns.despine()
 plt.ylim([0, 1])
@@ -104,7 +111,7 @@ plt.xticks(fontsize=fs-5)
 plt.yticks(fontsize=fs-5)
 plt.xlabel('Role in the IBL', fontsize=fs)
 plt.ylabel('Fraction of respondents', fontsize=fs)
-plt.title('Responsiveness to the survey', fontsize=fs)
+# plt.title('Responsiveness to the survey', fontsize=fs)
 # %%
 
 def plot_help(df, question, color,base):
