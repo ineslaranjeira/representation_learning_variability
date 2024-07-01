@@ -600,7 +600,6 @@ def traces_over_sates (init, design_matrix, session_trials, columns_to_standardi
     plt.show()
     
 
-
 def traces_over_few_sates (init, design_matrix, session_trials, columns_to_standardize):
     # Compute the most likely states
     
@@ -612,30 +611,44 @@ def traces_over_few_sates (init, design_matrix, session_trials, columns_to_stand
     df_normalized['Bin'] = design_matrix['Bin']
     
     use_normalized = df_normalized.loc[(df_normalized['Bin']>init) & (df_normalized['Bin']<end)]
-    
-    axs.imshow(use_normalized['most_likely_states'][None,:], 
-            extent=(0, len(use_normalized['most_likely_states']), -1, 1),
-            aspect="auto",
-            cmap='viridis',
-            alpha=0.3) 
-
-    axs.vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, label='Stim On', color='Black', linewidth=2)
-    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, label='Correct', color='Green', linewidth=2)
-    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, label='Incorrect', color='Red', linewidth=2)
-    axs.vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, label='First movement', color='Blue')
-    axs.vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, label='Trial end', color='Grey', linewidth=2)
-    axs.vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, label='Quiescence start', color='Pink', linewidth=2)
-
-    axs.hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
     if len(columns_to_standardize) == 2:
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[1]], label=columns_to_standardize[1], linewidth=2)
+        plot_max = np.max([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]]])
+        plot_min = np.min([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]]])
     elif len(columns_to_standardize) == 1:
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
-    
-    axs.set_ylim(-1, 1)
+        plot_max = np.max(use_normalized[columns_to_standardize[0]])
+        plot_min = np.min(use_normalized[columns_to_standardize[0]])
+    elif len(columns_to_standardize) == 3:
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[1]], label=columns_to_standardize[1], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[2]], label=columns_to_standardize[2], linewidth=2)
+        plot_max = np.max([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]],
+                           use_normalized[columns_to_standardize[2]]])
+        plot_min = np.min([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]],
+                           use_normalized[columns_to_standardize[2]]])
+    axs.imshow(use_normalized['most_likely_states'][None,:], 
+            extent=(0, len(use_normalized['most_likely_states']), plot_min, plot_max),
+            aspect="auto",
+            cmap='viridis',
+            alpha=0.3) 
+
+    axs.hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
+    axs.vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, label='Stim On', color='Black', linewidth=2)
+    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Correct', color='Green', linewidth=2)
+    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Incorrect', color='Red', linewidth=2)
+    axs.vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, label='First movement', color='Blue')
+    axs.vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, label='Trial end', color='Grey', linewidth=2)
+    axs.vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
+
+    axs.set_ylim(plot_min, plot_max)
     axs.set_ylabel("emissions")
     axs.set_xlabel("time (s)")
     axs.set_xlim(0, end-init)
@@ -646,4 +659,3 @@ def traces_over_few_sates (init, design_matrix, session_trials, columns_to_stand
     plt.tight_layout()
     plt.show()
     
-
