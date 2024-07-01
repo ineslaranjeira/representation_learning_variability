@@ -66,6 +66,43 @@ def cross_validate_model(model, key, all_emissions, train_emissions, method_to_u
     return val_lls, fit_params, init_params, baseline_val_lls, ll_train
 
 
+def cross_validate_poismodel(model, key, all_emissions, train_emissions, method_to_use, num_train_batches, num_iters=100):
+    # Initialize the parameters using K-Means on the full training set
+    init_params, props = model.initialize(key=key)
+
+    # Split the training data into folds.
+    # Note: this is memory inefficient but it highlights the use of vmap.
+    folds = jnp.stack([
+        jnp.concatenate([train_emissions[:i], train_emissions[i+1:]])
+        for i in range(num_train_batches)])
+
+    # Baseline model has the same number of states but random initialization
+    def _fit_fold_baseline(y_train, y_val):
+        return model.marginal_log_prob(init_params, y_val) # np.shape(y_val)[1]
+    
+    # Then actually fit the model to data
+    def _fit_fold(y_train, y_val):
+        fit_params, train_lps = model.fit_em(init_params, props, y_train, 
+                                             num_iters=num_iters, verbose=False)
+        return model.marginal_log_prob(fit_params, y_val) , fit_params  # np.shape(y_val)[1]
+    
+    # Get log likelihood without cross-validation
+    def _train_ll(all_emissions):
+        fit_params_non_cv, _ = model.fit_em(init_params, props, all_emissions,
+                                            num_iters=num_iters, verbose=False)
+        ll_train = model.marginal_log_prob(fit_params_non_cv, all_emissions)/len(all_emissions)
+        return ll_train
+
+    ll_train = _train_ll(all_emissions)
+    
+    val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions)
+    
+    baseline_val_lls = vmap(_fit_fold_baseline)(folds, train_emissions)
+
+    return val_lls, fit_params, init_params, baseline_val_lls
+
+
+
 def cross_validate_armodel(model, key, all_emissions, train_emissions, train_inputs, method_to_use, num_train_batches, num_iters=100):
     # Initialize the parameters using K-Means on the full training set
     #init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
