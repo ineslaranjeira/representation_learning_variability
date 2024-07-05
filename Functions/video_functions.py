@@ -479,17 +479,16 @@ def tongue_tip(XYs):
 # Find left paw
 def left_paw(XYs):
 
-    X = XYs['paw_l'][:, 0]
-    Y = XYs['paw_l'][:, 1]
+    X = XYs['paw_r'][:, 0]
+    Y = XYs['paw_r'][:, 1]
 
     return Y, X
-
 
 # Find right paw
 def right_paw(XYs):
 
-    X = XYs['paw_r'][:, 0]
-    Y = XYs['paw_r'][:, 1]
+    X = XYs['paw_l'][:, 0]
+    Y = XYs['paw_l'][:, 1]
 
     return Y, X
 
