@@ -98,19 +98,19 @@ def plot_states_aligned(init, end, reduced_design_matrix, event_type_name, bin_s
         # Correct left
         a = sns.histplot(x='new_bin', hue='most_likely_states', data=use_data.loc[(use_data['correct']==1) 
                                                                                 & (use_data['choice']=='left')], stat='count', alpha=0.3, 
-                        multiple="stack", binwidth=bin_size, binrange=(bin_size*init, bin_size*end), legend=False, ax = ax[0, 0], palette='viridis')
+                        multiple="stack", binwidth=bin_size, binrange=(bin_size*init+0.01, bin_size*end), legend=False, ax = ax[0, 0], palette='viridis')
         # Correct right
         b = sns.histplot(x='new_bin', hue='most_likely_states', data=use_data.loc[(use_data['correct']==1) 
                                                                                 & (use_data['choice']=='right')], stat='count', alpha=0.3, 
-                        multiple="stack", binwidth=bin_size, binrange=(bin_size*init, bin_size*end), legend=False, ax = ax[0, 1], palette='viridis')
+                        multiple="stack", binwidth=bin_size, binrange=(bin_size*init+0.01, bin_size*end), legend=False, ax = ax[0, 1], palette='viridis')
         # Incorrect left
         c = sns.histplot(x='new_bin', hue='most_likely_states', data=use_data.loc[(use_data['correct']==0) 
                                                                                 & (use_data['choice']=='left')], stat='count', alpha=0.3,
-                        multiple="stack", binwidth=bin_size, binrange=(bin_size*init, bin_size*end), legend=False, ax = ax[1, 0], palette='viridis')
+                        multiple="stack", binwidth=bin_size, binrange=(bin_size*init+0.01, bin_size*end), legend=False, ax = ax[1, 0], palette='viridis')
         # Incorrect right
         d = sns.histplot(x='new_bin', hue='most_likely_states', data=use_data.loc[(use_data['correct']==0) 
                                                                                 & (use_data['choice']=='right')], alpha=0.3, 
-                        stat='count', multiple="stack", binwidth=bin_size, binrange=(bin_size*init, bin_size*end), legend=False, ax = ax[1, 1], palette='viridis')
+                        stat='count', multiple="stack", binwidth=bin_size, binrange=(bin_size*init+0.01, bin_size*end), legend=False, ax = ax[1, 1], palette='viridis')
         
         # ax[0, 0].set_title(str(this_event + ' - correct left'))
         # ax[0, 0].set_xlabel(str('Time from event (s)'))
@@ -515,11 +515,11 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
     plt.show()
 
 
-def traces_over_sates (init, design_matrix, session_trials, columns_to_standardize):
+def traces_over_sates (init, interval, design_matrix, session_trials):
     
     # Compute the most likely states
     # design matrix arg should be empirical_data
-    end = init + 200
+    end = init + interval
 
     fig, axs = plt.subplots(3, 1, sharex=True, sharey=True, figsize=(15, 8))
 
@@ -600,10 +600,10 @@ def traces_over_sates (init, design_matrix, session_trials, columns_to_standardi
     plt.show()
     
 
-def traces_over_few_sates (init, design_matrix, session_trials, columns_to_standardize):
+def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_to_standardize):
     # Compute the most likely states
     
-    end = init + 100
+    end = init + inter
 
     fig, axs = plt.subplots(1, 1, sharex=True, sharey=True, figsize=(12, 4))
 
@@ -634,6 +634,19 @@ def traces_over_few_sates (init, design_matrix, session_trials, columns_to_stand
         plot_min = np.min([use_normalized[columns_to_standardize[0]], 
                            use_normalized[columns_to_standardize[1]],
                            use_normalized[columns_to_standardize[2]]])
+    elif len(columns_to_standardize) == 4:
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[1]], label=columns_to_standardize[1], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[2]], label=columns_to_standardize[2], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[3]], label=columns_to_standardize[3], linewidth=2)
+        plot_max = np.max([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]],
+                           use_normalized[columns_to_standardize[2]],
+                           use_normalized[columns_to_standardize[3]]])
+        plot_min = np.min([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]],
+                           use_normalized[columns_to_standardize[2]],
+                           use_normalized[columns_to_standardize[3]]])
     axs.imshow(use_normalized['most_likely_states'][None,:], 
             extent=(0, len(use_normalized['most_likely_states']), plot_min, plot_max),
             aspect="auto",
