@@ -26,7 +26,7 @@ def lick_rate(bin_size, lick_times, trials):
     # Count events within each time bin
     count_values = df.groupby('Bin')['Lick times'].count()
     count_values = count_values.rename('Lick count')
-    merged_df = df.merge(count_values, left_index=True, right_index=True, how='left')
+    merged_df = df.merge(count_values, on='Bin', how='outer')
     
     return merged_df
 
