@@ -66,7 +66,7 @@ def cross_validate_model(model, key, all_emissions, train_emissions, method_to_u
     return val_lls, fit_params, init_params, baseline_val_lls, ll_train
 
 
-def cross_validate_poismodel(model, key, all_emissions, train_emissions, method_to_use, num_train_batches, num_iters=100):
+def cross_validate_poismodel(model, key, all_emissions, train_emissions, num_train_batches, num_iters=100):
     # Initialize the parameters using K-Means on the full training set
     init_params, props = model.initialize(key=key)
 

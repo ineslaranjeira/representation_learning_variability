@@ -541,12 +541,18 @@ def Viewer(eid, video_type, frame_start, frame_stop, save_video=True,
     #return XYs, Times
 
 # %%
-session_eid = 'c4a4d9d8-a5f6-48b6-b4b6-a23f3f76e9ee'
-# session_eid = '7330f879-8dfc-4344-af84-cd422199bddc'
-# Viewer(eid, video_type, frame_start, frame_stop, save_video=True, 
-#            eye_zoom=False, lp=False, ens=False,
-#            res = '128x102_128x128', masked=True, paws_only=False,
-#            smooth_dlc = False)
-Viewer(session_eid, 'left', 1, 10000, lp=True)
+
+import pickle
+# Choose a session with good QC
+data_path = '/home/ines/repositories/representation_learning_variability/Video and wheel/'
+# data_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Video and wheel/'
+
+os.chdir(data_path)
+pass_qc = pickle.load(open(data_path + "good_brainwide_sessions_metadata", "rb"))
+pass_qc = pickle.load(open(data_path + "good_dlc_bwm_sessions_metadata", "rb"))
+# mouse_names = pass_qc['subject_nickname'].unique()
+#%%
+for s, session in enumerate(pass_qc['session_uuid'].unique()[46:]):
+    Viewer(session, 'left', 1, 10000, lp=False)
 
 # %%
