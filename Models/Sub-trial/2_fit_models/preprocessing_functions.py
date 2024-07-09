@@ -132,9 +132,35 @@ def concatenate_sessions (mouse_names, matrix_all, matrix_all_unnorm, session_al
     for mouse in np.unique(mouse_names):
         if len(np.where(mouse_names==mouse)[0]) > 1 and len(mouse) > 0:
             mouse_sessions = list(matrix_all[mouse].keys())
-            for s, session in enumerate(mouse_sessions):
-                collapsed_matrices[mouse] = np.vstack(matrix_all[mouse][session])
-                collapsed_unnorm[mouse] = np.vstack(matrix_all_unnorm[mouse][session])
-                collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
-                
+            collapsed_matrices[mouse] = np.concatenate([matrix_all[mouse][k] for k in mouse_sessions])
+            collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
+            collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
+            
     return collapsed_matrices, collapsed_unnorm, collapsed_trials
+
+
+def fix_discontinuities(session_trials, design_matrix_heading):
+    
+    cum_timing_vars = ['intervals_bpod_0', 'intervals_bpod_1', 'stimOn_times',
+                       'goCueTrigger_times', 'stimOff_times', 'goCue_times', 'response_times',
+                       'feedback_times', 'firstMovement_times', 'intervals_0', 'intervals_1']
+    
+    time_discs = np.where(np.diff(np.array(session_trials[cum_timing_vars[0]]))<0)[0]
+    bin_discs = np.where(np.diff(np.array(design_matrix_heading['Bin']))<0)[0]
+    
+    # Fix as many times as there are discontinuities
+    for d in range(len(time_discs)):
+        time_disc = time_discs[d]
+        bin_disc = bin_discs[d]
+        
+        trial_reset_time = session_trials['intervals_bpod_0'][time_disc]
+        
+        # Fix timing variables
+        for v in cum_timing_vars:
+            session_trials[v][time_disc+1:] = session_trials[v][time_disc+1:] + session_trials['intervals_bpod_0'][time_disc]
+            
+        # Fix bin count
+        design_matrix_heading['Bin'][bin_disc+1:] = design_matrix_heading['Bin'][bin_disc+1:] + trial_reset_time * 10
+        
+        
+    return session_trials, design_matrix_heading
