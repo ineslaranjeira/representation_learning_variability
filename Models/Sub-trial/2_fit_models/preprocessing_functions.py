@@ -135,7 +135,12 @@ def concatenate_sessions (mouse_names, matrix_all, matrix_all_unnorm, session_al
             collapsed_matrices[mouse] = np.concatenate([matrix_all[mouse][k] for k in mouse_sessions])
             collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
             collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
-            
+        elif len(np.where(mouse_names==mouse)[0]) == 1 and len(mouse) > 0:
+            mouse_session = list(matrix_all[mouse].keys())
+            collapsed_matrices[mouse] = matrix_all[mouse][mouse_session[0]]
+            collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
+            collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
+        
     return collapsed_matrices, collapsed_unnorm, collapsed_trials
 
 
