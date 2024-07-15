@@ -474,20 +474,8 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
                                         (session_trials['goCueTrigger_times']> trial_bin/10-2)]
         
         # # Plot trial
-        # axs[t].imshow(
-        #     np.array(bin_data['most_likely_states'])[None,:], 
-        #     extent=(0, len(bin_data['most_likely_states']), -1, 1),
-        #     aspect="auto",
-        #     cmap=colors,
-        #     alpha=0.3) 
         # Hacky solution to make sure color palette is used properly
-        attach_array = np.arange(0, num_states, 1)
-        # axs[t].imshow(
-        #     np.concatenate([bin_data['most_likely_states'], [0, 1, 2, 3, 4, 5]])[None,:], 
-        #     extent=(0, len(np.concatenate([bin_data['most_likely_states'], [0, 1, 2, 3, 4, 5]])), -1, 1),
-        #     aspect="auto",
-        #     cmap='viridis',
-        #     alpha=0.3) 
+        attach_array = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
         axs[t].imshow(
             np.concatenate([bin_data['most_likely_states'], attach_array])[None,:], 
             extent=(0, len(np.concatenate([bin_data['most_likely_states'], attach_array])), -1, 1),
@@ -515,6 +503,91 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
     plt.show()
 
 
+# def traces_over_sates (init, interval, design_matrix, session_trials):
+    
+#     # Compute the most likely states
+#     # design matrix arg should be empirical_data
+#     end = init + interval
+
+#     fig, axs = plt.subplots(3, 1, sharex=True, sharey=True, figsize=(15, 8))
+
+#     df_normalized = design_matrix.copy()
+#     df_normalized['Bin'] = design_matrix['Bin']
+#     use_normalized = df_normalized.loc[(df_normalized['Bin']>init) & (df_normalized['Bin']<end)]
+
+#     axs[0].imshow(use_normalized['most_likely_states'][None,:], 
+#             extent=(0, len(use_normalized['most_likely_states']), -1, 1),
+#             aspect="auto",
+#             cmap='viridis',
+#             alpha=0.3) 
+#     axs[0].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, label='Stim On', color='Black', linewidth=2)
+#     axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, label='Correct', color='Green', linewidth=2)
+#     axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, label='Incorrect', color='Red', linewidth=2)
+#     axs[0].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, label='First movement', color='Blue')
+#     axs[0].vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, label='Trial end', color='Grey', linewidth=2)
+#     axs[0].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, label='Quiescence start', color='Pink', linewidth=2)
+
+#     axs[0].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
+
+#     # Plot original values
+#     axs[0].plot(df_normalized['Bin']-init, df_normalized['avg_wheel_vel'], label='Wheel velocity', linewidth=2)
+#     axs[0].plot(df_normalized['Bin']-init, df_normalized['l_paw_speed'], label='Paw speed', linewidth=2)
+
+#     axs[1].imshow(use_normalized['most_likely_states'][None,:], 
+#             extent=(0, len(use_normalized['most_likely_states']), -1, 1),
+#             aspect="auto",
+#             cmap='viridis',
+#             alpha=0.3) 
+
+#     axs[1].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, color='Black', linewidth=2)
+#     axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, color='Green', linewidth=2)
+#     axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, color='Red', linewidth=2)
+#     axs[1].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, color='Blue')
+#     axs[1].vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, color='Grey', linewidth=2)
+#     axs[1].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, color='Pink', linewidth=2)
+#     axs[1].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
+
+#     # Plot original values
+#     axs[1].plot(df_normalized['Bin']-init, df_normalized['whisker_me'], label='Whisker ME', linewidth=2)
+#     axs[1].plot(df_normalized['Bin']-init, df_normalized['nose_speed'], label='Nose speed', linewidth=2)
+#     axs[1].plot(df_normalized['Bin']-init, df_normalized['Lick count'], label='Licks', linewidth=2)
+
+#     axs[2].imshow(use_normalized['most_likely_states'][None,:], 
+#             extent=(0, len(use_normalized['most_likely_states']), -1, 1),
+#             aspect="auto",
+#             cmap='viridis',
+#             alpha=0.3) 
+
+#     axs[2].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, color='Black', linewidth=2)
+#     axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, color='Green', linewidth=2)
+#     axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, color='Red', linewidth=2)
+#     axs[2].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, color='Blue')
+#     axs[2].vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, color='Grey', linewidth=2)
+#     axs[2].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, color='Pink', linewidth=2)
+#     axs[2].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
+
+#     # Plot original values
+#     axs[2].plot(df_normalized['Bin']-init, df_normalized['pupil_diameter'], label='Pupil diameter', linewidth=2)
+#     axs[2].plot(df_normalized['Bin']-init, df_normalized['pupil_speed'], label='Pupil speed', linewidth=2)
+
+
+#     axs[0].set_ylim(-1, 1)
+
+#     axs[0].set_ylabel("emissions")
+#     axs[1].set_ylabel("emissions")
+#     axs[2].set_ylabel("emissions")
+#     axs[2].set_xlabel("time (s)")
+#     axs[0].set_xlim(0, end-init)
+#     axs[0].set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+#     axs[0].set_title("inferred states")
+#     axs[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
+#     axs[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
+#     axs[2].legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+#     plt.tight_layout()
+#     plt.show()
+    
+
 def traces_over_sates (init, interval, design_matrix, session_trials):
     
     # Compute the most likely states
@@ -526,64 +599,75 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
     df_normalized = design_matrix.copy()
     df_normalized['Bin'] = design_matrix['Bin']
     use_normalized = df_normalized.loc[(df_normalized['Bin']>init) & (df_normalized['Bin']<end)]
-
-    axs[0].imshow(use_normalized['most_likely_states'][None,:], 
-            extent=(0, len(use_normalized['most_likely_states']), -1, 1),
+    
+    # To make sure color code is used correctly
+    number_of_states = len(use_normalized['most_likely_states'].unique()) - np.sum(np.isnan(use_normalized['most_likely_states'].unique()))
+    states_to_append = np.arange(0, number_of_states, 1)
+    
+    
+    plot_max = np.max([use_normalized['avg_wheel_vel'], use_normalized['whisker_me'],
+                       use_normalized['nose_X'], use_normalized['nose_Y'],
+                       use_normalized['Lick count']])
+    plot_min = np.min([use_normalized['avg_wheel_vel'], use_normalized['whisker_me'],
+                       use_normalized['nose_X'], use_normalized['nose_Y'],
+                       use_normalized['Lick count']])
+    
+    axs[0].imshow(np.concatenate([use_normalized['most_likely_states'], states_to_append])[None,:],  
+            extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), plot_min, plot_max),
             aspect="auto",
             cmap='viridis',
             alpha=0.3) 
-    axs[0].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, label='Stim On', color='Black', linewidth=2)
-    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, label='Correct', color='Green', linewidth=2)
-    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, label='Incorrect', color='Red', linewidth=2)
-    axs[0].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, label='First movement', color='Blue')
-    axs[0].vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, label='Trial end', color='Grey', linewidth=2)
-    axs[0].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, label='Quiescence start', color='Pink', linewidth=2)
+    axs[0].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, label='Stim On', color='Black', linewidth=2)
+    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Correct', color='Green', linewidth=2)
+    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Incorrect', color='Red', linewidth=2)
+    axs[0].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, label='First movement', color='Blue')
+    axs[0].vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, label='Trial end', color='Grey', linewidth=2)
+    axs[0].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
 
     axs[0].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
     axs[0].plot(df_normalized['Bin']-init, df_normalized['avg_wheel_vel'], label='Wheel velocity', linewidth=2)
-    axs[0].plot(df_normalized['Bin']-init, df_normalized['l_paw_speed'], label='Paw speed', linewidth=2)
+    # axs[0].plot(df_normalized['Bin']-init, df_normalized['l_paw_speed'], label='Paw speed', linewidth=2)
 
-    axs[1].imshow(use_normalized['most_likely_states'][None,:], 
-            extent=(0, len(use_normalized['most_likely_states']), -1, 1),
+    axs[1].imshow(np.concatenate([use_normalized['most_likely_states'], states_to_append])[None,:], 
+            extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), plot_min, plot_max),
             aspect="auto",
             cmap='viridis',
             alpha=0.3) 
 
-    axs[1].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, color='Black', linewidth=2)
-    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, color='Green', linewidth=2)
-    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, color='Red', linewidth=2)
-    axs[1].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, color='Blue')
-    axs[1].vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, color='Grey', linewidth=2)
-    axs[1].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, color='Pink', linewidth=2)
+    axs[1].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, color='Black', linewidth=2)
+    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Green', linewidth=2)
+    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Red', linewidth=2)
+    axs[1].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, color='Blue')
+    axs[1].vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, color='Grey', linewidth=2)
+    axs[1].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, color='Pink', linewidth=2)
     axs[1].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
     axs[1].plot(df_normalized['Bin']-init, df_normalized['whisker_me'], label='Whisker ME', linewidth=2)
-    axs[1].plot(df_normalized['Bin']-init, df_normalized['nose_speed'], label='Nose speed', linewidth=2)
-    axs[1].plot(df_normalized['Bin']-init, df_normalized['Lick count'], label='Licks', linewidth=2)
+    axs[1].plot(df_normalized['Bin']-init, df_normalized['nose_X'], label='Nose X', linewidth=2)
+    axs[1].plot(df_normalized['Bin']-init, df_normalized['nose_Y'], label='Nose Y', linewidth=2)
 
-    axs[2].imshow(use_normalized['most_likely_states'][None,:], 
-            extent=(0, len(use_normalized['most_likely_states']), -1, 1),
+    axs[2].imshow(np.concatenate([use_normalized['most_likely_states'], states_to_append])[None,:], 
+            extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), plot_min, plot_max),
             aspect="auto",
             cmap='viridis',
             alpha=0.3) 
 
-    axs[2].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init,-1, 1, color='Black', linewidth=2)
-    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, -1, 1, color='Green', linewidth=2)
-    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, -1, 1, color='Red', linewidth=2)
-    axs[2].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, -1, 1, color='Blue')
-    axs[2].vlines(np.array(session_trials['intervals_0'] * 10)-init, -1, 1, color='Grey', linewidth=2)
-    axs[2].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, -1, 1, color='Pink', linewidth=2)
+    axs[2].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, color='Black', linewidth=2)
+    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Green', linewidth=2)
+    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Red', linewidth=2)
+    axs[2].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, color='Blue')
+    axs[2].vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, color='Grey', linewidth=2)
+    axs[2].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, color='Pink', linewidth=2)
     axs[2].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
-    axs[2].plot(df_normalized['Bin']-init, df_normalized['pupil_diameter'], label='Pupil diameter', linewidth=2)
-    axs[2].plot(df_normalized['Bin']-init, df_normalized['pupil_speed'], label='Pupil speed', linewidth=2)
+    axs[2].plot(df_normalized['Bin']-init, df_normalized['Lick count'], label='Lick count', linewidth=2)
 
 
-    axs[0].set_ylim(-1, 1)
+    axs[0].set_ylim(plot_min, plot_max)
 
     axs[0].set_ylabel("emissions")
     axs[1].set_ylabel("emissions")
@@ -599,7 +683,7 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
     plt.tight_layout()
     plt.show()
     
-
+    
 def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_to_standardize):
     # Compute the most likely states
     
@@ -611,7 +695,11 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
     df_normalized['Bin'] = design_matrix['Bin']
     
     use_normalized = df_normalized.loc[(df_normalized['Bin']>init) & (df_normalized['Bin']<end)]
-
+    
+    # To make sure color code is used correctly
+    number_of_states = len(use_normalized['most_likely_states'].unique()) - np.sum(np.isnan(use_normalized['most_likely_states'].unique()))
+    states_to_append = np.arange(0, number_of_states, 1)
+    
     # Plot original values
     if len(columns_to_standardize) == 2:
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
@@ -647,8 +735,8 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
                            use_normalized[columns_to_standardize[1]],
                            use_normalized[columns_to_standardize[2]],
                            use_normalized[columns_to_standardize[3]]])
-    axs.imshow(use_normalized['most_likely_states'][None,:], 
-            extent=(0, len(use_normalized['most_likely_states']), plot_min, plot_max),
+    axs.imshow(np.concatenate([use_normalized['most_likely_states'], states_to_append])[None,:], 
+            extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), plot_min, plot_max),
             aspect="auto",
             cmap='viridis',
             alpha=0.3) 
@@ -671,4 +759,3 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
 
     plt.tight_layout()
     plt.show()
-    
