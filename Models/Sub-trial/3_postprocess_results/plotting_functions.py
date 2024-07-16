@@ -112,18 +112,6 @@ def plot_states_aligned(init, end, reduced_design_matrix, event_type_name, bin_s
                                                                                 & (use_data['choice']=='right')], alpha=0.3, 
                         stat='count', multiple="stack", binwidth=bin_size, binrange=(bin_size*init+0.01, bin_size*end), legend=False, ax = ax[1, 1], palette='viridis')
         
-        # ax[0, 0].set_title(str(this_event + ' - correct left'))
-        # ax[0, 0].set_xlabel(str('Time from event (s)'))
-
-        # ax[0, 1].set_title(str(this_event + ' - correct right'))
-        # ax[0, 1].set_xlabel(str('Time from event (s)'))
-        
-        # ax[1, 0].set_title(str(this_event + ' - incorrect left'))
-        # ax[1, 0].set_xlabel(str('Time from event (s)'))
-        
-        # ax[1, 1].set_title(str(this_event + ' - incorrect right'))
-        # ax[1, 1].set_xlabel(str('Time from event (s)'))
-        
         ax[0, 0].set_title(str('Correct left'))
         ax[0, 0].set_xlabel(str('Time from go cue (s)'))
 
@@ -183,7 +171,7 @@ def plot_transition_mat (init_params, fit_params):
     fit_params[1].transition_matrix[2]
     
 
-def states_per_trial_phase(reduced_design_matrix, session_trials):
+def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     
     # Split session into trial phases and gather most likely states of those trial phases
     use_data = reduced_design_matrix.dropna()
@@ -223,29 +211,29 @@ def states_per_trial_phase(reduced_design_matrix, session_trials):
     for t, trial in enumerate(range(trial_num)):
         
         # Quiescence
-        quiescence_data = use_data.loc[(use_data['Bin'] <= qui_end[t]*10) & (use_data['Bin'] > qui_init[t]*10)]
+        quiescence_data = use_data.loc[(use_data['Bin'] <= qui_end[t]*multiplier) & (use_data['Bin'] > qui_init[t]*multiplier)]
         quiescence_states = np.append(quiescence_states, quiescence_data['most_likely_states'])
 
         # Feedback        
         if session_trials['feedbackType'][t] == 1.:
             
-            correct_data = use_data.loc[(use_data['Bin'] <= correct_end[t]*10) & (use_data['Bin'] > feedback_init[t]*10)]
+            correct_data = use_data.loc[(use_data['Bin'] <= correct_end[t]*multiplier) & (use_data['Bin'] > feedback_init[t]*multiplier)]
             correct_states = np.append(correct_states, correct_data['most_likely_states'])
             
             # ITI correct
-            ITI_data_correct = use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > iti_init_correct[t]*10)]
+            ITI_data_correct = use_data.loc[(use_data['Bin'] <= iti_end[t]*multiplier) & (use_data['Bin'] > iti_init_correct[t]*multiplier)]
             ITI_states_correct = np.append(ITI_states_correct, ITI_data_correct['most_likely_states'])
         
         elif session_trials['feedbackType'][t] == -1.:
-            incorrect_data = use_data.loc[(use_data['Bin'] <= incorrect_end[t]*10) & (use_data['Bin'] > feedback_init[t]*10)]
+            incorrect_data = use_data.loc[(use_data['Bin'] <= incorrect_end[t]*multiplier) & (use_data['Bin'] > feedback_init[t]*multiplier)]
             incorrect_states = np.append(incorrect_states, incorrect_data['most_likely_states'])
 
             # ITI incorrect
-            ITI_data_incorrect = use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > iti_init_incorrect[t]*10)]
+            ITI_data_incorrect = use_data.loc[(use_data['Bin'] <= iti_end[t]*multiplier) & (use_data['Bin'] > iti_init_incorrect[t]*multiplier)]
             ITI_states_incorrect = np.append(ITI_states_incorrect, ITI_data_incorrect['most_likely_states'])
         
         # Move
-        move_data = use_data.loc[(use_data['Bin'] <= move_end[t]*10) & (use_data['Bin'] > move_init[t]*10)]
+        move_data = use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & (use_data['Bin'] > move_init[t]*multiplier)]
         
         if session_trials['choice'][t] == -1:
             left_states = np.append(left_states, move_data['most_likely_states'])
@@ -253,7 +241,7 @@ def states_per_trial_phase(reduced_design_matrix, session_trials):
             right_states = np.append(right_states, move_data['most_likely_states'])
             
         # React
-        react_data = use_data.loc[(use_data['Bin'] <= rt_end[t]*10) & (use_data['Bin'] > rt_init[t]*10)]
+        react_data = use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & (use_data['Bin'] > rt_init[t]*multiplier)]
         
         if prepro(session_trials)['signed_contrast'][t] < 0:
             stim_left_states = np.append(stim_left_states, react_data['most_likely_states'])
@@ -503,6 +491,56 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
     plt.show()
 
 
+def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_size, trials_to_plot, num_states):
+    
+    # PLOT
+    fig, axs = plt.subplots(nrows=trials_to_plot, ncols=1, sharex=True, sharey=True, figsize=[8, 6])
+
+    plt.rc('font', size=12)
+    use_data = empirical_data.dropna()
+    use_data['new_bin'] = use_data['new_bin'] * bin_size
+    multiplier = 1/bin_size
+    
+    trials = empirical_data.loc[empirical_data['new_bin']==0]
+    bins = list(trials['Bin'])
+    
+    for t, trial in enumerate(range(trials_to_plot)):
+        
+        trial_bin = bins[trial_init + t]
+        bin_data = use_data.loc[(use_data['Bin']<trial_bin + 1.4*multiplier) & (use_data['Bin']> trial_bin - 1*multiplier)]
+        trial_data = session_trials.loc[(session_trials['goCueTrigger_times']< trial_bin/(multiplier*1)+2) & 
+                                        (session_trials['goCueTrigger_times']> trial_bin/(multiplier*1)-2)]
+        
+        # # Plot trial
+        # Hacky solution to make sure color palette is used properly
+        attach_array = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
+        axs[t].imshow(
+            np.concatenate([bin_data['most_likely_states'], attach_array])[None,:], 
+            extent=(0, len(np.concatenate([bin_data['most_likely_states'], attach_array])), -1, 1),
+            aspect="auto",
+            cmap='viridis',
+            alpha=0.3) 
+
+
+        axs[t].vlines(.9*multiplier,-1, 1, label='Stim On', color='Black', linewidth=2)
+        axs[t].vlines(np.array(trial_data.loc[trial_data['feedbackType']==1, 'feedback_times'] * multiplier) - 
+                      trial_bin + 1.0*multiplier, -1, 1, label='Correct', color='Green', linewidth=2)
+        axs[t].vlines(np.array(trial_data.loc[trial_data['feedbackType']==-1, 'feedback_times'] * multiplier) - 
+                      trial_bin + 1.0*multiplier, -1, 1, label='Incorrect', color='Red', linewidth=2)
+        axs[t].vlines(np.array(trial_data['firstMovement_times'] * multiplier) - trial_bin + 1*multiplier, -1, 1, 
+                      label='First movement', color='Blue')
+        axs[t].vlines(np.array((trial_data['goCueTrigger_times'] - trial_data['quiescencePeriod']) * multiplier) - 
+                      trial_bin + 1.0*multiplier, -1, 1, label='Quiescence start', color='Purple')
+
+    axs[t].set_yticks([] ,[])
+    axs[t].set_xticks([0, .9*multiplier, 1.9*multiplier] ,[-0.9, 0, 1])
+    axs[t].set_xlabel(str('Time from go cue (s)'))
+    axs[t].set_xlim([0, 2.4*multiplier])
+
+    axs[t].legend(loc='upper left', bbox_to_anchor=(1, -0.5))
+    plt.show()
+
+
 # def traces_over_sates (init, interval, design_matrix, session_trials):
     
 #     # Compute the most likely states
@@ -588,7 +626,7 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
 #     plt.show()
     
 
-def traces_over_sates (init, interval, design_matrix, session_trials):
+def traces_over_sates (init, interval, design_matrix, session_trials, multiplier):
     
     # Compute the most likely states
     # design matrix arg should be empirical_data
@@ -613,16 +651,21 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
                        use_normalized['Lick count']])
     
     axs[0].imshow(np.concatenate([use_normalized['most_likely_states'], states_to_append])[None,:],  
-            extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), plot_min, plot_max),
+            extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), 
+                    plot_min, plot_max),
             aspect="auto",
             cmap='viridis',
             alpha=0.3) 
-    axs[0].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, label='Stim On', color='Black', linewidth=2)
-    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Correct', color='Green', linewidth=2)
-    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Incorrect', color='Red', linewidth=2)
-    axs[0].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, label='First movement', color='Blue')
+    axs[0].vlines(np.array(session_trials['goCueTrigger_times'] * 1*multiplier)-init, plot_min, 
+                  plot_max, label='Stim On', color='Black', linewidth=2)
+    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 1*multiplier)-init, 
+                  plot_min, plot_max, label='Correct', color='Green', linewidth=2)
+    axs[0].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 1*multiplier)-init, plot_min, 
+                  plot_max, label='Incorrect', color='Red', linewidth=2)
+    axs[0].vlines(np.array(session_trials['firstMovement_times'] * 1*multiplier)-init, plot_min, plot_max, label='First movement', color='Blue')
     axs[0].vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, label='Trial end', color='Grey', linewidth=2)
-    axs[0].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
+    axs[0].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 1*multiplier)-init, 
+                  plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
 
     axs[0].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
@@ -636,12 +679,15 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
             cmap='viridis',
             alpha=0.3) 
 
-    axs[1].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, color='Black', linewidth=2)
-    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Green', linewidth=2)
-    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Red', linewidth=2)
-    axs[1].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, color='Blue')
-    axs[1].vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, color='Grey', linewidth=2)
-    axs[1].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, color='Pink', linewidth=2)
+    axs[1].vlines(np.array(session_trials['goCueTrigger_times'] * 1*multiplier)-init, plot_min, plot_max, color='Black', linewidth=2)
+    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 1*multiplier)-init, 
+                  plot_min, plot_max, color='Green', linewidth=2)
+    axs[1].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 1*multiplier)-init, 
+                  plot_min, plot_max, color='Red', linewidth=2)
+    axs[1].vlines(np.array(session_trials['firstMovement_times'] * 1*multiplier)-init, plot_min, plot_max, color='Blue')
+    axs[1].vlines(np.array(session_trials['intervals_0'] * 1*multiplier)-init, plot_min, plot_max, color='Grey', linewidth=2)
+    axs[1].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 1*multiplier)-init, 
+                  plot_min, plot_max, color='Pink', linewidth=2)
     axs[1].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
@@ -655,12 +701,15 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
             cmap='viridis',
             alpha=0.3) 
 
-    axs[2].vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, color='Black', linewidth=2)
-    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Green', linewidth=2)
-    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, color='Red', linewidth=2)
-    axs[2].vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, color='Blue')
-    axs[2].vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, color='Grey', linewidth=2)
-    axs[2].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, color='Pink', linewidth=2)
+    axs[2].vlines(np.array(session_trials['goCueTrigger_times'] * 1*multiplier)-init, plot_min, plot_max, color='Black', linewidth=2)
+    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 1*multiplier)-init, 
+                  plot_min, plot_max, color='Green', linewidth=2)
+    axs[2].vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 1*multiplier)-init, 
+                  plot_min, plot_max, color='Red', linewidth=2)
+    axs[2].vlines(np.array(session_trials['firstMovement_times'] * 1*multiplier)-init, plot_min, plot_max, color='Blue')
+    axs[2].vlines(np.array(session_trials['intervals_0'] * 1*multiplier)-init, plot_min, plot_max, color='Grey', linewidth=2)
+    axs[2].vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 1*multiplier)-init, 
+                  plot_min, plot_max, color='Pink', linewidth=2)
     axs[2].hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
 
     # Plot original values
@@ -673,8 +722,10 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
     axs[1].set_ylabel("emissions")
     axs[2].set_ylabel("emissions")
     axs[2].set_xlabel("time (s)")
-    axs[0].set_xlim(0, end-init)
-    axs[0].set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+    # axs[0].set_xlim(0, end-init)
+    # axs[0].set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+    # axs[0].set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+
     axs[0].set_title("inferred states")
     axs[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
     axs[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
@@ -684,7 +735,7 @@ def traces_over_sates (init, interval, design_matrix, session_trials):
     plt.show()
     
     
-def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_to_standardize):
+def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_to_standardize, multiplier):
     # Compute the most likely states
     
     end = init + inter
@@ -742,18 +793,23 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
             alpha=0.3) 
 
     axs.hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
-    axs.vlines(np.array(session_trials['goCueTrigger_times'] * 10)-init, plot_min, plot_max, label='Stim On', color='Black', linewidth=2)
-    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Correct', color='Green', linewidth=2)
-    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 10)-init, plot_min, plot_max, label='Incorrect', color='Red', linewidth=2)
-    axs.vlines(np.array(session_trials['firstMovement_times'] * 10)-init, plot_min, plot_max, label='First movement', color='Blue')
-    axs.vlines(np.array(session_trials['intervals_0'] * 10)-init, plot_min, plot_max, label='Trial end', color='Grey', linewidth=2)
-    axs.vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 10)-init, plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
+    axs.vlines(np.array(session_trials['goCueTrigger_times'] * 1*multiplier)-init, plot_min, plot_max, label='Stim On', 
+               color='Black', linewidth=2)
+    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * 1*multiplier)-init, 
+               plot_min, plot_max, label='Correct', color='Green', linewidth=2)
+    axs.vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * 1*multiplier)-init, 
+               plot_min, plot_max, label='Incorrect', color='Red', linewidth=2)
+    axs.vlines(np.array(session_trials['firstMovement_times'] * 1*multiplier)-init, plot_min, plot_max, label='First movement', color='Blue')
+    axs.vlines(np.array(session_trials['intervals_0'] * 1*multiplier)-init, plot_min, plot_max, label='Trial end', color='Grey', linewidth=2)
+    axs.vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * 1*multiplier)-init, 
+               plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
 
     axs.set_ylim(plot_min, plot_max)
     axs.set_ylabel("emissions")
     axs.set_xlabel("time (s)")
     axs.set_xlim(0, end-init)
-    axs.set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+    # axs.set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+    # axs.set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
     axs.set_title("inferred states")
     axs.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
