@@ -23,7 +23,7 @@ def idxs_from_files(one, design_matrices, frame_rate, data_path, bin_size):
     mouse_names = []
     for m, mat in enumerate(design_matrices):
         
-        mouse_name = design_matrices[m][51:-4]
+        mouse_name = design_matrices[m][51:-(len(str(bin_size))+1)]
         eid = design_matrices[m][14:50]
         idx = str(eid + '_' + mouse_name)
                     
@@ -58,6 +58,8 @@ def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path,
     matrix_all_unnorm = defaultdict(list)
     session_all = defaultdict(list)
 
+    multiplier = 1/bin_size
+    
     for m, mouse_name in enumerate(mouse_names):
         # Save results per mouse
         matrix_all[mouse_name] = {}
@@ -88,10 +90,11 @@ def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path,
 
             if first_90 == True:
                 # Keep only first 90 trials
-                design_matrix = design_matrix.loc[(design_matrix['Bin'] < time_trial_90 * 10) & (design_matrix['Bin'] > session_start * 10)]
+                design_matrix = design_matrix.loc[(design_matrix['Bin'] < time_trial_90 * multiplier) & 
+                                                  (design_matrix['Bin'] > session_start * multiplier)]
                 use_trials = session_trials.loc[session_trials['stimOff_times'] < time_trial_90]
             else:
-                design_matrix = design_matrix.loc[design_matrix['Bin'] > session_start * 10]
+                design_matrix = design_matrix.loc[design_matrix['Bin'] > session_start * multiplier]
                 use_trials = session_trials.copy()
                 
             training_set = np.array(design_matrix[var_names]).copy() 
@@ -130,42 +133,49 @@ def concatenate_sessions (mouse_names, matrix_all, matrix_all_unnorm, session_al
 
     # Collapse multiple sessions per mouse
     for mouse in np.unique(mouse_names):
+        # If multiple sessions
         if len(np.where(mouse_names==mouse)[0]) > 1 and len(mouse) > 0:
             mouse_sessions = list(matrix_all[mouse].keys())
-            collapsed_matrices[mouse] = np.concatenate([matrix_all[mouse][k] for k in mouse_sessions])
-            collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
-            collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
+            if len(mouse_sessions) > 0:
+                collapsed_matrices[mouse] = np.concatenate([matrix_all[mouse][k] for k in mouse_sessions])
+                collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
+                collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
+        
         elif len(np.where(mouse_names==mouse)[0]) == 1 and len(mouse) > 0:
             mouse_session = list(matrix_all[mouse].keys())
-            collapsed_matrices[mouse] = matrix_all[mouse][mouse_session[0]]
-            collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
-            collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
+            if len(mouse_session) > 0:
+                collapsed_matrices[mouse] = matrix_all[mouse][mouse_session[0]]
+                collapsed_unnorm[mouse] = pd.concat(matrix_all_unnorm[mouse], ignore_index=True)
+                collapsed_trials[mouse] = pd.concat(session_all[mouse], ignore_index=True)
         
     return collapsed_matrices, collapsed_unnorm, collapsed_trials
 
 
-def fix_discontinuities(session_trials, design_matrix_heading):
+def fix_discontinuities(session_trials, design_matrix_heading, multiplier):
+    
+    new_trials = session_trials.copy()
+    new_matrix = design_matrix_heading.copy()
     
     cum_timing_vars = ['intervals_bpod_0', 'intervals_bpod_1', 'stimOn_times',
                        'goCueTrigger_times', 'stimOff_times', 'goCue_times', 'response_times',
                        'feedback_times', 'firstMovement_times', 'intervals_0', 'intervals_1']
     
-    time_discs = np.where(np.diff(np.array(session_trials[cum_timing_vars[0]]))<0)[0]
-    bin_discs = np.where(np.diff(np.array(design_matrix_heading['Bin']))<0)[0]
+    time_discs = np.where(np.diff(np.array(new_trials[cum_timing_vars[0]]))<0)[0]
+    bin_discs = np.where(np.diff(np.array(new_matrix['Bin']))<0)[0]
     
     # Fix as many times as there are discontinuities
     for d in range(len(time_discs)):
         time_disc = time_discs[d]
         bin_disc = bin_discs[d]
         
-        trial_reset_time = session_trials['intervals_bpod_0'][time_disc]
+        trial_reset_time = new_trials['intervals_bpod_0'][time_disc]
         
         # Fix timing variables
         for v in cum_timing_vars:
-            session_trials[v][time_disc+1:] = session_trials[v][time_disc+1:] + session_trials['intervals_bpod_0'][time_disc]
+            new_trials[v][time_disc+1:] = new_trials[v][time_disc+1:] + new_trials['intervals_bpod_0'][time_disc]
             
         # Fix bin count
-        design_matrix_heading['Bin'][bin_disc+1:] = design_matrix_heading['Bin'][bin_disc+1:] + trial_reset_time * 10
+        new_matrix['Bin'][bin_disc+1:] = new_matrix['Bin'][bin_disc+1:] + trial_reset_time * multiplier
         
         
-    return session_trials, design_matrix_heading
+    return new_trials, new_matrix
