@@ -109,10 +109,14 @@ def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path,
                 
                 if len(var_names)>1:
                     matrix_all[mouse_name][session] = normalized
+                    matrix_all[mouse_name][session] = standardized
                 else:
                     matrix_all[mouse_name][session] = standardized
+                
+                # Keep licks unnormalized
                 if 'Lick count' in var_names:
-                    matrix_all[mouse_name][session] = training_set
+                    index_lick = np.where(np.array(var_names)=='Lick count')[0][0]
+                    matrix_all[mouse_name][session][:,index_lick] = training_set[:,index_lick]
                 
                 session_all[mouse_name][session] = use_trials    
                 matrix_all_unnorm[mouse_name][session] = design_matrix
