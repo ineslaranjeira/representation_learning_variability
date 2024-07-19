@@ -808,8 +808,8 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
     axs.set_ylabel("emissions")
     axs.set_xlabel("time (s)")
     axs.set_xlim(0, end-init)
-    # axs.set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
-    # axs.set_xticks(np.arange(0, end-init+50, 50),np.arange(init/10, end/10+5, 5))
+    axs.set_xticks(np.arange(0, inter, inter/5),np.arange(init/multiplier, 
+                                                          end/multiplier, (inter/multiplier)/5))
     axs.set_title("inferred states")
     axs.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
