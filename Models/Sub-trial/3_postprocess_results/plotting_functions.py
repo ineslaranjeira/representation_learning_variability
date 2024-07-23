@@ -463,7 +463,8 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
         
         # # Plot trial
         # Hacky solution to make sure color palette is used properly
-        attach_array = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
+        attach_array1 = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
+        attach_array = np.concatenate([np.arange(0, 10, 1)*np.nan, attach_array1])
         axs[t].imshow(
             np.concatenate([bin_data['most_likely_states'], attach_array])[None,:], 
             extent=(0, len(np.concatenate([bin_data['most_likely_states'], attach_array])), -1, 1),
