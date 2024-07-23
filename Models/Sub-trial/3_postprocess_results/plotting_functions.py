@@ -443,56 +443,6 @@ def broader_label(df):
 
 
 def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_size, trials_to_plot, num_states):
-
-    # PLOT
-    fig, axs = plt.subplots(nrows=trials_to_plot, ncols=1, sharex=True, sharey=True, figsize=[8, 6])
-
-    plt.rc('font', size=12)
-    use_data = empirical_data.dropna()
-    use_data['new_bin'] = use_data['new_bin'] * bin_size
-
-    trials = empirical_data.loc[empirical_data['new_bin']==0]
-    bins = list(trials['Bin'])
-    
-    for t, trial in enumerate(range(trials_to_plot)):
-        
-        trial_bin = bins[trial_init + t]
-        bin_data = use_data.loc[(use_data['Bin']<trial_bin + 15) & (use_data['Bin']> trial_bin - 10)]
-        trial_data = session_trials.loc[(session_trials['goCueTrigger_times']< trial_bin/10+2) & 
-                                        (session_trials['goCueTrigger_times']> trial_bin/10-2)]
-        
-        # # Plot trial
-        # Hacky solution to make sure color palette is used properly
-        attach_array1 = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
-        attach_array = np.concatenate([np.arange(0, 10, 1)*np.nan, attach_array1])
-        axs[t].imshow(
-            np.concatenate([bin_data['most_likely_states'], attach_array])[None,:], 
-            extent=(0, len(np.concatenate([bin_data['most_likely_states'], attach_array])), -1, 1),
-            aspect="auto",
-            cmap='viridis',
-            alpha=0.3) 
-
-
-        axs[t].vlines(9,-1, 1, label='Stim On', color='Black', linewidth=2)
-        axs[t].vlines(np.array(trial_data.loc[trial_data['feedbackType']==1, 'feedback_times'] * 10) - 
-                      trial_bin + 10, -1, 1, label='Correct', color='Green', linewidth=2)
-        axs[t].vlines(np.array(trial_data.loc[trial_data['feedbackType']==-1, 'feedback_times'] * 10) - 
-                      trial_bin + 10, -1, 1, label='Incorrect', color='Red', linewidth=2)
-        axs[t].vlines(np.array(trial_data['firstMovement_times'] * 10) - trial_bin + 10, -1, 1, 
-                      label='First movement', color='Blue')
-        axs[t].vlines(np.array((trial_data['goCueTrigger_times'] - trial_data['quiescencePeriod']) * 10) - 
-                      trial_bin + 10, -1, 1, label='Quiescence start', color='Purple')
-
-    axs[t].set_yticks([] ,[])
-    axs[t].set_xticks([0, 9, 19] ,[-0.9, 0, 1])
-    axs[t].set_xlabel(str('Time from go cue (s)'))
-    axs[t].set_xlim([0, 24])
-
-    axs[t].legend(loc='upper left', bbox_to_anchor=(1, -0.5))
-    plt.show()
-
-
-def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_size, trials_to_plot, num_states):
     
     # PLOT
     fig, axs = plt.subplots(nrows=trials_to_plot, ncols=1, sharex=True, sharey=True, figsize=[8, 6])
@@ -514,7 +464,8 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
         
         # # Plot trial
         # Hacky solution to make sure color palette is used properly
-        attach_array = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
+        attach_array1 = np.arange(0, len(use_data['most_likely_states'].unique()), 1)
+        attach_array = np.concatenate([np.arange(0, 10, 1)*np.nan, attach_array1])
         axs[t].imshow(
             np.concatenate([bin_data['most_likely_states'], attach_array])[None,:], 
             extent=(0, len(np.concatenate([bin_data['most_likely_states'], attach_array])), -1, 1),
