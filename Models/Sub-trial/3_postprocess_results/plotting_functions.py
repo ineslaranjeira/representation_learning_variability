@@ -34,10 +34,12 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
         reduced_design_matrix['new_bin'] = reduced_design_matrix['Bin'] * np.nan
         reduced_design_matrix['correct'] = reduced_design_matrix['Bin'] * np.nan
         reduced_design_matrix['choice'] = reduced_design_matrix['Bin'] * np.nan
-                
+        reduced_design_matrix['contrast'] = reduced_design_matrix['Bin'] * np.nan
+
         events = session_trials[this_event]
         feedback = session_trials['feedbackType']
         choice = session_trials['choice']
+        contrast = np.abs(prepro(session_trials)['signed_contrast'])
         
         events = session_trials[this_event]
         #state_stack = np.zeros((len(events), end + init)) * np.nan
@@ -63,6 +65,11 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
                 reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
                                             (reduced_design_matrix['Bin']> event*multiplier + init), 
                                             'choice'] = 'left'
+            
+            # Check contrast
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
+                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+                                            'contrast'] = contrast[t]
             # Rename bins so that they are aligned on stimulus onset
             if event > 0:
                 event_window = reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
@@ -180,74 +187,75 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     # Quiescence
     qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
     qui_end = session_trials['goCueTrigger_times']
-    quiescence_states = []
-
+    quiescence_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
+    
     # ITI
     iti_init_correct = session_trials['feedback_times'] + 1
     iti_init_incorrect = session_trials['feedback_times'] + 2
     iti_end = session_trials['intervals_1']
-    ITI_states_correct = []
-    ITI_states_incorrect = []
+    ITI_states_correct = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
+    ITI_states_incorrect = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
 
     # Feedback
     feedback_init = session_trials['feedback_times']
     correct_end = session_trials['feedback_times'] + 1
     incorrect_end = session_trials['feedback_times'] + 2
-    correct_states = []
-    incorrect_states = []
+    correct_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
+    incorrect_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
 
     # Reaction time 
     rt_init = session_trials['goCueTrigger_times']
     rt_end = session_trials['firstMovement_times']
-    stim_left_states = []
-    stim_right_states = []
+    stim_left_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
+    stim_right_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
 
     # Movement time 
     move_init = session_trials['firstMovement_times']
     move_end = session_trials['feedback_times']
-    left_states = []
-    right_states = []
+    left_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
+    right_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'most_likely_states', 'Bin'])
+    
 
     for t, trial in enumerate(range(trial_num)):
         
         # Quiescence
         quiescence_data = use_data.loc[(use_data['Bin'] <= qui_end[t]*multiplier) & (use_data['Bin'] > qui_init[t]*multiplier)]
-        quiescence_states = np.append(quiescence_states, quiescence_data['most_likely_states'])
-
+        quiescence_states = quiescence_states.append(quiescence_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
+        
         # Feedback        
         if session_trials['feedbackType'][t] == 1.:
             
             correct_data = use_data.loc[(use_data['Bin'] <= correct_end[t]*multiplier) & (use_data['Bin'] > feedback_init[t]*multiplier)]
-            correct_states = np.append(correct_states, correct_data['most_likely_states'])
+            correct_states = correct_states.append(correct_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
             
             # ITI correct
             ITI_data_correct = use_data.loc[(use_data['Bin'] <= iti_end[t]*multiplier) & (use_data['Bin'] > iti_init_correct[t]*multiplier)]
-            ITI_states_correct = np.append(ITI_states_correct, ITI_data_correct['most_likely_states'])
-        
+            ITI_states_correct = ITI_states_correct.append(ITI_data_correct[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
+
         elif session_trials['feedbackType'][t] == -1.:
             incorrect_data = use_data.loc[(use_data['Bin'] <= incorrect_end[t]*multiplier) & (use_data['Bin'] > feedback_init[t]*multiplier)]
-            incorrect_states = np.append(incorrect_states, incorrect_data['most_likely_states'])
+            incorrect_states =incorrect_states.append(incorrect_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
 
             # ITI incorrect
             ITI_data_incorrect = use_data.loc[(use_data['Bin'] <= iti_end[t]*multiplier) & (use_data['Bin'] > iti_init_incorrect[t]*multiplier)]
-            ITI_states_incorrect = np.append(ITI_states_incorrect, ITI_data_incorrect['most_likely_states'])
-        
+            ITI_states_incorrect = ITI_states_incorrect.append(ITI_data_incorrect[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
+
         # Move
         move_data = use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & (use_data['Bin'] > move_init[t]*multiplier)]
         
         if session_trials['choice'][t] == -1:
-            left_states = np.append(left_states, move_data['most_likely_states'])
+            left_states = left_states.append(move_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
         elif session_trials['choice'][t] == 1.:
-            right_states = np.append(right_states, move_data['most_likely_states'])
+            right_states = right_states.append(move_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
             
         # React
         react_data = use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & (use_data['Bin'] > rt_init[t]*multiplier)]
         
         if prepro(session_trials)['signed_contrast'][t] < 0:
-            stim_left_states = np.append(stim_left_states, react_data['most_likely_states'])
+            stim_left_states = stim_left_states.append(react_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
         elif prepro(session_trials)['signed_contrast'][t] > 0:
-            stim_right_states = np.append(stim_right_states, react_data['most_likely_states'])
-            
+            stim_right_states = stim_right_states.append(react_data[['correct', 'choice', 'contrast', 'most_likely_states', 'Bin']])
+
     # Save all in a dataframe
     quiescence_df = pd.DataFrame(quiescence_states)
     quiescence_df['label'] = 'Quiescence'
@@ -284,7 +292,7 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     all_df = all_df.append(incorrect_df)
     all_df = all_df.append(iti_df_correct)
     all_df = all_df.append(iti_df_incorrect)
-
+        
     return all_df
 
 def bins_per_trial_phase(design_matrix, session_trials):
@@ -764,6 +772,40 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
                                                           end/multiplier, (inter/multiplier)/5))
     axs.set_title("inferred states")
     axs.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+    plt.tight_layout()
+    plt.show()
+    
+    
+def plot_avg_state(unique_states, empirical_data, inverted_mapping):
+    use_vars = ['avg_wheel_vel', 'Lick count', 'whisker_me',
+        'Bin', 'most_likely_states']
+    
+    use_data = empirical_data[use_vars].copy()
+    use_data['avg_wheel_vel'] = np.abs(use_data['avg_wheel_vel'])
+
+    melted = pd.melt(use_data, id_vars=['Bin', 'most_likely_states'], value_vars=use_vars)
+
+    melted.loc[melted['variable']=='avg_wheel_vel', 'variable'] = 'Signed wheel speed'
+    melted.loc[melted['variable']=='whisker_me', 'variable'] = 'Whisker ME'
+    states = unique_states
+            
+    fig, ax = plt.subplots(ncols=int(np.ceil(len(states)/2)) , nrows=2, sharex=True, sharey=True, figsize=[20, 8])
+    plt.rc('font', size=12)
+
+    for s, state in enumerate(states):
+        use_data = melted.loc[melted['most_likely_states']==s]
+        state_label = inverted_mapping[state]
+        if s < len(states)/2:  
+            sns.barplot(y='variable', x='value', data=use_data, ax=ax[0,s], palette='plasma')
+            ax[0,s].vlines(0, -.50, 3, color='Gray', linestyles='--', linewidth=1)
+            ax[0,s].set_xlabel('Mean')
+            ax[0,s].set_title(state_label)
+        else:
+            sns.barplot(y='variable', x='value', data=use_data, ax=ax[1,s-3], palette='plasma')
+            ax[1,s-3].vlines(0, -.50, 3, color='Gray', linestyles='--', linewidth=1)
+            ax[1,s-3].set_xlabel('Mean')
+            ax[1,s-3].set_title(state_label)
 
     plt.tight_layout()
     plt.show()
