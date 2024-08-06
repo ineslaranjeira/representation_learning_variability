@@ -720,7 +720,10 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
         plot_min = np.min([use_normalized[columns_to_standardize[0]], 
                            use_normalized[columns_to_standardize[1]]])
     elif len(columns_to_standardize) == 1:
-        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
+        use_index0 = ~np.isnan(use_normalized[columns_to_standardize[0]])
+        use_time = np.arange(0, len(use_index0), 1)  # NOTE! If there are NaNs, x axis label will have the time wrong # NOTE!!
+        # axs.plot(use_normalized['Bin'][use_index0]-init, use_normalized[columns_to_standardize[0]][use_index0], label=columns_to_standardize[0], linewidth=2)
+        axs.plot(use_time, use_normalized[columns_to_standardize[0]][use_index0], label=columns_to_standardize[0], linewidth=2)
         plot_max = np.max(use_normalized[columns_to_standardize[0]])
         plot_min = np.min(use_normalized[columns_to_standardize[0]])
     elif len(columns_to_standardize) == 3:
