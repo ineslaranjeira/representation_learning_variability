@@ -39,7 +39,10 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
             lag_lls.append(all_lls[lag][k])
             b_lag_lls.append(all_baseline_lls[lag][k])
             # Best fold
-            b_f = np.where(all_lls[lag][k]==np.nanmax(all_lls[lag][k]))[0][0]
+            if np.abs(np.nansum(all_lls[lag][k])) > 0:  # accounts for possibility that all folds are nan
+                b_f = np.where(all_lls[lag][k]==np.nanmax(all_lls[lag][k]))[0][0]
+            else:
+                b_f = np.nan
             b_fold.append(b_f)
             
         avg_val_lls = np.array(lag_lls)
@@ -76,7 +79,11 @@ def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kap
         lls.append(all_lls[k])
         b_lls.append(all_baseline_lls[k])
         # Best fold
-        b_f = np.where(all_lls[k]==np.nanmax(all_lls[k]))[0][0]
+        if np.abs(np.nansum(all_lls[k])) > 0:  # accounts for possibility that all folds are nan
+            b_f = np.where(all_lls[k]==np.nanmax(all_lls[k]))[0][0]
+        else:
+            b_f = np.nan
+            
         b_fold.append(b_f)
             
     avg_val_lls = np.array(lls)
@@ -168,6 +175,7 @@ def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_nam
     # Add color bar
     cbar = plt.colorbar(cax)
     cbar.set_label('Delta LL')
+    ax.set_xticks(np.arange(0, len(kappas), 1), kappas)
     plt.xlabel('Kappa')
     plt.ylabel('Lag')
     plt.title(mouse_name + ' ' + var_interest)
