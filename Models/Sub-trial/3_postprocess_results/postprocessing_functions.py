@@ -332,12 +332,12 @@ def plot_trajectories(new_states, inverted_mapping, design_matrix_heading, x_var
             ax.set_ylabel('Whisker motion energy - state ' + str(state_whisker_ax))
             
             
-def plot_x_y_dynamics(x_var, y_var, dynamics, mouse_name, new_states, design_matrix_heading, inverted_mapping, grid_density, trajectory_num, plot_traj=True):
+def plot_x_y_dynamics(x_var, y_var, mouse_dynamics, mouse_name, new_states, design_matrix_heading, inverted_mapping, grid_density, trajectory_num, plot_traj=True):
     
     fig, axs = plt.subplots(2, 2, figsize=(10, 9))
     unique_states = np.array(list(inverted_mapping.keys()))
     unique_states = unique_states[~np.isnan(unique_states)]
-    mouse_dynamics = dynamics[mouse_name]
+    # mouse_dynamics = dynamics[mouse_name]
     
     # # Check dynamics to decide which state is movement and which state is not
     # dynamics_wheel_0 = mouse_dynamics[x_var]['weights'][0][0][0]
@@ -417,3 +417,51 @@ def transition_probabilities(states, unique_states):
             transition_matrix[s_p, s] = joint / marginal
         
     return transition_matrix
+
+
+def trans_mat_complete(mapping, state_label, unique_states, transition_matrix):
+    states_template = ['000', '001', '010', '100', '110', '101', '011', '111']
+    matrix_df = np.zeros((len(states_template), len(states_template))) * np.nan
+    for r, row in enumerate(states_template):
+        for c, column in enumerate(states_template):
+            if (row in state_label) & (column in state_label):
+                state_c = mapping[column]
+                state_c_mat = np.where(unique_states==state_c)
+                state_r = mapping[row]
+                state_r_mat = np.where(unique_states==state_r)
+                # if (state_c in unique_states) & (state_r in unique_states):
+                matrix_df[r, c] = transition_matrix[state_r_mat, state_c_mat]
+    
+    return matrix_df
+
+
+def state_identifiability(combined_states, design_matrix_heading):
+    
+    unique_states = np.unique(combined_states)
+    new_states = unique_states.copy()
+    
+    # Create new mapping depending on empirical data for each state
+    for v, var in enumerate(['avg_wheel_vel', 'Lick count', 'whisker_me']):
+        zeros = [s[v] == '0' for s in combined_states]
+        ones = [s[v] == '1' for s in combined_states]
+        if var == 'avg_wheel_vel':
+            var_0 = np.array(np.abs(design_matrix_heading[var]))[zeros]
+            var_1 = np.array(np.abs(design_matrix_heading[var]))[ones]
+        else:
+            var_0 = np.array(design_matrix_heading[var])[zeros]
+            var_1 = np.array(design_matrix_heading[var])[ones]
+        
+        if np.nanmean(var_0)> np.nanmean(var_1):
+            var_state_0 = [s[v] == '0' for s in unique_states]
+            new_states[var_state_0] = np.array([s[:v] + '1' + s[v+1:] for s in new_states[var_state_0]])
+            var_state_1 = [s[v] == '1' for s in unique_states]
+            new_states[var_state_1] = np.array([s[:v] + '0' + s[v+1:] for s in new_states[var_state_1]])
+    
+
+    identifiable_mapping = {unique: key for unique, key in zip(unique_states, new_states)}
+
+    # Use np.vectorize to apply the mapping
+    replace_func = np.vectorize(identifiable_mapping.get)
+    identifiable_states = replace_func(combined_states)
+    
+    return identifiable_states
