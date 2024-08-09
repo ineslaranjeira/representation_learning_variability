@@ -523,6 +523,8 @@ def prepro(trials):
     """ Response/ reaction times """
     trials['response'] = trials['response_times'] - trials['goCue_times']
     trials['reaction'] = trials['firstMovement_times'] - trials['goCue_times']
+    """ Quiescence elongation """
+    trials['elongation'] = trials['goCue_times'] - trials['quiescencePeriod'] - trials['intervals_0']
     #TODO : trials['days_to_trained'] = trials['training_time']
     
     return trials
