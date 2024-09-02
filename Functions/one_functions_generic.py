@@ -525,8 +525,18 @@ def prepro(trials):
     trials['reaction'] = trials['firstMovement_times'] - trials['goCue_times']
     """ Quiescence elongation """
     trials['elongation'] = trials['goCue_times'] - trials['quiescencePeriod'] - trials['intervals_0']
+    """ Win stay lose shift """
+    trials['prev_choice'] = trials['choice'] * np.nan
+    trials['prev_choice'][1:] = trials['choice'][:-1]
+    trials['prev_feedback'] = trials['feedbackType'] * np.nan
+    trials['prev_feedback'][1:] = trials['feedbackType'][:-1]
+    trials['wsls'] = trials['choice'] * np.nan
+    trials.loc[(trials['prev_feedback']==1.) & (trials['choice']==trials['prev_choice']), 'wsls'] = 'wst'
+    trials.loc[(trials['prev_feedback']==1.) & (trials['choice']!=trials['prev_choice']), 'wsls'] = 'wsh'
+    trials.loc[(trials['prev_feedback']==-1.) & (trials['choice']!=trials['prev_choice']), 'wsls'] = 'lsh'
+    trials.loc[(trials['prev_feedback']==-1.) & (trials['choice']==trials['prev_choice']), 'wsls'] = 'ls'
     #TODO : trials['days_to_trained'] = trials['training_time']
-    
+
     return trials
 
 
