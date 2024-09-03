@@ -509,10 +509,11 @@ def plot_states_aligned_trial(trial_init, empirical_data, session_trials, bin_si
     # cax_colorbar = divider.append_axes("right", size="5%", pad=0.5)
     cbar = fig.colorbar(cax, ax=axs)
     cbar.set_label('State')
-    # Set the ticks and labels based on the dictionary
-    cbar.set_ticks(list(inverted_mapping.keys()))
-    cbar.set_ticklabels(list(inverted_mapping.values()))
-    
+    if len(inverted_mapping) > 0:
+        # Set the ticks and labels based on the dictionary
+        cbar.set_ticks(list(inverted_mapping.keys()))
+        cbar.set_ticklabels(list(inverted_mapping.values()))
+        
     axs[t].set_yticks([] ,[])
     axs[t].set_xticks([0, .9*multiplier, 1.9*multiplier] ,[-0.9, 0, 1])
     axs[t].set_xlabel(str('Time from go cue (s)'))
@@ -636,7 +637,7 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
     
     end = init + inter
 
-    fig, axs = plt.subplots(1, 1, sharex=True, sharey=True, figsize=(12, 4))
+    fig, axs = plt.subplots(1, 1, sharex=True, sharey=True, figsize=(20, 3))
 
     df_normalized = design_matrix
     df_normalized['Bin'] = design_matrix['Bin']
@@ -707,9 +708,10 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
     cbar = fig.colorbar(cax, cax=cax_colorbar, ax=axs)
 
     cbar.set_label('State')
-    # Set the ticks and labels based on the dictionary
-    cbar.set_ticks(list(inverted_mapping.keys()))
-    cbar.set_ticklabels(list(inverted_mapping.values()))
+    if len(inverted_mapping) > 0:
+        # Set the ticks and labels based on the dictionary
+        cbar.set_ticks(list(inverted_mapping.keys()))
+        cbar.set_ticklabels(list(inverted_mapping.values()))
 
     axs.hlines(0, init, end, color='Black', linestyles='dashed', linewidth=2)
     axs.vlines(np.array(session_trials['goCueTrigger_times'] * 1*multiplier)-init, plot_min, plot_max, label='Stim On', 
@@ -799,15 +801,15 @@ def plot_states_aligned(init, end, reduced_design_matrix, event_type_name, bin_s
                                                                                 & (use_data['choice']=='right')], alpha=0.3, 
                         stat='count', multiple="stack", binwidth=bin_size, binrange=(bin_size*init+0.01, bin_size*end), legend=False, ax = ax[1, 1], palette='viridis')
         
-        
-        ordered_labels = [inverted_mapping[hue] for hue in sorted(use_data.loc[(use_data['correct']==1) 
-                                                                                & (use_data['choice']=='left'), 'most_likely_states'].unique())]
-        # Get current handles and labels
-        handles, _ = ax[0, 0].get_legend_handles_labels()
-        print(handles)
+        if len(inverted_mapping) > 0:
+            ordered_labels = [inverted_mapping[hue] for hue in sorted(use_data.loc[(use_data['correct']==1) 
+                                                                                    & (use_data['choice']=='left'), 'most_likely_states'].unique())]
+            # Get current handles and labels
+            handles, _ = ax[0, 0].get_legend_handles_labels()
+            print(handles)
 
-        # Set custom labels
-        ax[0, 0].legend(handles=handles, labels=ordered_labels, loc='upper left', bbox_to_anchor=(1, 1))
+            # Set custom labels
+            ax[0, 0].legend(handles=handles, labels=ordered_labels, loc='upper left', bbox_to_anchor=(1, 1))
         ax[0, 0].set_title(str('Correct left'))
         ax[0, 0].set_xlabel(str('Time from go cue (s)'))
 
