@@ -1,4 +1,4 @@
-""" 
+"""
 IMPORTS
 """
 import autograd.numpy as np
@@ -9,7 +9,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-    
 
 """ Model comparison """
 
@@ -181,9 +180,7 @@ def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_nam
     plt.title(mouse_name + ' ' + var_interest)
     # Display the plot
     plt.show()
-    
 
-""" State dynamics  - should move these to plotting functions!!"""
 
 def get_index(var_timeseries, target_value):
 
@@ -215,194 +212,6 @@ def update_var(target_value, var_timeseries, var_name, mouse_dynamics, state):
     return updated_var
 
 
-# def plot_trajectories(new_states, inverted_mapping, design_matrix_heading, x_var, y_var, movement_wheel, movement_whisker, axs, trajectory_num):
-    
-#     state_switches = np.diff(new_states)
-#     switch_idxs = np.where(np.abs(state_switches)>0)[0][0:-1] 
-#     switch_types = np.unique(new_states)
-#     switch_types = switch_types[~np.isnan(switch_types)]
-#     switch_type_idx = new_states[switch_idxs+1]
-
-#     for t, type in enumerate(switch_types):
-#         switch_interest = switch_idxs[np.where(switch_type_idx==type)]
-#         switch_plot = np.random.choice(switch_interest, trajectory_num)
-        
-#         # Loop through switche types
-#         for s, switch in enumerate(switch_plot):
-#             trajectory_end = switch_idxs[switch_idxs>switch][0]
-            
-#             # Check if trajectory is long enough, if not, draw new switch
-#             while (trajectory_end - switch) < 10:
-#                 switch = np.random.choice(switch_interest, 1)[0]
-#                 # print(switch, switch_idxs, switch_idxs[switch_idxs>switch])
-#                 trajectory_end = switch_idxs[switch_idxs>switch][0]
-            
-#             current_state = new_states[switch+1]
-#             state_label = inverted_mapping[current_state]
-            
-#             state_wheel = int(state_label[0])
-#             state_whisker = int(state_label[2])
-
-#             # flip so that state 0 is no movement and state 1 is movement
-#             if movement_wheel == 0:
-#                 state_wheel = -(state_wheel-1)
-#             if movement_whisker == 0:
-#                 state_whisker = -(state_whisker-1)
-            
-#             ax = axs[state_wheel, state_whisker]
-
-#             color = sns.color_palette("viridis", len(switch_types))[int(current_state)]
-#             label = state_label
-#             xx = design_matrix_heading[x_var][switch+1:trajectory_end]
-#             yy = design_matrix_heading[y_var][switch+1:trajectory_end]
-
-#             if s == trajectory_num -1:
-#                 ax.plot(xx, yy, alpha=0.5, color=color, label=label)
-#                 ax.legend()
-#             else:
-#                 ax.plot(xx, yy, alpha=0.5, color=color)
-
-#             ax.set_xlabel('Wheel velocity - state ' + str(state_wheel))
-#             ax.set_ylabel('Whisker motion energy - state ' + str(state_whisker))
-
-
-def plot_trajectories(new_states, inverted_mapping, design_matrix_heading, x_var, y_var, axs, trajectory_num):
-
-    length_minimum = 3
-    state_switches = np.diff(new_states)
-    switch_idxs = np.where(np.abs(state_switches)>0)[0][0:-1] 
-    switch_types = np.unique(new_states)
-    switch_types = switch_types[~np.isnan(switch_types)]
-    switch_type_idx = new_states[switch_idxs+1]
-
-    for t, type in enumerate(switch_types):
-        switch_interest = switch_idxs[np.where(switch_type_idx==type)]
-        trajectory_length = np.zeros(len(switch_interest)) * np.nan
-        # Check length of trajectories
-        for s_t, switch_test in enumerate(switch_interest[:-1]):
-            trajectory_length[s_t]= switch_idxs[switch_idxs>switch_test][0] - switch_test
-        # Find long enough trajectories
-        long_switches = switch_interest[np.where(trajectory_length> length_minimum)]
-        if len(long_switches) >= trajectory_num:
-            switch_plot = np.random.choice(long_switches, trajectory_num, replace=False)
-        else:
-            switch_plot = np.random.choice(long_switches, len(long_switches), replace=False)
-        
-        # Loop through switche types
-        for s, switch in enumerate(switch_plot[:-1]):
-            trajectory_end = switch_idxs[switch_idxs>switch][0]
-            
-            # Check if trajectory is long enough, if not, draw new switch
-            # while (trajectory_end - switch) < 10:
-            #     switch = np.random.choice(switch_interest, 1)[0]
-            #     # print(switch, switch_idxs, switch_idxs[switch_idxs>switch])
-            #     trajectory_end = switch_idxs[switch_idxs>switch][0]
-            
-            current_state = new_states[switch+1]
-            state_label = inverted_mapping[current_state]
-            
-            state_wheel = int(state_label[0])
-            state_whisker = int(state_label[2])
-
-            # # flip so that state 0 is no movement and state 1 is movement
-            # if movement_wheel == 1:
-            #     state_wheel_ax = state_wheel
-            # else:
-            #     state_wheel_ax = -(state_wheel-1)
-            # if movement_whisker == 1:
-            #     state_whisker_ax = state_whisker
-            # else:
-            #     state_whisker_ax = -(state_whisker-1)
-            state_wheel_ax = state_wheel
-            state_whisker_ax = state_whisker
-            ax = axs[state_wheel_ax, state_whisker_ax]
-
-            color = sns.color_palette("viridis", len(switch_types))[int(current_state)]
-            label = state_label
-            xx = design_matrix_heading[x_var][switch+1:trajectory_end]
-            yy = design_matrix_heading[y_var][switch+1:trajectory_end]
-
-            if s == len(switch_plot) -2:
-                ax.plot(xx, yy, alpha=0.5, color=color, label=label)
-                ax.legend()
-            else:
-                ax.plot(xx, yy, alpha=0.5, color=color)
-
-            ax.set_xlabel('Wheel velocity - state ' + str(state_wheel_ax))
-            ax.set_ylabel('Whisker motion energy - state ' + str(state_whisker_ax))
-            
-            
-def plot_x_y_dynamics(x_var, y_var, mouse_dynamics, mouse_name, new_states, design_matrix_heading, inverted_mapping, grid_density, trajectory_num, plot_traj=True):
-    
-    fig, axs = plt.subplots(2, 2, figsize=(10, 9))
-    unique_states = np.array(list(inverted_mapping.keys()))
-    unique_states = unique_states[~np.isnan(unique_states)]
-    # mouse_dynamics = dynamics[mouse_name]
-    
-    # # Check dynamics to decide which state is movement and which state is not
-    # dynamics_wheel_0 = mouse_dynamics[x_var]['weights'][0][0][0]
-    # dynamics_wheel_1 = mouse_dynamics[x_var]['weights'][1][0][0]
-    # dynamics_whisker_0 = mouse_dynamics[y_var]['weights'][0][0][0]
-    # dynamics_whisker_1 = mouse_dynamics[y_var]['weights'][1][0][0]
-    # if np.abs(dynamics_wheel_1) > np.abs(dynamics_wheel_0):
-    #     movement_wheel = 1
-    # else:
-    #     movement_wheel = 0
-    # if np.abs(dynamics_whisker_1) > np.abs(dynamics_whisker_0):
-    #     movement_whisker = 1
-    # else:
-    #     movement_whisker = 0
-
-    for s, state in enumerate(unique_states):
-        
-        x = np.linspace(np.min(design_matrix_heading[x_var]), 
-                    np.max(design_matrix_heading[x_var]), grid_density)
-        y = np.linspace(np.min(design_matrix_heading[y_var]), 
-                        np.max(design_matrix_heading[y_var]), grid_density)
-        X, Y = np.meshgrid(x, y)
-        U = np.zeros_like(X)
-        V = np.zeros_like(Y)
-
-        where = np.where(np.array(list(inverted_mapping.keys())) == state)[0][0]
-        state_wheel = int(inverted_mapping[where][0])
-        state_whisker = int(inverted_mapping[where][2])
-
-        # # flip so that state 0 is no movement and state 1 is movement
-        # if movement_wheel == 1:
-        #     state_wheel_ax = state_wheel
-        # else:
-        #     state_wheel_ax = -(state_wheel-1)
-        # if movement_whisker == 1:
-        #     state_whisker_ax = state_whisker
-        # else:
-    #     state_whisker_ax = -(state_whisker-1)
-        state_wheel_ax = state_wheel
-        state_whisker_ax = state_whisker
-        ax = axs[state_wheel_ax, state_whisker_ax]
-
-        for i in range(len(x)):
-            for j in range(len(y)):
-                U[i, j] = X[j, i] - update_var(X[j, i], design_matrix_heading[x_var], x_var, mouse_dynamics, 
-                                    state_wheel)
-                V[i, j] = Y[j, i] - update_var(Y[j, i], design_matrix_heading[y_var], y_var, mouse_dynamics, 
-                                    state_whisker)
-
-        # xy': Arrow direction in data coordinates, i.e. the arrows point from (x, y) to (x+u, y+v).     
-        ax.quiver(X, Y, U, V, angles='xy')
-        ax.set_xlabel('Wheel velocity - state ' + str(state_wheel_ax))
-        ax.set_ylabel('Whisker motion energy - state ' + str(state_whisker_ax))
-        ax.set_title(mouse_name)
-        # ax.set_ylim([-1.5, 4])
-        # ax.set_xlim([-4, 4])
-        
-    if plot_traj == True:
-        plot_trajectories(new_states, inverted_mapping, design_matrix_heading, x_var, y_var, axs, trajectory_num)
-        
-    plt.tight_layout()
-    
-    plt.show()
-    
-    
 def transition_probabilities(states, unique_states):
     
     transition_matrix = np.zeros((len(unique_states), len(unique_states))) * np.nan
