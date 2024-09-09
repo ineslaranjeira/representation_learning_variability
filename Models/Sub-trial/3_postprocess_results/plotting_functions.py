@@ -14,8 +14,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # # Custom functions
-# functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
+# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 
@@ -307,144 +307,6 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     all_df = all_df.append(iti_df_correct)
     all_df = all_df.append(iti_df_incorrect)
         
-    return all_df
-
-def bins_per_trial_phase(design_matrix, session_trials):
-    # Split session into trial phases and gather most likely states of those trial phases
-    use_data = design_matrix.dropna()
-    use_data['Trial'] = use_data['Bin'] * np.nan
-    use_data['feedback'] = use_data['Bin'] * np.nan
-    use_data['signed_contrast'] = use_data['Bin'] * np.nan
-    use_data['choice'] = use_data['Bin'] * np.nan
-
-    trial_num = len(session_trials)
-    
-    # Quiescence
-    qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
-    qui_end = session_trials['goCueTrigger_times']
-    quiescence_states = []
-
-    # ITI
-    iti_init_correct = session_trials['feedback_times'] + 1
-    iti_init_incorrect = session_trials['feedback_times'] + 1
-    iti_end = session_trials['intervals_1']
-    ITI_states_correct = []
-    ITI_states_incorrect = []
-
-    # Feedback
-    feedback_init = session_trials['feedback_times']
-    correct_end = session_trials['feedback_times'] + 1
-    incorrect_end = session_trials['feedback_times'] + 1
-    correct_states = []
-    incorrect_states = []
-
-    # Reaction time 
-    rt_init = session_trials['goCueTrigger_times']
-    rt_end = session_trials['firstMovement_times']
-    stim_left_states = []
-    stim_right_states = []
-
-    # Movement time 
-    move_init = session_trials['firstMovement_times']
-    move_end = session_trials['feedback_times']
-    left_states = []
-    right_states = []
-
-    for t, trial in enumerate(range(trial_num)):
-        
-        # Trial number   
-        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'Trial'] = trial
-        
-        # Choice   
-        choice = session_trials['choice'][t]
-        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'choice'] = choice
-        
-        # Correct   
-        correct = prepro(session_trials)['correct'][t]
-        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'feedback'] = correct
-        
-        # Sided contrast  
-        contrast = prepro(session_trials)['signed_contrast'][t]
-        use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > qui_init[t]*10), 'signed_contrast'] = contrast
-        
-        # Quiescence
-        quiescence_data = use_data.loc[(use_data['Bin'] <= qui_end[t]*10) & (use_data['Bin'] > qui_init[t]*10)]
-        quiescence_states = np.append(quiescence_states, quiescence_data['Bin'])
-        
-        # Feedback
-        if session_trials['feedbackType'][t] == 1.:
-            correct_data = use_data.loc[(use_data['Bin'] <= correct_end[t]*10) & (use_data['Bin'] > feedback_init[t]*10)]
-            correct_states = np.append(correct_states, correct_data['Bin'])
-            
-            # ITI correct
-            ITI_data_correct = use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > iti_init_correct[t]*10)]
-            ITI_states_correct = np.append(ITI_states_correct, ITI_data_correct['Bin'])
-        
-        elif session_trials['feedbackType'][t] == -1.:
-            incorrect_data = use_data.loc[(use_data['Bin'] <= incorrect_end[t]*10) & (use_data['Bin'] > feedback_init[t]*10)]
-            incorrect_states = np.append(incorrect_states, incorrect_data['Bin'])
-            
-            # ITI incorrect
-            ITI_data_incorrect = use_data.loc[(use_data['Bin'] <= iti_end[t]*10) & (use_data['Bin'] > iti_init_incorrect[t]*10)]
-            ITI_states_incorrect = np.append(ITI_states_incorrect, ITI_data_incorrect['Bin'])
-
-        # Move
-        move_data = use_data.loc[(use_data['Bin'] <= move_end[t]*10) & (use_data['Bin'] > move_init[t]*10)]
-        
-        if session_trials['choice'][t] == -1:
-            left_states = np.append(left_states, move_data['Bin'])
-        elif session_trials['choice'][t] == 1.:
-            right_states = np.append(right_states, move_data['Bin'])
-            
-        # React
-        react_data = use_data.loc[(use_data['Bin'] <= rt_end[t]*10) & (use_data['Bin'] > rt_init[t]*10)]
-        
-        if prepro(session_trials)['signed_contrast'][t] < 0:
-            stim_left_states = np.append(stim_left_states, react_data['Bin'])
-        elif prepro(session_trials)['signed_contrast'][t] > 0:
-            stim_right_states = np.append(stim_right_states, react_data['Bin'])
-            
-    # Save all in a dataframe
-    quiescence_df = pd.DataFrame(quiescence_states)
-    quiescence_df['label'] = 'Quiescence'
-
-    left_stim_df = pd.DataFrame(stim_left_states)
-    left_stim_df['label'] = 'Stimulus left'
-
-    right_stim_df = pd.DataFrame(stim_right_states)
-    right_stim_df['label'] = 'Stimulus right'
-
-    iti_df_correct = pd.DataFrame(ITI_states_correct)
-    iti_df_correct['label'] = 'ITI_correct'
-
-    iti_df_incorrect = pd.DataFrame(ITI_states_incorrect)
-    iti_df_incorrect['label'] = 'ITI_incorrect'
-
-    correct_df = pd.DataFrame(correct_states)
-    correct_df['label'] = 'Correct feedback'
-
-    incorrect_df = pd.DataFrame(incorrect_states)
-    incorrect_df['label'] = 'Incorrect feedback'
-
-    left_df = pd.DataFrame(left_states)
-    left_df['label'] = 'Left choice'
-
-    right_df = pd.DataFrame(right_states)
-    right_df['label'] = 'Right choice'
-    
-    
-    all_df = quiescence_df.append(left_stim_df)
-    all_df = all_df.append(right_stim_df)
-    all_df = all_df.append(left_df)
-    all_df = all_df.append(right_df)
-    all_df = all_df.append(correct_df)
-    all_df = all_df.append(incorrect_df)
-    all_df = all_df.append(iti_df_correct)
-    all_df = all_df.append(iti_df_incorrect)
-    
-    all_df = all_df.rename(columns={0: "Bin"})
-    # Merge trials
-    all_df = all_df.merge(use_data[['Bin', 'Trial', 'feedback', 'signed_contrast', 'choice']], on='Bin')
     return all_df
 
 
