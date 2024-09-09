@@ -170,10 +170,17 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     use_data = reduced_design_matrix.dropna()
     trial_num = len(session_trials)
 
+    # Pre-quiescence 
+    pre_qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod'] - session_trials['intervals_0']
+    pre_qui_end = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
+    pre_quiescence_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
+                                              'wsls', 'most_likely_states', 'Bin', 'trial_id'])
+    
+    
     # Quiescence
     qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
     qui_end = session_trials['goCueTrigger_times']
-    qui_end = session_trials['stimOn_times']
+    # qui_end = session_trials['stimOn_times']
     quiescence_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
                                               'wsls', 'most_likely_states', 'Bin', 'trial_id'])
     
@@ -213,6 +220,12 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     
 
     for t, trial in enumerate(range(trial_num)):
+        
+        # Pre-quiescence
+        pre_quiescence_data = use_data.loc[(use_data['Bin'] < pre_qui_end[t]*multiplier) & (use_data['Bin'] > pre_qui_init[t]*multiplier)]
+        pre_quiescence_states = pre_quiescence_states.append(pre_quiescence_data[['correct', 'choice', 'contrast', 
+                                                                                  'reaction', 'response', 'elongation', 'wsls', 
+                                                                                  'most_likely_states', 'Bin', 'trial_id']])
         
         # Quiescence
         quiescence_data = use_data.loc[(use_data['Bin'] < qui_end[t]*multiplier) & (use_data['Bin'] > qui_init[t]*multiplier)]
@@ -271,6 +284,9 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
                                                                      'most_likely_states', 'Bin', 'trial_id']])
 
     # Save all in a dataframe
+    pre_quiescence_df = pd.DataFrame(pre_quiescence_states)
+    pre_quiescence_df['label'] = 'Pre-quiescence'
+
     quiescence_df = pd.DataFrame(quiescence_states)
     quiescence_df['label'] = 'Quiescence'
 
@@ -298,7 +314,8 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     right_df = pd.DataFrame(right_states)
     right_df['label'] = 'Right choice'
 
-    all_df = quiescence_df.append(left_stim_df)
+    all_df = quiescence_df.append(pre_quiescence_df)
+    all_df = all_df.append(left_stim_df)
     all_df = all_df.append(right_stim_df)
     all_df = all_df.append(left_df)
     all_df = all_df.append(right_df)
@@ -316,6 +333,7 @@ def broader_label(df):
     df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Stimulus'
     df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Stimulus'
     df.loc[df['broader_label']=='Quiescence', 'broader_label'] = 'Quiescence'
+    df.loc[df['broader_label']=='Pre-quiescence', 'broader_label'] = 'Pre-quiescence'
     df.loc[df['broader_label']=='Left choice', 'broader_label'] = 'Choice'
     df.loc[df['broader_label']=='Right choice', 'broader_label'] = 'Choice'
     df.loc[df['broader_label']=='Correct feedback', 'broader_label'] = 'ITI'
