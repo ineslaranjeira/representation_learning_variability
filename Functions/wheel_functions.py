@@ -15,7 +15,7 @@ import brainbox.behavior.wheel as wh
 
 # Get my functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 from design_functions import wheel_velocity
