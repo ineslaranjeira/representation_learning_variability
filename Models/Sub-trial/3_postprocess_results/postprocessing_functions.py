@@ -244,28 +244,33 @@ def trans_mat_complete(mapping, state_label, unique_states, transition_matrix):
     return matrix_df
 
 
-def state_identifiability(combined_states, design_matrix_heading):
+def state_identifiability(combined_states, design_matrix_heading, use_sets):
     
     unique_states = np.unique(combined_states)
     new_states = unique_states.copy()
-    
+
     # Create new mapping depending on empirical data for each state
-    for v, var in enumerate(['avg_wheel_vel', 'Lick count', 'whisker_me']):
-        zeros = [s[v] == '0' for s in combined_states]
-        ones = [s[v] == '1' for s in combined_states]
-        if var == 'avg_wheel_vel':
+    for v, var in enumerate(use_sets):
+        zeros = [s[v] == '0' if s != 'nan' else False for s in combined_states]
+        ones = [s[v] == '1' if s != 'nan' else False for s in combined_states]
+        if var == ['avg_wheel_vel']:
             var_0 = np.array(np.abs(design_matrix_heading[var]))[zeros]
             var_1 = np.array(np.abs(design_matrix_heading[var]))[ones]
+        elif var == ['left_X', 'left_Y', 'right_X', 'right_Y']:
+            var_0 = np.array(np.abs(np.diff(design_matrix_heading[var], axis=0)))[zeros[1:]]
+            var_1 = np.array(np.abs(np.diff(design_matrix_heading[var], axis=0)))[ones[1:]]
+        elif var == ['nose_x', 'nose_Y']:
+            print('Not implemented yet')
         else:
             var_0 = np.array(design_matrix_heading[var])[zeros]
             var_1 = np.array(design_matrix_heading[var])[ones]
         
         if np.nanmean(var_0)> np.nanmean(var_1):
-            var_state_0 = [s[v] == '0' for s in unique_states]
+            var_state_0 = [s[v] == '0' if s != 'nan' else False for s in unique_states]
             new_states[var_state_0] = np.array([s[:v] + '1' + s[v+1:] for s in new_states[var_state_0]])
-            var_state_1 = [s[v] == '1' for s in unique_states]
+            var_state_1 = [s[v] == '1' if s != 'nan' else False for s in unique_states]
             new_states[var_state_1] = np.array([s[:v] + '0' + s[v+1:] for s in new_states[var_state_1]])
-    
+
 
     identifiable_mapping = {unique: key for unique, key in zip(unique_states, new_states)}
 

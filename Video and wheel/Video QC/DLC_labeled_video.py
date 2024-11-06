@@ -556,3 +556,4 @@ for s, session in enumerate(pass_qc['session_uuid'].unique()[46:]):
     Viewer(session, 'left', 1, 10000, lp=False)
 
 # %%
+Viewer("03063955-2523-47bd-ae57-f7489dd40f15", 'left', 231*60, 235*60, lp=False)

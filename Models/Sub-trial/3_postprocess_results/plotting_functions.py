@@ -28,77 +28,80 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
         
         # Initialize variables
         # Before there was a function for keeping validation set apart, now deprecated
-        #test_length = np.shape(test_set)[0]
-        #reduced_design_matrix = design_matrix[:test_length*2].append(design_matrix[-test_length*2:])
         reduced_design_matrix = design_matrix.copy()
         reduced_design_matrix['most_likely_states'] = most_likely_states
         reduced_design_matrix['new_bin'] = reduced_design_matrix['Bin'] * np.nan
         reduced_design_matrix['correct'] = reduced_design_matrix['Bin'] * np.nan
         reduced_design_matrix['choice'] = reduced_design_matrix['Bin'] * np.nan
         reduced_design_matrix['contrast'] = reduced_design_matrix['Bin'] * np.nan        
-        
-        events = session_trials[this_event]
+
         feedback = session_trials['feedbackType']
         choice = session_trials['choice']
         contrast = np.abs(prepro(session_trials)['signed_contrast'])
         reaction = prepro(session_trials)['reaction']
         response = prepro(session_trials)['response']
         elongation = prepro(session_trials)['elongation']
-        wsls = prepro(session_trials)['wsls'] 
+        wsls = prepro(session_trials)['wsls']
         trial_id = session_trials['index'] 
 
         events = session_trials[this_event]
-        #state_stack = np.zeros((len(events), end + init)) * np.nan
                 
-        for t, trial in enumerate(events[:-2]):
+        for t, trial in enumerate(events[:-1]):
             event = events[t]
+            trial_start = session_trials['intervals_0'][t]
+            trial_end = session_trials['intervals_0'][t+1]
             
             # Check feedback
             if feedback[t] ==1:
-                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'correct'] = 1
             elif feedback[t] == -1:
-                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'correct'] = 0
             # Check choice
             if choice[t] ==1:
-                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'choice'] = 'right'
             elif choice[t] == -1:
-                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'choice'] = 'left'
             
             # Check reaction
-            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'reaction'] = reaction[t]
             # Check response
-            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'response'] = response[t]
             # Check elongation
-            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']>trial_start*multiplier), 
                                             'elongation'] = elongation[t]
 
             # Check contrast
-            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'contrast'] = contrast[t]
             
             # Check wsls
-            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'wsls'] = wsls[t]
 
             # Check trial id
-            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'trial_id'] = trial_id[t]
+            
+            # Add reliable timestamp to identify trial
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            this_event] = event
             
             # Rename bins so that they are aligned on stimulus onset
             if event > 0:
@@ -119,7 +122,6 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
                                           (reduced_design_matrix['Bin']> event*multiplier + init), 'new_bin'] = np.nan
                 
     return reduced_design_matrix
-
 
 def params_to_df (var_names, num_states, num_train_batches, fit_params, norm_results):
 
@@ -162,176 +164,150 @@ def plot_transition_mat (init_params, fit_params):
     plt.title('Fold 3')
     plot_transition_matrix(fit_params[1].transition_matrix[2])
     fit_params[1].transition_matrix[2]
-    
+
 
 def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     
     # Split session into trial phases and gather most likely states of those trial phases
     use_data = reduced_design_matrix.dropna()
+    use_data['label'] = use_data['Bin'] * np.nan
     trial_num = len(session_trials)
 
     # Pre-quiescence 
-    pre_qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod'] - session_trials['intervals_0']
+    pre_qui_init = session_trials['intervals_0']
     pre_qui_end = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
-    pre_quiescence_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                              'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-    
+
     
     # Quiescence
     qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
     qui_end = session_trials['goCueTrigger_times']
-    # qui_end = session_trials['stimOn_times']
-    quiescence_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                              'wsls', 'most_likely_states', 'Bin', 'trial_id'])
     
     # ITI
-    iti_init_correct = session_trials['feedback_times'] + 1
-    iti_init_incorrect = session_trials['feedback_times'] + 2
+    iti_init = session_trials['feedback_times']
     iti_end = session_trials['intervals_1']
-    ITI_states_correct = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                               'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-    ITI_states_incorrect = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                                 'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-
-    # Feedback
-    feedback_init = session_trials['feedback_times']
-    correct_end = session_trials['feedback_times'] + 1
-    incorrect_end = session_trials['feedback_times'] + 2
-    correct_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                           'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-    incorrect_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                             'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-
+    
+    # iti_end = np.concatenate((session_trials['intervals_0'][1:], 
+    #                           np.array(session_trials['intervals_1'][-1:])), axis=0) 
+    
     # Reaction time 
     rt_init = session_trials['goCueTrigger_times']
     rt_end = session_trials['firstMovement_times']
-    stim_left_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                             'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-    stim_right_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                              'wsls', 'most_likely_states', 'Bin', 'trial_id'])
 
     # Movement time 
     move_init = session_trials['firstMovement_times']
     move_end = session_trials['feedback_times']
-    left_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                        'wsls', 'most_likely_states', 'Bin', 'trial_id'])
-    right_states = pd.DataFrame(columns=['correct', 'choice', 'contrast', 'reaction', 'response', 'elongation', 
-                                         'wsls', 'most_likely_states', 'Bin', 'trial_id'])
     
 
-    for t, trial in enumerate(range(trial_num)):
+    for t in range(trial_num):
         
         # Pre-quiescence
-        pre_quiescence_data = use_data.loc[(use_data['Bin'] < pre_qui_end[t]*multiplier) & (use_data['Bin'] > pre_qui_init[t]*multiplier)]
-        pre_quiescence_states = pre_quiescence_states.append(pre_quiescence_data[['correct', 'choice', 'contrast', 
-                                                                                  'reaction', 'response', 'elongation', 'wsls', 
-                                                                                  'most_likely_states', 'Bin', 'trial_id']])
-        
+        use_data.loc[(use_data['Bin'] <= pre_qui_end[t]*multiplier) & 
+                     (use_data['Bin'] > pre_qui_init[t]*multiplier), 'label'] = 'Pre-quiescence'
+
         # Quiescence
-        quiescence_data = use_data.loc[(use_data['Bin'] < qui_end[t]*multiplier) & (use_data['Bin'] > qui_init[t]*multiplier)]
-        quiescence_states = quiescence_states.append(quiescence_data[['correct', 'choice', 'contrast', 
-                                                                      'reaction', 'response', 'elongation', 'wsls', 
-                                                                      'most_likely_states', 'Bin', 'trial_id']])
+        use_data.loc[(use_data['Bin'] <= qui_end[t]*multiplier) &
+                     (use_data['Bin'] > qui_init[t]*multiplier), 'label'] = 'Quiescence'
         
-        # Feedback        
-        if session_trials['feedbackType'][t] == 1.:
-            
-            correct_data = use_data.loc[(use_data['Bin'] < correct_end[t]*multiplier) & (use_data['Bin'] > feedback_init[t]*multiplier)]
-            correct_states = correct_states.append(correct_data[['correct', 'choice', 'contrast', 
-                                                                 'reaction', 'response', 'elongation', 'wsls', 
-                                                                 'most_likely_states', 'Bin', 'trial_id']])
-            
-            # ITI correct
-            ITI_data_correct = use_data.loc[(use_data['Bin'] < iti_end[t]*multiplier) & (use_data['Bin'] > iti_init_correct[t]*multiplier)]
-            ITI_states_correct = ITI_states_correct.append(ITI_data_correct[['correct', 'choice', 
-                                                                             'reaction', 'response', 'elongation', 'wsls', 
-                                                                             'contrast', 'most_likely_states', 'Bin', 'trial_id']])
-
-        elif session_trials['feedbackType'][t] == -1.:
-            incorrect_data = use_data.loc[(use_data['Bin'] < incorrect_end[t]*multiplier) & (use_data['Bin'] > feedback_init[t]*multiplier)]
-            incorrect_states =incorrect_states.append(incorrect_data[['correct', 'choice', 'contrast', 
-                                                                      'reaction', 'response', 'elongation', 'wsls', 
-                                                                      'most_likely_states', 'Bin', 'trial_id']])
-
-            # ITI incorrect
-            ITI_data_incorrect = use_data.loc[(use_data['Bin'] < iti_end[t]*multiplier) & (use_data['Bin'] > iti_init_incorrect[t]*multiplier)]
-            ITI_states_incorrect = ITI_states_incorrect.append(ITI_data_incorrect[['correct', 'choice', 
-                                                                                   'reaction', 'response', 'elongation', 'wsls', 
-                                                                                   'contrast', 'most_likely_states', 'Bin', 'trial_id']])
-
+        # ITI
+        use_data.loc[(use_data['Bin'] <= iti_end[t]*multiplier) & 
+                        (use_data['Bin'] > iti_init[t]*multiplier), 'label'] = 'ITI'
+        
         # Move
-        move_data = use_data.loc[(use_data['Bin'] < move_end[t]*multiplier) & (use_data['Bin'] > move_init[t]*multiplier)]
-        
         if session_trials['choice'][t] == -1:
-            left_states = left_states.append(move_data[['correct', 'choice', 'contrast', 
-                                                        'reaction', 'response', 'elongation', 'wsls', 
-                                                        'most_likely_states', 'Bin', 'trial_id']])
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Left choice'
         elif session_trials['choice'][t] == 1.:
-            right_states = right_states.append(move_data[['correct', 'choice', 'contrast', 
-                                                          'reaction', 'response', 'elongation', 
-                                                          'wsls', 'most_likely_states', 'Bin', 'trial_id']])
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Right choice'
             
-        # React
-        react_data = use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & (use_data['Bin'] > rt_init[t]*multiplier)]
-        
+        # React        
         if prepro(session_trials)['signed_contrast'][t] < 0:
-            stim_left_states = stim_left_states.append(react_data[['correct', 'choice', 'contrast', 
-                                                                   'reaction', 'response', 'elongation', 'wsls', 
-                                                                   'most_likely_states', 'Bin', 'trial_id']])
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
         elif prepro(session_trials)['signed_contrast'][t] > 0:
-            stim_right_states = stim_right_states.append(react_data[['correct', 'choice', 'contrast', 
-                                                                     'reaction', 'response', 'elongation', 'wsls', 
-                                                                     'most_likely_states', 'Bin', 'trial_id']])
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
+            
+    return use_data
 
-    # Save all in a dataframe
-    pre_quiescence_df = pd.DataFrame(pre_quiescence_states)
-    pre_quiescence_df['label'] = 'Pre-quiescence'
-
-    quiescence_df = pd.DataFrame(quiescence_states)
-    quiescence_df['label'] = 'Quiescence'
-
-    left_stim_df = pd.DataFrame(stim_left_states)
-    left_stim_df['label'] = 'Stimulus left'
-
-    right_stim_df = pd.DataFrame(stim_right_states)
-    right_stim_df['label'] = 'Stimulus right'
+# THIS function was to control for difference in ITI length for correct and incorrect
+def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     
-    iti_df_correct = pd.DataFrame(ITI_states_correct)
-    iti_df_correct['label'] = 'ITI_correct'
+    # Split session into trial phases and gather most likely states of those trial phases
+    use_data = reduced_design_matrix.dropna()
+    use_data['label'] = use_data['Bin'] * np.nan
+    trial_num = len(session_trials)
 
-    iti_df_incorrect = pd.DataFrame(ITI_states_incorrect)
-    iti_df_incorrect['label'] = 'ITI_incorrect'
+    # Pre-quiescence 
+    pre_qui_init = session_trials['intervals_0']
+    pre_qui_end = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
 
-    correct_df = pd.DataFrame(correct_states)
-    correct_df['label'] = 'Correct feedback'
+    
+    # Quiescence
+    qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
+    qui_end = session_trials['goCueTrigger_times']
+    
+    # ITI
+    iti_init = session_trials['feedback_times']
+    iti_end_correct = session_trials['intervals_1']
+    iti_end_incorrect = session_trials['intervals_1'] - 1
+    # iti_end = session_trials['feedback_times'] + 1.5
+    
+    # iti_end = np.concatenate((session_trials['intervals_0'][1:], 
+    #                           np.array(session_trials['intervals_1'][-1:])), axis=0) 
+    
+    # Reaction time 
+    rt_init = session_trials['goCueTrigger_times']
+    rt_end = session_trials['firstMovement_times']
 
-    incorrect_df = pd.DataFrame(incorrect_states)
-    incorrect_df['label'] = 'Incorrect feedback'
+    # Movement time 
+    move_init = session_trials['firstMovement_times']
+    move_end = session_trials['feedback_times']
+    
 
-    left_df = pd.DataFrame(left_states)
-    left_df['label'] = 'Left choice'
-
-    right_df = pd.DataFrame(right_states)
-    right_df['label'] = 'Right choice'
-
-    all_df = quiescence_df.append(pre_quiescence_df)
-    all_df = all_df.append(left_stim_df)
-    all_df = all_df.append(right_stim_df)
-    all_df = all_df.append(left_df)
-    all_df = all_df.append(right_df)
-    all_df = all_df.append(correct_df)
-    all_df = all_df.append(incorrect_df)
-    all_df = all_df.append(iti_df_correct)
-    all_df = all_df.append(iti_df_incorrect)
+    for t in range(trial_num):
         
-    return all_df
+        # Pre-quiescence
+        use_data.loc[(use_data['Bin']+0.5 <= pre_qui_end[t]*multiplier) & 
+                     (use_data['Bin']+0.5 > pre_qui_init[t]*multiplier), 'label'] = 'Pre-quiescence'
+
+        # Quiescence
+        use_data.loc[(use_data['Bin']+0.5 <= qui_end[t]*multiplier) &
+                     (use_data['Bin']+0.5 > qui_init[t]*multiplier), 'label'] = 'Quiescence'
+        
+        # ITI
+        if session_trials['feedbackType'][t] == -1.:
+            use_data.loc[(use_data['Bin']+0.5 <= iti_end_incorrect[t]*multiplier) & 
+                            (use_data['Bin']+0.5 > iti_init[t]*multiplier), 'label'] = 'ITI'
+        elif session_trials['feedbackType'][t] == 1.:
+            use_data.loc[(use_data['Bin']+0.5 <= iti_end_correct[t]*multiplier) & 
+                            (use_data['Bin']+0.5 > iti_init[t]*multiplier), 'label'] = 'ITI'
+        # Move
+        if session_trials['choice'][t] == -1:
+            use_data.loc[(use_data['Bin']+0.5 <= move_end[t]*multiplier) & 
+                         (use_data['Bin']+0.5 > move_init[t]*multiplier), 'label'] = 'Left choice'
+        elif session_trials['choice'][t] == 1.:
+            use_data.loc[(use_data['Bin']+0.5 <= move_end[t]*multiplier) & 
+                         (use_data['Bin']+0.5 > move_init[t]*multiplier), 'label'] = 'Right choice'
+            
+        # React        
+        if prepro(session_trials)['signed_contrast'][t] < 0:
+            use_data.loc[(use_data['Bin']+0.5 <= rt_end[t]*multiplier) & 
+                         (use_data['Bin']+0.5 > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
+        elif prepro(session_trials)['signed_contrast'][t] > 0:
+            use_data.loc[(use_data['Bin']+0.5 <= rt_end[t]*multiplier) & 
+                         (use_data['Bin']+0.5 > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
+            
+    return use_data
 
 
 def broader_label(df):
     
     df['broader_label'] = df['label']
-    df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Stimulus'
-    df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Stimulus'
+    # df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Stimulus'
+    # df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Stimulus'
+    df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Choice'
     df.loc[df['broader_label']=='Quiescence', 'broader_label'] = 'Quiescence'
     df.loc[df['broader_label']=='Pre-quiescence', 'broader_label'] = 'Pre-quiescence'
     df.loc[df['broader_label']=='Left choice', 'broader_label'] = 'Choice'
@@ -564,19 +540,28 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
         plot_min = np.min([use_normalized[columns_to_standardize[0]], 
                            use_normalized[columns_to_standardize[1]],
                            use_normalized[columns_to_standardize[2]]])
-    elif len(columns_to_standardize) == 4:
+    elif len(columns_to_standardize) == 7:
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[1]], label=columns_to_standardize[1], linewidth=2)
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[2]], label=columns_to_standardize[2], linewidth=2)
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[3]], label=columns_to_standardize[3], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[4]], label=columns_to_standardize[4], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[5]], label=columns_to_standardize[5], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[6]], label=columns_to_standardize[6], linewidth=2)
         plot_max = np.max([use_normalized[columns_to_standardize[0]], 
                            use_normalized[columns_to_standardize[1]],
                            use_normalized[columns_to_standardize[2]],
-                           use_normalized[columns_to_standardize[3]]])
+                           use_normalized[columns_to_standardize[3]],
+                           use_normalized[columns_to_standardize[4]],
+                           use_normalized[columns_to_standardize[5]],
+                           use_normalized[columns_to_standardize[6]]])
         plot_min = np.min([use_normalized[columns_to_standardize[0]], 
                            use_normalized[columns_to_standardize[1]],
                            use_normalized[columns_to_standardize[2]],
-                           use_normalized[columns_to_standardize[3]]])
+                           use_normalized[columns_to_standardize[3]],
+                           use_normalized[columns_to_standardize[4]],
+                           use_normalized[columns_to_standardize[5]],
+                           use_normalized[columns_to_standardize[6]]])
     cax = axs.imshow(np.concatenate([use_normalized['most_likely_states'], states_to_append])[None,:], 
             extent=(0, len(np.concatenate([use_normalized['most_likely_states'], states_to_append])), plot_min, plot_max),
             aspect="auto",
