@@ -611,7 +611,8 @@ def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_basel
                 next_onset_time = series_df['time'][next_onset_index]
                 
                 # Get time from first trial (only once to avoid the last trial)
-                if t == 0:
+                #if t == 0:
+                if trial_onset == np.min(onset_times):   
                     
                     time_window = series_df.loc[(series_df['time']> trial_onset-t_init) & 
                                                 (series_df['time'] <= trial_onset+t_end), 'time'] - onset_time
