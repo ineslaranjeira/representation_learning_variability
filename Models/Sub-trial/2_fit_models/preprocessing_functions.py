@@ -17,7 +17,7 @@ def get_frame_rate(eid, mouse_name, frame_rate):
     return fr
 
 
-def idxs_from_files(one, design_matrices, frame_rate, data_path, bin_size):
+def idxs_from_files_pre_custom_qc(one, design_matrices, frame_rate, data_path, bin_size):
     
     idxs = []
     mouse_names = []
@@ -47,6 +47,26 @@ def idxs_from_files(one, design_matrices, frame_rate, data_path, bin_size):
                 else:
                     idxs = np.hstack((idxs, idx))
                     mouse_names = np.hstack((mouse_names, mouse_name))
+            
+    return idxs, mouse_names
+
+
+def idxs_from_files(design_matrices, bin_size):
+    
+    idxs = []
+    mouse_names = []
+    for m, mat in enumerate(design_matrices):
+        
+        mouse_name = design_matrices[m][51:-(len(str(bin_size))+1)]
+        eid = design_matrices[m][14:50]
+        idx = str(eid + '_' + mouse_name)
+
+        if len(idxs) == 0:
+            idxs = idx
+            mouse_names = mouse_name
+        else:
+            idxs = np.hstack((idxs, idx))
+            mouse_names = np.hstack((mouse_names, mouse_name))
             
     return idxs, mouse_names
 
