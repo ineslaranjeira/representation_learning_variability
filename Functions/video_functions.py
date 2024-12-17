@@ -228,13 +228,15 @@ def motion_energy_PSTH(one, eid):
 
 
 def get_ME(one, eid, video_type):
-
-    #video_type = 'left'        
-    
-    #Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy') 
-    Times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % video_type)
-    ME = one.load_dataset(eid,f'alf/{video_type}Camera.ROIMotionEnergy.npy')
-    
+     
+    try: 
+        Times = one.load_dataset(eid, 'alf/_ibl_%sCamera.times.npy' % video_type)
+    except:
+        Times = one.load_dataset(eid,f'_ibl_{video_type}Camera.times.npy') 
+    try:
+        ME = one.load_dataset(eid,f'alf/{video_type}Camera.ROIMotionEnergy.npy')
+    except:
+        ME = one.load_dataset(eid,f'{video_type}Camera.ROIMotionEnergy.npy')
 
     return Times, ME
 
@@ -842,3 +844,70 @@ def downsample (metric, to_shorten, reference):
             
     
     return metric
+
+
+
+"""
+FILTER SESSIONS BASED ON CUSTOM VIDEO QC
+"""
+
+def extended_left_dlc(one, qc):
+    
+    eids = qc['Session ID']
+
+    # Initialize df
+    df = pd.DataFrame()
+
+    for e, eid in enumerate(eids):
+        
+        extended_qc = one.get_details(eid, True)['extended_qc']
+        transposed_df = pd.DataFrame.from_dict(extended_qc, orient='index').T
+        transposed_df['eid'] = eid
+        df = df.append(transposed_df)
+    
+    return df
+
+
+def custom_qc(one, df):
+    # Calculate licks per trial and append to extended qc df
+    df['ratio'] = df['behavior'] * np.nan
+    df['miss_lick_count'] = df['behavior'] * np.nan
+
+    for e, eid in enumerate(df['eid'].unique()):
+        try:
+            lick_times = get_lick_times(one, eid, video_type = 'left')
+            trials = one.load_object(eid, obj='trials', namespace='ibl')
+            trials_df = trials.to_df()
+            licks_psth_post = lick_psth(trials_df, lick_times, 0, 1, event='feedback_times')
+
+            # Save
+            df.loc[df['eid']==eid, 'ratio'] = round(len(lick_times) / len(trials_df), 2)
+            if len(licks_psth_post) > 0:
+                df.loc[df['eid']==eid, 'miss_lick_count'] = np.max(licks_psth_post['trial']) - len(licks_psth_post['trial'].unique())
+            
+        except:
+            print('No licks for session '+str(eid))
+            
+    return df
+
+
+def full_custom_qc(one, qc):
+    
+    # Extend QC 
+    ext_qc = extended_left_dlc(one, qc)
+    # Filter by task QC
+    task_qc = ext_qc.loc[ext_qc['task'].isin(['PASS', 'WARNING'])]
+    # Apply custom lick QC
+    lick_custom = custom_qc(task_qc)
+    # Filter based on custom lick qc and some key video qcs
+    final_custom_qc = lick_custom.loc[(lick_custom['dlcLeft'].isin(['FAIL', 'WARNING', 'PASS', np.nan])) &
+                    (lick_custom['videoLeft'].isin(['FAIL', 'WARNING', 'PASS', np.nan])) &
+                    (lick_custom['ratio']>5) &
+                    (lick_custom['_videoLeft_pin_state'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &
+                    (lick_custom['_videoLeft_framerate'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &  
+                    (lick_custom['_videoLeft_camera_times'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &
+                    (lick_custom['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS' or x == None)) &
+                    (lick_custom['_videoLeft_timestamps'].isin([True, 'PASS', np.nan]))                   
+                    ]
+    
+    return final_custom_qc
