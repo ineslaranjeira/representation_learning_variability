@@ -7,7 +7,6 @@ from one.api import ONE
 from scipy.interpolate import interp1d
 import math
 import matplotlib.pyplot as plt
-
 from brainbox.io.one import SessionLoader
 
 
