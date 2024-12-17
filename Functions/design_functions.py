@@ -80,7 +80,8 @@ def wheel_displacement(wheel_times, wheel_positions, trials, bin_size, onset_sub
     df['Bin'] = bins
 
     # Define the bin edges array
-    trial_edges = list(trials['stimOn_times'])
+    # trial_edges = list(trials['stimOn_times'])
+    trial_edges = list(trials['goCueTrigger_times'])
     df['Trial'] = pd.cut(df['Wheel times'], bins=trial_edges, labels=False)
 
     onsets = pd.DataFrame({'Onset times': trial_edges,
@@ -130,7 +131,8 @@ def pupil_diam(pupil_times, pupil_dia_smooth, trials, bin_size, onset_subtractio
     df['Bin'] = bins
 
     # Define the bin edges array
-    trial_edges = list(trials['stimOn_times'])
+    # trial_edges = list(trials['stimOn_times'])
+    trial_edges = list(trials['goCueTrigger_times'])
     df['Trial'] = pd.cut(df['Pupil times'], bins=trial_edges, labels=False)
     
     # Subtract onset value
@@ -178,7 +180,8 @@ def cont_bin(times, metric, trials, bin_size):
     df['Bin'] = bins
 
     # Define the bin edges array
-    trial_edges = list(trials['stimOn_times'])
+    # trial_edges = list(trials['stimOn_times'])
+    trial_edges = list(trials['goCueTrigger_times'])
     df['Trial'] = pd.cut(df['Times'], bins=trial_edges, labels=False)
 
     onsets = pd.DataFrame({'Onset times': trial_edges,
@@ -192,11 +195,12 @@ def cont_bin(times, metric, trials, bin_size):
 
     return df_binned
 
-
+# IS this function actually used?
 def align_stimOn(df, trials):
 
     # Define the bin edges array
-    trial_edges = list(trials['stimOn_times'])
+    # trial_edges = list(trials['stimOn_times'])
+    trial_edges = list(trials['goCueTrigger_times'])
 
     onsets = pd.DataFrame({'onset_times': trial_edges,
                           'Trial': np.arange(0, len(trial_edges), 1)})
