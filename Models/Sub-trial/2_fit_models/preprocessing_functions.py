@@ -96,7 +96,7 @@ def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path,
             session_trials = one.load_object(session, obj='trials', namespace='ibl')
             session_trials = session_trials.to_df()
             session_end = list(session_trials['stimOff_times'][-1:])[0]  # TODO: this might not work if stimOff times are missing
-            session_start = list(session_trials['stimOn_times'])[0]
+            session_start = list(session_trials['goCueTrigger_times'])[0]
 
             # Get time of last unbiased trial
             unbiased = session_trials.loc[session_trials['probabilityLeft']==0.5]
