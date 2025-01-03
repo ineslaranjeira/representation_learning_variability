@@ -9,7 +9,7 @@ import json
 import pickle
 from one.api import ONE
 import brainbox.behavior.wheel as wh
-
+import sys
 # Plotting tools
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -346,16 +346,22 @@ def plot_timeseries_pcs(X, augmented_data, var_names, init, range):
         plt.show()
         
         
-def save_pickle_and_log(file_to_save, filename, save_path):
+def save_and_log(file_to_save, filename, file_format, save_path):
 
     # current date
     now = datetime.now() # current date and time
     date_time = now.strftime("%m-%d-%Y")
     
-    # First, save file in desired location
+    # First, save file in desired location and with desired format
     os.chdir(save_path)
-    pickle.dump(file_to_save, open(filename+date_time, "wb"))
-    
+    if file_format == 'pickle':
+        pickle.dump(file_to_save, open(filename+date_time, "wb"))
+    elif file_format == 'parquet':
+        assert isinstance(file_to_save, pd.DataFrame) 
+        file_to_save.to_parquet(filename+date_time, compression='gzip')  
+    else: 
+        sys.exit("File format not implemented")        
+
     # Open log file json
     log_file_path =  '/home/ines/repositories/representation_learning_variability/DATA/' 
     with open(log_file_path + 'metadata_log.json', 'r') as openfile:
@@ -368,7 +374,7 @@ def save_pickle_and_log(file_to_save, filename, save_path):
     
     # Populate new entry
     new_log_entry = {
-    "data_filename": str(file_to_save),
+    "data_filename": filename,
     "script_name": script_name,
     "timestamp": date_time
     }
@@ -376,9 +382,10 @@ def save_pickle_and_log(file_to_save, filename, save_path):
     # Update log dict
     order_last_entry = int(list(metadata_log.keys())[-1])
     metadata_log[order_last_entry+1] = new_log_entry
-    
+    updated_json = json.dumps(metadata_log)
+
     # Overwrite json log file
     with open(log_file_path+"metadata_log.json", "w") as outfile:
-        outfile.write(str(metadata_log))
-        
+        outfile.write(updated_json)
+
     return metadata_log
