@@ -108,7 +108,7 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
                 event_window = reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
                                                          (reduced_design_matrix['Bin']> event*multiplier + init)]
                 onset_bin = reduced_design_matrix.loc[reduced_design_matrix['Bin']>= event*multiplier, 'Bin']
-                if (len(event_window)>0): # & len(onset_bin)>0:
+                if (len(event_window)>0) & len(onset_bin)>0:
                     bin = list(onset_bin)[0]
                     reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
                                             (reduced_design_matrix['Bin']> event*multiplier + init), 
