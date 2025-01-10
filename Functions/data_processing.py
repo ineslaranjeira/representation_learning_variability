@@ -346,7 +346,7 @@ def plot_timeseries_pcs(X, augmented_data, var_names, init, range):
         plt.show()
         
         
-def save_and_log(file_to_save, filename, file_format, save_path):
+def save_and_log(file_to_save, filename, file_format, save_path, script_name):
 
     # current date
     now = datetime.now() # current date and time
@@ -368,9 +368,9 @@ def save_and_log(file_to_save, filename, file_format, save_path):
         # Reading from json file
         metadata_log = json.load(openfile)
     
-    # Then create entry for the log file
-    files = [f for f in os.listdir() if f.endswith('.ipynb')]
-    script_name = files[0]
+    # # Then create entry for the log file
+    # files = [f for f in os.listdir() if f.endswith('.ipynb')]
+    # script_name = files[0]
     
     # Populate new entry
     new_log_entry = {
