@@ -103,7 +103,17 @@ def get_lick_times(one, eid, combine=False, video_type='left'):
         lick_times = times[r[:idx]]
 
     return lick_times
-        
+
+
+def get_lick_on(one, eid, video_type='left'):
+    
+    times, XYs = get_dlc_XYs_lick(one, eid, video_type, query_type='remote')    
+    r = get_licks(XYs)
+    # Var which stores frames with lick
+    lick_on = times * 0
+    lick_on[r] = 1       
+
+    return times, lick_on
 
 # By Ines
 def lick_psth(trials, licks, t_init, t_end, event='feedback_times'):

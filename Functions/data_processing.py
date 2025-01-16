@@ -270,6 +270,23 @@ def interpolate(time_snippet, snippet, size, plot):
     return rescaled_array
 
 
+def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None):
+    
+    # t = np.arange(t_init, t_end, 1 / freq)  # Evenly resample at frequency
+    if reference_time[-1] > timestamps[-1]:
+        reference_time = reference_time[:-1]  # Occasionally due to precision errors the last sample may be outside of range.
+    yinterp = interpolate.interp1d(timestamps, data, kind=kind)(reference_time)
+    
+    if fill_gaps:
+        #  Find large gaps and forward fill @fixme This is inefficient
+        gaps, = np.where(np.diff(timestamps) >= fill_gaps)
+
+        for i in gaps:
+            yinterp[(reference_time >= timestamps[i]) & (reference_time < timestamps[i + 1])] = data[i]
+            
+    return yinterp, reference_time
+
+
 """ DIMENSIONALITY REDUCTION FUNCTIONS """
 
 def pca_behavior(use_mat, keep_pc, plot=False):
