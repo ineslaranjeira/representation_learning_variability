@@ -10,6 +10,8 @@ import pickle
 from one.api import ONE
 import brainbox.behavior.wheel as wh
 import sys
+from joblib import Parallel, delayed
+
 # Plotting tools
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -18,6 +20,7 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from scipy.interpolate import interp1d
+from scipy.fftpack import fft, ifft, fftshift
 
 # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
@@ -389,3 +392,93 @@ def save_and_log(file_to_save, filename, file_format, save_path, script_name):
         outfile.write(updated_json)
 
     return metadata_log
+
+
+""" WAVELETS """
+
+
+def morlet_conj_ft(omega_vals, omega0):
+    """
+    Computes the conjugate Fourier transform of the Morlet wavelet.
+    
+    Parameters:
+    - w: Angular frequency values (array or scalar)
+    - omega0: Dimensionless Morlet wavelet parameter
+    
+    Returns:
+    - out: Conjugate Fourier transform of the Morlet wavelet
+    """
+    
+    return np.pi**(-1/4) * np.exp(-0.5 * (omega_vals - omega0)**2)
+
+
+def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
+    """
+    Fast Morlet wavelet transform using parallel computation.
+
+    Args:
+        x (array): 1D array of projection values to transform.
+        f (array): Center frequencies of the wavelet frequency channels (Hz).
+        omega0 (float): Dimensionless Morlet wavelet parameter.
+        dt (float): Sampling time (seconds).
+
+    Returns:
+        amp (array): Wavelet amplitudes.
+        W (array): Wavelet coefficients (complex-valued, optional).
+    """
+    N = len(x)
+    L = len(f)
+    amp = np.zeros((L, N))
+    Q = np.zeros((L, N))
+
+    # Ensure N is even
+    if N % 2 == 1:
+        x = np.append(x, 0)
+        N += 1
+        test = True
+    else:
+        test = False
+
+    # Add zero padding to x
+    # Zero padding serves to compensate for the fact that the kernel does not have the same size as 
+    # 
+    x = np.concatenate((np.zeros(N // 2), x, np.zeros(N // 2)))
+    M = N
+    N = len(x)
+
+    # Compute scales
+    scales = (omega0 + np.sqrt(2 + omega0**2)) / (4 * np.pi * f)
+    # angular frequencies to compute FT for (depends on sampling frequency); is as long as N 
+    omega_vals = 2 * np.pi * np.arange(-N // 2, N // 2) / (N * dt)  
+
+    # Fourier transform of x; shift folds it around zero so that it is more interpretable (frequencies at the right of nyquist become negative)
+    x_hat = fftshift(fft(x))
+
+    # Index for truncation to recover the actual x without padding
+    if test:
+        idx = np.arange(M // 2, M // 2 + M - 1)
+    else:
+        idx = np.arange(M // 2, M // 2 + M)
+
+    # Function for parallel processing
+    def process_frequency(i):
+        # Take the Morlet conjugate of the Fourier transform
+        m = morlet_conj_ft(-omega_vals * scales[i], omega0)
+        # Convolution on the Fourier domain (as opposed to time domain in DWT)
+        conv = m * x_hat
+        # Inverse Fourier transform (normalized?)
+        # q are the wavelet coefficients; normalized to ensure the energy of the wavelet is preserved across different scales
+        q = ifft(conv) * np.sqrt(scales[i])
+        # Recover q without padding
+        q = q[idx]
+        amp_row = np.abs(q) * np.pi**-0.25 * np.exp(0.25 * (omega0 - np.sqrt(omega0**2 + 2))**2) / np.sqrt(2 * scales[i])
+        return amp_row, q
+
+    # Parallel processing
+    results = Parallel(n_jobs=-1)(delayed(process_frequency)(i) for i in range(L))
+
+    for i, (amp_row, q) in enumerate(results):
+        amp[i, :] = amp_row
+        Q[i, :] = q
+
+    return amp, Q, x_hat
