@@ -56,8 +56,10 @@ def idxs_from_files(design_matrices, bin_size):
     idxs = []
     mouse_names = []
     for m, mat in enumerate(design_matrices):
-        
-        mouse_name = design_matrices[m][51:-(len(str(bin_size))+1)]
+        if bin_size  == 0.017:
+            mouse_name = design_matrices[m][51:]
+        else:
+            mouse_name = design_matrices[m][51:-(len(str(bin_size))+1)]
         eid = design_matrices[m][14:50]
         idx = str(eid + '_' + mouse_name)
 
@@ -71,14 +73,13 @@ def idxs_from_files(design_matrices, bin_size):
     return idxs, mouse_names
 
 
-def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path, first_90=True):
+
+def prepro_design_matrix(one, idxs, mouse_names, bin_size, multiplier, var_names, data_path, first_90=True):
 
     # Save data of all sessions for latter
     matrix_all = defaultdict(list)
     matrix_all_unnorm = defaultdict(list)
     session_all = defaultdict(list)
-
-    multiplier = 1/bin_size
     
     for m, mouse_name in enumerate(mouse_names):
         # Save results per mouse
@@ -102,8 +103,13 @@ def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path,
             unbiased = session_trials.loc[session_trials['probabilityLeft']==0.5]
             time_trial_90 = list(unbiased['stimOff_times'])[-1]
             
-            filename = str(data_path +'design_matrix_' + mat + '_'  + str(bin_size))  # + mouse_name + '_'
-            big_design_matrix = pickle.load(open(filename, "rb"))
+            if bin_size == 0.017:
+                filename = str(data_path +'design_matrix_' + mat)  # + mouse_name + '_'
+                big_design_matrix = pd.read_parquet(filename, engine='pyarrow')
+            else:
+                filename = str(data_path +'design_matrix_' + mat + '_'  + str(bin_size))  # + mouse_name + '_'
+                big_design_matrix = pickle.load(open(filename, "rb"))
+                
             design_matrix = big_design_matrix.groupby('Bin')[var_names].mean()  # 
             design_matrix = design_matrix.reset_index(level = [0])  # , 'Onset times'
             design_matrix = design_matrix.dropna()
@@ -128,10 +134,10 @@ def prepro_design_matrix(one, idxs, mouse_names, bin_size, var_names, data_path,
                 normalized = normalizer.fit_transform(standardized)
                 
                 if len(var_names)>1:
-                    matrix_all[mouse_name][session] = normalized
+                    # matrix_all[mouse_name][session] = normalized
                     matrix_all[mouse_name][session] = standardized
-                else:
-                    matrix_all[mouse_name][session] = standardized
+                # else:
+                #     matrix_all[mouse_name][session] = standardized
                 
                 # Keep licks unnormalized
                 if 'Lick count' in var_names:
