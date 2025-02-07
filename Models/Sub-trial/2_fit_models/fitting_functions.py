@@ -66,7 +66,7 @@ def cross_validate_model(model, key, all_emissions, train_emissions, method_to_u
     return val_lls, fit_params, init_params, baseline_val_lls, ll_train
 
 
-def cross_validate_poismodel(model, key, all_emissions, train_emissions, num_train_batches, num_iters=100):
+def cross_validate_poismodel(model, key, train_emissions, num_train_batches, method='sgd', num_iters=100):
     # Initialize the parameters using K-Means on the full training set
     init_params, props = model.initialize(key=key)
 
@@ -81,19 +81,17 @@ def cross_validate_poismodel(model, key, all_emissions, train_emissions, num_tra
         return model.marginal_log_prob(init_params, y_val) # np.shape(y_val)[1]
     
     # Then actually fit the model to data
-    def _fit_fold(y_train, y_val):
-        fit_params, train_lps = model.fit_em(init_params, props, y_train, 
-                                             num_iters=num_iters, verbose=False)
-        return model.marginal_log_prob(fit_params, y_val) , fit_params  # np.shape(y_val)[1]
-    
-    # Get log likelihood without cross-validation
-    def _train_ll(all_emissions):
-        fit_params_non_cv, _ = model.fit_em(init_params, props, all_emissions,
-                                            num_iters=num_iters, verbose=False)
-        ll_train = model.marginal_log_prob(fit_params_non_cv, all_emissions)/len(all_emissions)
-        return ll_train
-
-    ll_train = _train_ll(all_emissions)
+    if method == 'em':
+        def _fit_fold(y_train, y_val):
+            fit_params, train_lps = model.fit_em(init_params, props, y_train, 
+                                                num_iters=num_iters, verbose=False)
+            return model.marginal_log_prob(fit_params, y_val) , fit_params  
+        
+    elif method == 'sgd':
+        def _fit_fold(y_train, y_val):
+            fit_params, train_lps = model.fit_sgd(init_params, props, y_train, 
+                                                num_epochs=num_iters)
+            return model.marginal_log_prob(fit_params, y_val) , fit_params  
     
     val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions)
     
@@ -102,8 +100,7 @@ def cross_validate_poismodel(model, key, all_emissions, train_emissions, num_tra
     return val_lls, fit_params, init_params, baseline_val_lls
 
 
-
-def cross_validate_armodel(model, key, all_emissions, train_emissions, train_inputs, method_to_use, num_train_batches, num_iters=100):
+def cross_validate_armodel(model, key, train_emissions, train_inputs, method_to_use, num_train_batches, method='sgd', num_iters=100):
     # Initialize the parameters using K-Means on the full training set
     #init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
     init_params, props = model.initialize(key=key, method=method_to_use, emissions=train_emissions)
@@ -125,10 +122,16 @@ def cross_validate_armodel(model, key, all_emissions, train_emissions, train_inp
     baseline_val_lls = vmap(_fit_fold_baseline)(train_emissions, train_inputs)
     
     # Then actually fit the model to data
-    def _fit_fold(y_train, y_val, inpt_folds, inpts):
-        fit_params, train_lps = model.fit_em(init_params, props, y_train, inpt_folds, 
-                                             num_iters=num_iters, verbose=False)
-        return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params  # np.shape(y_val)[1]
+    if method == 'em':
+        def _fit_fold(y_train, y_val, inpt_folds, inpts):
+            fit_params, train_lps = model.fit_em(init_params, props, y_train, inpt_folds, 
+                                                num_iters=num_iters, verbose=False)
+            return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params 
+    elif method == 'sgd':
+        def _fit_fold(y_train, y_val, inpt_folds, inpts):
+            fit_params, train_lps = model.fit_sgd(init_params, props, y_train, inpt_folds, 
+                                                num_epochs=num_iters)
+            return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params  
     
     val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions, inpt_folds, train_inputs)
     

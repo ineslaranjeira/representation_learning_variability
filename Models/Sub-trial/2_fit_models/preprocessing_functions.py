@@ -74,7 +74,8 @@ def idxs_from_files(design_matrices, bin_size):
 
 
 
-def prepro_design_matrix(one, idxs, mouse_names, bin_size, multiplier, var_names, data_path, first_90=True):
+def prepro_design_matrix(one, idxs, mouse_names, bin_size, multiplier, 
+                         var_names, data_path, first_90=True):
 
     # Save data of all sessions for latter
     matrix_all = defaultdict(list)

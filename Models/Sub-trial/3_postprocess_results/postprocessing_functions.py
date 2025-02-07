@@ -19,7 +19,7 @@ from one_functions_generic import prepro
 
 """ Model comparison """
 
-def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, Lags):
+def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, Lags, subtract_baseline=False):
     
     # Find best params per mouse
     best_lag = {}
@@ -32,6 +32,7 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
     fold_len =  len(shortened_array)/num_train_batches
     
     mean_bits_LL = np.ones((len(Lags), len(kappas))) * np.nan
+    mean_LL = np.ones((len(Lags), len(kappas))) * np.nan
     best_fold = np.ones((len(Lags), len(kappas))) * np.nan
     
     for l, lag in enumerate(Lags):
@@ -56,16 +57,20 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
         bits_LL = (np.array(avg_val_lls) - np.array(baseline_lls)) / fold_len * np.log(2)
         
         mean_bits_LL[l,:] = np.nanmean(bits_LL, axis=1)        
+        mean_LL[l,:] = np.nanmean(avg_val_lls, axis=1)     
         best_fold[l, :] = b_fold
         
     # Save best params for the mouse
     best_lag = Lags[np.where(mean_bits_LL==np.nanmax(mean_bits_LL))[0][0]]
-    best_kappa = kappas[np.where(mean_bits_LL==np.nanmax(mean_bits_LL))[1][0]]
+    if subtract_baseline:
+        best_kappa = kappas[np.where(mean_bits_LL==np.nanmax(mean_bits_LL))[1][0]]
+    else:
+        best_kappa = kappas[np.where(mean_LL==np.nanmax(mean_LL))[1][0]]
     
-    return best_lag, best_kappa, mean_bits_LL, best_fold
+    return best_lag, best_kappa, mean_bits_LL, mean_LL, best_fold
 
 
-def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas):
+def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, subtract_baseline=False):
     
     # Find best params per mouse
     best_kappa = {}
@@ -91,18 +96,21 @@ def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kap
             b_f = np.nan
             
         b_fold.append(b_f)
-            
+
     avg_val_lls = np.array(lls)
     baseline_lls = np.array(b_lls)
     bits_LL = (np.array(avg_val_lls) - np.array(baseline_lls)) / fold_len * np.log(2)
-    
-    mean_bits_LL = np.nanmean(bits_LL, axis=1)        
+    mean_bits_LL = np.nanmean(bits_LL, axis=1)       
+    mean_LL = np.nanmean(lls, axis=1) 
     best_fold = b_fold
     
-    # Save best params for the mouse
-    best_kappa = kappas[np.where(mean_bits_LL==np.nanmax(mean_bits_LL))[0][0]]
+    if subtract_baseline:  
+        # Save best params for the mouse
+        best_kappa = kappas[np.where(mean_bits_LL==np.nanmax(mean_bits_LL))[0][0]]
+    else:
+        best_kappa = kappas[np.where(mean_LL==np.nanmax(mean_LL))[0][0]]
     
-    return best_kappa, mean_bits_LL, best_fold
+    return best_kappa, mean_bits_LL, mean_LL, best_fold
 
 
 def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_name, var_interest):
@@ -127,6 +135,7 @@ def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_nam
     cbar = plt.colorbar(cax)
     cbar.set_label('Delta LL')
     ax.set_xticks(np.arange(0, len(kappas), 1), kappas)
+    ax.set_yticks(np.arange(0, len(Lags), 1), Lags)
     plt.xlabel('Kappa')
     plt.ylabel('Lag')
     plt.title(mouse_name + ' ' + var_interest)

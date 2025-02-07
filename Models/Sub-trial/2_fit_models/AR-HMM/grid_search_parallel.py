@@ -153,14 +153,14 @@ def run_grid_search_parallel(matrix_all, idxs, var_interest, var_interest_map, i
     )
 
 # Parameters
-n_jobs = 6  # Number of CPU cores to use
+n_jobs = 2  # Number of CPU cores to use
 bin_size = 0.017
 num_states=2
 var_interest = 'whisker_me'
 save_path = '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/'  + str(bin_size) + '/'+str(num_states)+'_states/grid_search/individual_sessions/'
 
 # Load data
-data_file = "preprocessed_data_v5_01-17-2025"
+data_file = "preprocessed_data_v5_01-20-2025"
 if data_file == "preprocessed_data_v4_170724":
     use_sets = [['avg_wheel_vel'], ['Lick count'], ['whisker_me'],
                 ['left_X', 'left_Y', 'right_X', 'right_Y'], ['nose_X', 'nose_Y']]
@@ -182,7 +182,7 @@ elif data_file == "preprocessed_data_v4_171224_alltrials":
     prepro_results_path =  '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/' + str(bin_size) + '/'
     idxs, mouse_names, matrix_all, matrix_all_unnorm, session_all = pickle.load(open(prepro_results_path + data_file, "rb"))
     # collapsed_matrices, collapsed_unnorm, collapsed_trials = concatenate_sessions (mouse_names, matrix_all, matrix_all_unnorm, session_all)
-elif data_file == "preprocessed_data_v5_01-17-2025":
+elif data_file == "preprocessed_data_v5_01-20-2025":
     use_sets = [['avg_wheel_vel'], ['whisker_me'], ['Lick count'], ['0.25', '0.5',
        '1.0', '2.0', '4.0', '8.0', '16.0']]
     var_interest_map = ['avg_wheel_vel', 'whisker_me', 'Lick count', '0.25', '0.5',
