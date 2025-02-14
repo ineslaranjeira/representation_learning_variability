@@ -14,7 +14,7 @@ from sklearn import mixture
 
 """ Cluster assessment """
 
-def GMM_log_likelihood(embedding, components):
+def GMM_neg_log_likelihood(embedding, components):
     
     LL = np.zeros(len(components)) * np.nan
     
