@@ -243,6 +243,22 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
         plot_min = np.min([use_normalized[columns_to_standardize[0]], 
                            use_normalized[columns_to_standardize[1]],
                            use_normalized[columns_to_standardize[2]]])
+    elif len(columns_to_standardize) == 5:
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[1]], label=columns_to_standardize[1], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[2]], label=columns_to_standardize[2], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[3]], label=columns_to_standardize[3], linewidth=2)
+        axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[4]], label=columns_to_standardize[4], linewidth=2)
+        plot_max = np.max([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]],
+                           use_normalized[columns_to_standardize[2]],
+                           use_normalized[columns_to_standardize[3]],
+                           use_normalized[columns_to_standardize[4]]])
+        plot_min = np.min([use_normalized[columns_to_standardize[0]], 
+                           use_normalized[columns_to_standardize[1]],
+                           use_normalized[columns_to_standardize[2]],
+                           use_normalized[columns_to_standardize[3]],
+                           use_normalized[columns_to_standardize[4]]])
     elif len(columns_to_standardize) == 7:
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[0]], label=columns_to_standardize[0], linewidth=2)
         axs.plot(use_normalized['Bin']-init, use_normalized[columns_to_standardize[1]], label=columns_to_standardize[1], linewidth=2)
@@ -303,6 +319,46 @@ def traces_over_few_sates (init, inter, design_matrix, session_trials, columns_t
     axs.legend(loc='upper left', bbox_to_anchor=(1.2, 1))
 
     plt.tight_layout()
+    plt.show()
+    
+def wheel_over_wavelet_clusters(init, inter, empirical_data, session_trials):
+    # Plot raw trace over states
+    # init should be in seconds; inter should be in frames
+    frame_rate = 60
+    plot_min = -10
+    plot_max = 10
+
+    fig, ax = plt.subplots(ncols=1 , nrows=1, sharex=False, sharey=False, figsize=[20, 5])
+    plt.rc('font', size=12)
+
+    # ax.plot(data)
+    ax.plot(empirical_data.loc[empirical_data['Bin']>=init, 'avg_wheel_vel'].reset_index(), color='black')
+    ax.imshow(np.concatenate([empirical_data.loc[empirical_data['Bin']>=init, 'most_likely_states']])[None,:],
+                extent=(0, len(np.concatenate([empirical_data.loc[empirical_data['Bin']>=init, 'most_likely_states']])), -10, 10),
+                aspect="auto",
+                cmap='viridis',
+                alpha=0.3)
+    ax.vlines(np.array(session_trials['goCueTrigger_times'] -init)*frame_rate, plot_min, plot_max, label='Stim On', 
+                color='Black', linewidth=2)
+    ax.vlines(np.array(session_trials.loc[session_trials['feedbackType']==1, 'feedback_times'] * frame_rate)-init*frame_rate, 
+                plot_min, plot_max, label='Correct', color='Green', linewidth=2)
+    ax.vlines(np.array(session_trials.loc[session_trials['feedbackType']==-1, 'feedback_times'] * frame_rate)-init*frame_rate, 
+                plot_min, plot_max, label='Incorrect', color='Red', linewidth=2)
+    ax.vlines(np.array(session_trials['firstMovement_times'] * frame_rate)-init*frame_rate, plot_min, plot_max, label='First movement', color='Blue')
+    ax.vlines(np.array(session_trials['intervals_0'] * frame_rate)-init*frame_rate, plot_min, plot_max, label='Trial end', color='Grey', linewidth=2)
+    ax.vlines(np.array((session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']) * frame_rate)-init*frame_rate, 
+                plot_min, plot_max, label='Quiescence start', color='Pink', linewidth=2)
+
+    ax.set_xlim([init, init+inter])
+    ax.set_ylabel("Wheel velocity")
+    ax.set_xlabel("Time (s)")
+    ax.set_xticks(np.arange(0, inter, inter/5),np.arange(init, 
+                                                          (init+inter)/frame_rate, (inter/frame_rate)/5))
+    ax.set_title("Wavelet transform clusters")
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax.set_ylim([-10, 10])
+
+    plt.tight_layout()    
     plt.show()
     
     
