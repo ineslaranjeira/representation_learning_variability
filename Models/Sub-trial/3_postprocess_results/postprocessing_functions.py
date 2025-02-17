@@ -70,6 +70,60 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
     return best_lag, best_kappa, mean_bits_LL, mean_LL, best_fold
 
 
+def best_lag_kappa_bic(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, Lags, num_states):
+    
+    # Find best params per mouse
+    best_lag = {}
+    best_kappa = {}
+    mean_bits_LL = {}
+                  
+    # Get size of folds
+    num_timesteps = np.shape(design_matrix)[0]
+    shortened_array = np.array(design_matrix[:(num_timesteps // num_train_batches) * num_train_batches])
+    fold_len =  len(shortened_array)/num_train_batches
+    
+    mean_bits_LL = np.ones((len(Lags), len(kappas))) * np.nan
+    mean_LL = np.ones((len(Lags), len(kappas))) * np.nan
+    all_bic = np.ones((len(Lags), len(kappas))) * np.nan
+    best_fold = np.ones((len(Lags), len(kappas))) * np.nan
+        
+    for l, lag in enumerate(Lags):
+        
+        num_params = 3*num_states + num_states**2 + num_states * lag
+        
+        # Reshape
+        lag_lls = []
+        b_lag_lls = []
+        b_fold = []
+        
+        for k in kappas:
+            lag_lls.append(all_lls[lag][k])
+            b_lag_lls.append(all_baseline_lls[lag][k])
+            # Best fold
+            if np.abs(np.nansum(all_lls[lag][k])) > 0:  # accounts for possibility that all folds are nan
+                b_f = np.where(all_lls[lag][k]==np.nanmax(all_lls[lag][k]))[0][0]
+            else:
+                b_f = np.nan
+            b_fold.append(b_f)
+            
+        avg_val_lls = np.array(lag_lls)
+        baseline_lls = np.array(b_lag_lls)
+        bits_LL = (np.array(avg_val_lls) - np.array(baseline_lls)) / fold_len * np.log(2)
+        bic = num_params * np.log(fold_len*num_train_batches) - 2 * np.nansum(avg_val_lls, axis=1)
+        bic = num_params * 2 - 2 * np.nansum(avg_val_lls, axis=1)
+
+        mean_bits_LL[l,:] = np.nanmean(bits_LL, axis=1)        
+        mean_LL[l,:] = np.nanmean(avg_val_lls, axis=1)  
+        all_bic[l,:] = bic
+        best_fold[l, :] = b_fold
+        
+    # Save best params for the mouse
+    best_kappa = kappas[np.where(all_bic==np.nanmin(all_bic))[1][0]]
+    best_lag = Lags[np.where(all_bic==np.nanmin(all_bic))[0][0]]
+    
+    return best_lag, best_kappa, mean_bits_LL, mean_LL, all_bic, best_fold
+
+
 def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, subtract_baseline=False):
     
     # Find best params per mouse
