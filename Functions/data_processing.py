@@ -379,6 +379,8 @@ def save_and_log(file_to_save, filename, file_format, save_path, script_name):
     elif file_format == 'parquet':
         assert isinstance(file_to_save, pd.DataFrame) 
         file_to_save.to_parquet(filename+date_time, compression='gzip')  
+    elif file_format == 'npy':
+        np.save(open(filename+date_time, 'wb'), file_to_save)
     else: 
         sys.exit("File format not implemented")        
 
