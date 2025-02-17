@@ -121,7 +121,7 @@ def cross_validate_poismodel(model, key, train_emissions, num_train_batches, met
 # Function to perform grid search for a single session
 def grid_search_versatile(id, var_interest, var_interest_map, 
                           idx_init_list, idx_end_list, use_sets, fixed_states, 
-                          params, sticky, save_path, data_path, num_train_batches, method):
+                          params, sticky, save_path, data_path, num_train_batches, method, fit_method):
     # Load mouse/session data
     index_var = np.where(np.array(var_interest_map) == var_interest)[0][0]
     idx_init = idx_init_list[index_var]
@@ -224,7 +224,7 @@ def grid_search_versatile(id, var_interest, var_interest_map,
                     train_inputs = jnp.stack(jnp.split(my_inputs, num_train_batches))
 
                     all_val_lls, fit_params, init_params, baseline_lls = cross_validate_armodel(
-                        test_arhmm, jr.PRNGKey(0), train_emissions, train_inputs, method, num_train_batches
+                        test_arhmm, jr.PRNGKey(0), train_emissions, train_inputs, method, num_train_batches, fit_method
                     )
                     
                     all_lls[lag][kappa] = all_val_lls
@@ -241,7 +241,7 @@ def grid_search_versatile(id, var_interest, var_interest_map,
                         train_inputs = jnp.stack(jnp.split(my_inputs, num_train_batches))
 
                         all_val_lls, fit_params, init_params, baseline_lls = cross_validate_armodel(
-                            test_arhmm, jr.PRNGKey(0), train_emissions, train_inputs, method, num_train_batches
+                            test_arhmm, jr.PRNGKey(0), train_emissions, train_inputs, method, num_train_batches, fit_method
                         )
                         
                         all_lls[state][lag][kappa] = all_val_lls
@@ -262,7 +262,7 @@ def grid_search_versatile(id, var_interest, var_interest_map,
 # Main function for parallel processing
 def run_grid_search_parallel(idxs, var_interest, var_interest_map, idx_init_list,
                              idx_end_list, use_sets, fixed_states, params, sticky,
-                             save_path, data_path, num_train_batches, method, n_jobs):
+                             save_path, data_path, num_train_batches, method, fit_method, n_jobs):
     # Identify sessions to process
     sessions_to_process = []
     for m, mat in enumerate(idxs):
@@ -272,6 +272,7 @@ def run_grid_search_parallel(idxs, var_interest, var_interest_map, idx_init_list
         result_filename = os.path.join(save_path, f"{'best_sticky' if sticky else 'best'}_results_{var_interest}_{fit_id}")
         if not os.path.exists(result_filename):
             sessions_to_process.append((mouse_name, session))
+    sessions_to_process = sessions_to_process[:5]
 
     print(f"Found {len(sessions_to_process)} sessions to process.")
 
@@ -279,7 +280,7 @@ def run_grid_search_parallel(idxs, var_interest, var_interest_map, idx_init_list
     Parallel(n_jobs=n_jobs)(
         delayed(grid_search_versatile)(
             id, var_interest, var_interest_map, idx_init_list, idx_end_list, use_sets,
-            fixed_states, params, sticky, save_path, data_path, num_train_batches, method
+            fixed_states, params, sticky, save_path, data_path, num_train_batches, method, fit_method
         ) for id in sessions_to_process
     )
 
@@ -295,7 +296,7 @@ def run_grid_search_parallel(idxs, var_interest, var_interest_map, idx_init_list
 # Parameters
 n_jobs = 5  # Number of CPU cores to use
 bin_size = 0.017
-num_states = 2
+num_states = 3
 save_path = '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/'  + str(bin_size) + '/'+str(num_states)+'_states/grid_search/individual_sessions/'
 
 use_sets = [['avg_wheel_vel'], ['whisker_me'], ['Lick count'], ['0.25', '0.5',
@@ -323,13 +324,18 @@ all_num_lags = [1, 3, 5, 7, 10, 15, 20, 30]
 all_num_lags=list(range(1, 20, 2))
 kappas=[0, 0.5, 1, 2, 3, 4, 5, 10, 20, 100]
 
+all_num_lags=[1, 2, 5, 10]
+# all_num_lags=[1, 10, 20, 30, 40, 45, 50, 55, 60, 65]
+
+kappas=[0, 1, 50, 100]
+
 params = num_sates, all_num_lags, kappas
 
 
-var_interest = 'Lick count'
+var_interest = 'avg_wheel_vel'
 
 # Run the grid search
 run_grid_search_parallel(
     idxs, var_interest, var_interest_map, idx_init_list, idx_end_list, use_sets,
     fixed_states=True, params=params, sticky=False,
-    save_path=save_path,  data_path=data_path, num_train_batches=5, method='prior', n_jobs=n_jobs)
+    save_path=save_path,  data_path=data_path, num_train_batches=20, method='prior', fit_method='sgd', n_jobs=n_jobs)
