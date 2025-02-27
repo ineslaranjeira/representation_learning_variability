@@ -264,7 +264,12 @@ def state_identifiability(combined_states, design_matrix_heading, use_sets):
     for v, var in enumerate(use_sets):
         zeros = [s[v] == '0' if s != 'nan' else False for s in combined_states]
         ones = [s[v] == '1' if s != 'nan' else False for s in combined_states]
-        if var == ['avg_wheel_vel']:
+        
+        # For an empty variable, do not make changes (wavelet)
+        if len(var) == 0:
+            var_0 = np.nan
+            var_1 = np.nan
+        elif var == ['avg_wheel_vel']:
             var_0 = np.array(np.abs(design_matrix_heading[var]))[zeros]
             var_1 = np.array(np.abs(design_matrix_heading[var]))[ones]
         elif var == ['left_X', 'left_Y', 'right_X', 'right_Y']:
@@ -702,15 +707,16 @@ def define_trial_types(states_trial_type, trial_type_agg):
     states_trial_type.loc[states_trial_type['correct_str']==1., 'correct_str'] = 'correct'
     states_trial_type.loc[states_trial_type['correct_str']==0., 'correct_str'] = 'incorrect'
     states_trial_type['contrast_str'] = states_trial_type['contrast'].astype(str)
+    states_trial_type['block_str'] = states_trial_type['block'].astype(str)
     states_trial_type['perseverence'] = states_trial_type['wsls'].copy()
     states_trial_type.loc[states_trial_type['wsls'].isin(['wst', 'lst']), 'perseverence']  = 'stay'
     states_trial_type.loc[states_trial_type['wsls'].isin(['wsh', 'lsh']), 'perseverence']  = 'shift'
-    states_trial_type.loc[states_trial_type['ballistic']==True, 'ballistic'] = 1
-    states_trial_type.loc[states_trial_type['ballistic']==False, 'ballistic'] = 0
     states_trial_type['trial_type'] = states_trial_type[trial_type_agg].agg(' '.join, axis=1)
     states_trial_type['trial_str'] = states_trial_type['trial_id'].astype(str)
     states_trial_type['sample'] = states_trial_type[['session', 'trial_str']].agg(' '.join, axis=1)
-
+    if 'ballistic' in states_trial_type.columns:
+        states_trial_type.loc[states_trial_type['ballistic']==True, 'ballistic'] = 1
+        states_trial_type.loc[states_trial_type['ballistic']==False, 'ballistic'] = 0
     return states_trial_type
 
 def state_relative_frequency(use_data):

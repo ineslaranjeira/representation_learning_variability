@@ -205,7 +205,7 @@ def grid_search_versatile(id, var_interest, var_interest_map,
                 for kappa in kappas:
                     test_poishmm = PoissonHMM(state, emission_dim, transition_matrix_stickiness=kappa)
                     all_val_lls, fit_params, init_params, baseline_lls = cross_validate_poismodel(test_poishmm, jr.PRNGKey(0), 
-                                                                                                train_emissions, num_train_batches, num_iters=100)
+                num_train_batches                                                                               train_emissions, num_train_batches, num_iters=100)
 
                     all_lls[state][kappa] = all_val_lls
                     all_baseline_lls[state][kappa] = baseline_lls
