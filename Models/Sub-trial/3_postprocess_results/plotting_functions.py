@@ -628,3 +628,25 @@ def plot_states_trial_type(df_epoch):
     plt.tight_layout()
     # plt.title(mouse_name)
     plt.show()
+    
+    
+def plot_binned_sequence(df_grouped, index, states_to_append):
+        title = df_grouped['broader_label'][index]
+        fig, axs = plt.subplots(2, 1, sharex=False, sharey=True, figsize=(5, 2))
+        axs[0].imshow(np.concatenate([df_grouped['sequence'][index], states_to_append])[None,:],  
+                extent=(0, len(np.concatenate([df_grouped['sequence'][index], states_to_append])), 
+                        0, 1),
+                aspect="auto",
+                cmap='viridis',
+                alpha=0.7) 
+        axs[0].set_xlim([0, len(df_grouped['sequence'][index])])
+
+        axs[1].imshow(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])[None,:],  
+                extent=(0, len(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])), 
+                        0, 1),
+                aspect="auto",
+                cmap='viridis',
+                alpha=0.7) 
+        axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
+        axs[0].set_title(title)
+        plt.tight_layout()

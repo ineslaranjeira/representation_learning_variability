@@ -3,12 +3,13 @@ IMPORTS
 """
 import autograd.numpy as np
 import pandas as pd
-from collections import defaultdict
-from sklearn.preprocessing import StandardScaler, Normalizer
+from sklearn.model_selection import KFold
+from sklearn.metrics import f1_score, confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import os 
+from scipy.stats import mode
 
 # # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
@@ -776,3 +777,160 @@ def trial_relative_frequency(use_data, vars):
     freq_df[freq_df.isna()] = 0
     
     return count, freq_df
+
+
+def bin_sequence(seq, target_length):
+    bins = np.array_split(seq, target_length)  # Split into target length bins
+    return [mode(bin)[0] for bin in bins]  # Take most frequent element in each bin
+
+
+def plot_cm(decoding_result, trial_epochs, control=False):
+    """
+    PLOT RESULTS
+    """
+
+    # -- Confusion Matrix
+    # labels = trial_epochs
+
+    # Results on original model
+    plt.rc('font', size=12) 
+    plt.figure(figsize=[6.2, 5.2])
+    hmap = sns.color_palette("mako", as_cmap=True)
+    data = decoding_result.loc[decoding_result['shuffle'] == 0]
+    sns.heatmap(data['confusion_matrix'].mean(), annot=True, square=True,
+        yticklabels=trial_epochs, xticklabels=trial_epochs, 
+        cmap= hmap, vmin=0, vmax=1, fmt=".2f") 
+
+    plt.xticks([.5, 1.5, 2.5, 3.5], trial_epochs)
+    plt.yticks([.5, 1.5, 2.5, 3.5], trial_epochs)
+    plt.xticks(rotation = 90)
+    plt.yticks(rotation = 0)
+    plt.xlabel('Predicted label')
+    plt.ylabel('True label')
+    plt.savefig('full_cm.svg',dpi=500)
+    plt.show()
+    print('F1 results', data['f1'].mean())
+
+    if control:
+        # Results from shuffled model
+        plt.rc('font', size=12) 
+        plt.figure(figsize=[6.2, 5.2])
+        data = decoding_result.loc[decoding_result['shuffle'] >0]
+        sns.heatmap(data['confusion_matrix'].mean(), annot=True, square=True,
+            yticklabels=trial_epochs, xticklabels=trial_epochs, 
+            cmap= hmap, vmin=0, vmax=1, fmt=".2f")
+
+        plt.xticks([.5, 1.5, 2.5, 3.5], trial_epochs)
+        plt.yticks([.5, 1.5, 2.5, 3.5], trial_epochs)
+        plt.xticks(rotation = 90)
+        plt.yticks(rotation = 0)
+        plt.xlabel('Predicted label')
+        plt.ylabel('True label')
+        plt.show()
+        print('F1 shuffled results',  data['f1'].mean())
+
+
+def plot_f1(decoding_result):
+    # -- F1 score per model, original and shuffled
+    data = decoding_result.copy()
+    data['f1'] = data['f1'].astype(float)
+
+    data.loc[data['shuffle'] >= 1, 'shuffle'] = 'Shuffled'
+    data.loc[data['shuffle'] == 0, 'shuffle'] = 'Original'
+    data = data.rename(columns={'shuffle': 'Dataset'})
+
+    plt.rc('font', size=12) 
+    plt.figure(figsize=[4.5, 4])
+    sns.boxplot(y='f1', x='Dataset', data=data, color='grey') 
+    sns.swarmplot(y='f1', x='Dataset', data=data, color='black', dodge=True, alpha=0.7, size=3)
+    plt.ylim([0,1])
+    plt.ylabel('Accuracy score (F1)')
+    plt.legend(bbox_to_anchor=(1.05, 1))
+    sns.despine(top=True, right=True)
+    #plt.savefig('violin.svg',dpi=500)
+    
+
+def decoder(mat, var, model, mapping, trial_epochs, shufflings, plot = False):
+    
+    """
+    RUN MODEL
+    """
+
+    # Generate random states for each iteration with a fixed seed
+    # Loop over iterations of random draws of mice
+    # Create empty dataframes to save results
+    decoding_result = pd.DataFrame(columns=['shuffle', 'f1', 'confusion_matrix'])
+
+    # Decoding function with 10-fold cross validation
+    kf = KFold(n_splits=10, shuffle=True, random_state=0)
+    use_mat = mat.copy() # test using all mice
+
+    # Find minimum number of samples per label
+    original_labels = np.array(use_mat[var])
+    # Use np.vectorize to apply the mapping
+    replace_func = np.vectorize(mapping.get)
+    labels = replace_func(original_labels)
+    labels_nr = np.arange(labels.shape[0])
+    min_freq = np.min(use_mat['y'].value_counts())
+
+    # Randomly select N mice from each lab to equalize classes
+    use_index = np.empty(0, dtype=int)
+    for j, epoch in enumerate(np.unique(labels)):
+        use_index = np.concatenate([use_index, np.random.choice(labels_nr[labels == epoch],
+                                                                min_freq, replace=False)])
+
+    new_mat = use_mat.iloc[use_index].reset_index().drop(columns=['index']).copy()
+            
+    # -- ORIGINAL DATASET
+
+    dec_result = pd.DataFrame(columns=['shuffle', 'f1', 'confusion_matrix'])
+    y_pred = np.zeros(len(new_mat), dtype=int) 
+    exog = new_mat[new_mat.columns.difference([var])]
+    endog = new_mat.loc[:, var].copy()
+    endog[:] = replace_func(endog)
+
+    for train_index, test_index in kf.split(new_mat):
+        model.fit(exog.iloc[train_index], endog.iloc[train_index].astype(int))
+        y_pred[test_index] = model.predict(exog.iloc[test_index])
+
+    # Calculate f1 score and confusion matrix
+    f1 = f1_score(endog.astype(int), y_pred.astype('int'), average='micro')
+    cm = confusion_matrix(endog.astype(int), y_pred.astype('int'), normalize='true')
+
+    # Save results
+    dec_result.loc[0, 'f1'] = f1
+    dec_result.loc[0, 'confusion_matrix'] = cm
+    dec_result.loc[0, 'shuffle'] = 0
+
+    decoding_result = pd.concat([decoding_result, dec_result])
+
+    # -- SHUFFLED DATASET 
+    shuffle_result = pd.DataFrame(columns=['shuffle', 'f1', 'confusion_matrix'])
+    for s in range(shufflings):
+        if np.mod(s+1, 10) == 0:
+            print('Shuffling %d of %d' % (s+1, shufflings))   
+
+        shuffle_y_pred = np.zeros(len(new_mat), dtype=int) 
+        shuffle_endog = endog.copy()
+        np.random.shuffle(shuffle_endog.values)
+
+        for train_index, test_index in kf.split(new_mat):
+            model.fit(exog.iloc[train_index], list(shuffle_endog.iloc[train_index].astype(int)))
+            shuffle_y_pred[test_index] = model.predict(exog.iloc[test_index])   
+
+        shuffle_f1 = f1_score(shuffle_endog.astype(int), shuffle_y_pred.astype('int'), average='micro')
+        shuffle_cm = confusion_matrix(shuffle_endog.astype(int), shuffle_y_pred.astype('int'), normalize='true')
+
+        # SAVE
+        shuffle_result.loc[s, 'f1'] = shuffle_f1
+        shuffle_result.loc[s, 'confusion_matrix'] = shuffle_cm
+        shuffle_result.loc[s, 'shuffle'] = s + 1
+
+    decoding_result = pd.concat([decoding_result, shuffle_result])
+
+    if plot:
+        # Plot
+        plot_cm(decoding_result, trial_epochs)
+        plot_f1(decoding_result)
+        
+    return decoding_result
