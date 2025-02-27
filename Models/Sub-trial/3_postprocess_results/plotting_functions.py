@@ -585,3 +585,46 @@ def plot_x_y_dynamics(x_var, y_var, mouse_dynamics, mouse_name, new_states, desi
     plt.tight_layout()
     
     plt.show()
+    
+    
+def plot_states_trial_type(df_epoch):
+    """ Plot states per trial epoch """
+    num_states = len(df_epoch['most_likely_states'].unique())
+    colors = sns.color_palette("viridis", num_states)
+
+    fig, axs = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=False, figsize=[10, 8])
+    
+    # Create custom legend
+    unique_hues = df_epoch['most_likely_states'].unique()
+    unique_labels = df_epoch['identifiable_states'].unique()
+    handles = [plt.Line2D([0], [0], marker='o', color='w', alpha=0.5, markerfacecolor=plt.cm.viridis(i / max(unique_hues)), markersize=10) for i in unique_hues]
+
+    correct_left = df_epoch.loc[(df_epoch['correct']==1.) & (df_epoch['choice']=='left')]
+    sns.histplot(x='broader_label', hue='identifiable_states', data=correct_left, stat = 'count',
+                        multiple="stack", legend=True, palette='viridis', alpha=0.3, ax=axs[0, 0])
+    axs[0, 0].set_title('Correct left')
+    axs[0, 0].legend(handles, unique_labels, title='Label')
+
+    correct_right = df_epoch.loc[(df_epoch['correct']==1.) & (df_epoch['choice']=='right')]
+    sns.histplot(x='broader_label', hue='identifiable_states', data=correct_right, stat = 'count',
+                        multiple="stack", legend=True, palette='viridis', alpha=0.3, ax=axs[0, 1])
+    axs[0, 1].set_title('Correct right')
+    axs[0, 1].legend(handles, unique_labels, title='Label')
+
+    incorrect_left = df_epoch.loc[(df_epoch['correct']==0.) & (df_epoch['choice']=='left')]
+    sns.histplot(x='broader_label', hue='identifiable_states', data=incorrect_left, stat = 'count',
+                        multiple="stack", legend=True, palette='viridis', alpha=0.3, ax=axs[1, 0])
+    axs[1, 0].set_title('Incorrect left')
+    axs[1, 0].legend(handles, unique_labels, title='Label')
+
+    incorrect_right = df_epoch.loc[(df_epoch['correct']==0.) & (df_epoch['choice']=='right')]
+    sns.histplot(x='broader_label', hue='identifiable_states', data=incorrect_right, stat = 'count',
+                        multiple="stack", legend=True, palette='viridis', alpha=0.3, ax=axs[1, 1])
+    axs[1, 1].set_title('Incorrect right')
+    axs[1, 1].legend(handles, unique_labels, title='Label')
+        
+    # axs[1, 0].set_xticks(rotation=45)
+    # axs[1, 1].set_xticks(rotation=45)
+    plt.tight_layout()
+    # plt.title(mouse_name)
+    plt.show()
