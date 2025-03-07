@@ -779,9 +779,34 @@ def trial_relative_frequency(use_data, vars):
     return count, freq_df
 
 
-def bin_sequence(seq, target_length):
-    bins = np.array_split(seq, target_length)  # Split into target length bins
-    return [mode(bin)[0] for bin in bins]  # Take most frequent element in each bin
+def rescale_sequence(seq, target_length):
+    """
+    Rescales a categorical sequence to a fixed target length.
+    
+    - If `target_length` is smaller than the original length, it takes the mode of each bin.
+    - If `target_length` is larger, it repeats values evenly.
+    
+    Parameters:
+        seq (array-like): The original categorical sequence.
+        target_length (int): The desired length of the output sequence.
+    
+    Returns:
+        np.ndarray: The transformed sequence with the specified target length.
+    """
+    original_length = len(seq)
+
+    if original_length == target_length:
+        return np.array(seq)  # No change needed
+
+    if target_length < original_length:
+        # Compression: Split into bins and take mode of each bin
+        bins = np.array_split(seq, target_length)
+        return np.array([mode(b)[0][0] for b in bins])  # Extract mode from result
+
+    else:
+        # Stretching: Repeat values to fit new size
+        stretched_indices = np.floor(np.linspace(0, original_length - 1, target_length)).astype(int)
+        return np.array(seq)[stretched_indices]  # Map stretched indices to original values
 
 
 def plot_cm(decoding_result, trial_epochs, control=False):
