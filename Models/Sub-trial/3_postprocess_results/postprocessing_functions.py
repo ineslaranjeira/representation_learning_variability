@@ -646,37 +646,67 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
 
     for t in range(trial_num):
         
+        # # Pre-quiescence
+        # use_data.loc[(use_data['Bin']+0.5 <= pre_qui_end[t]*multiplier) & 
+        #              (use_data['Bin']+0.5 > pre_qui_init[t]*multiplier), 'label'] = 'Pre-quiescence'
+
+        # # Quiescence
+        # use_data.loc[(use_data['Bin']+0.5 <= qui_end[t]*multiplier) &
+        #              (use_data['Bin']+0.5 > qui_init[t]*multiplier), 'label'] = 'Quiescence'
+        
+        # # ITI
+        # if session_trials['feedbackType'][t] == -1.:
+        #     use_data.loc[(use_data['Bin']+0.5 <= iti_end_incorrect[t]*multiplier) & 
+        #                     (use_data['Bin']+0.5 > iti_init[t]*multiplier), 'label'] = 'ITI'
+        # elif session_trials['feedbackType'][t] == 1.:
+        #     use_data.loc[(use_data['Bin']+0.5 <= iti_end_correct[t]*multiplier) & 
+        #                     (use_data['Bin']+0.5 > iti_init[t]*multiplier), 'label'] = 'ITI'
+        # # Move
+        # if session_trials['choice'][t] == -1:
+        #     use_data.loc[(use_data['Bin']+0.5 <= move_end[t]*multiplier) & 
+        #                  (use_data['Bin']+0.5 > move_init[t]*multiplier), 'label'] = 'Left choice'
+        # elif session_trials['choice'][t] == 1.:
+        #     use_data.loc[(use_data['Bin']+0.5 <= move_end[t]*multiplier) & 
+        #                  (use_data['Bin']+0.5 > move_init[t]*multiplier), 'label'] = 'Right choice'
+            
+        # # React        
+        # if prepro(session_trials)['signed_contrast'][t] < 0:
+        #     use_data.loc[(use_data['Bin']+0.5 <= rt_end[t]*multiplier) & 
+        #                  (use_data['Bin']+0.5 > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
+        # elif prepro(session_trials)['signed_contrast'][t] > 0:
+        #     use_data.loc[(use_data['Bin']+0.5 <= rt_end[t]*multiplier) & 
+        #                  (use_data['Bin']+0.5 > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
+    
         # Pre-quiescence
-        use_data.loc[(use_data['Bin']+0.5 <= pre_qui_end[t]*multiplier) & 
-                     (use_data['Bin']+0.5 > pre_qui_init[t]*multiplier), 'label'] = 'Pre-quiescence'
+        use_data.loc[(use_data['Bin'] <= pre_qui_end[t]*multiplier) & 
+                     (use_data['Bin'] > pre_qui_init[t]*multiplier), 'label'] = 'Pre-quiescence'
 
         # Quiescence
-        use_data.loc[(use_data['Bin']+0.5 <= qui_end[t]*multiplier) &
-                     (use_data['Bin']+0.5 > qui_init[t]*multiplier), 'label'] = 'Quiescence'
+        use_data.loc[(use_data['Bin'] <= qui_end[t]*multiplier) &
+                     (use_data['Bin'] > qui_init[t]*multiplier), 'label'] = 'Quiescence'
         
         # ITI
         if session_trials['feedbackType'][t] == -1.:
-            use_data.loc[(use_data['Bin']+0.5 <= iti_end_incorrect[t]*multiplier) & 
-                            (use_data['Bin']+0.5 > iti_init[t]*multiplier), 'label'] = 'ITI'
+            use_data.loc[(use_data['Bin'] <= iti_end_incorrect[t]*multiplier) & 
+                            (use_data['Bin'] > iti_init[t]*multiplier), 'label'] = 'ITI'
         elif session_trials['feedbackType'][t] == 1.:
-            use_data.loc[(use_data['Bin']+0.5 <= iti_end_correct[t]*multiplier) & 
-                            (use_data['Bin']+0.5 > iti_init[t]*multiplier), 'label'] = 'ITI'
+            use_data.loc[(use_data['Bin'] <= iti_end_correct[t]*multiplier) & 
+                            (use_data['Bin'] > iti_init[t]*multiplier), 'label'] = 'ITI'
         # Move
         if session_trials['choice'][t] == -1:
-            use_data.loc[(use_data['Bin']+0.5 <= move_end[t]*multiplier) & 
-                         (use_data['Bin']+0.5 > move_init[t]*multiplier), 'label'] = 'Left choice'
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Left choice'
         elif session_trials['choice'][t] == 1.:
-            use_data.loc[(use_data['Bin']+0.5 <= move_end[t]*multiplier) & 
-                         (use_data['Bin']+0.5 > move_init[t]*multiplier), 'label'] = 'Right choice'
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Right choice'
             
         # React        
         if prepro(session_trials)['signed_contrast'][t] < 0:
-            use_data.loc[(use_data['Bin']+0.5 <= rt_end[t]*multiplier) & 
-                         (use_data['Bin']+0.5 > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
         elif prepro(session_trials)['signed_contrast'][t] > 0:
-            use_data.loc[(use_data['Bin']+0.5 <= rt_end[t]*multiplier) & 
-                         (use_data['Bin']+0.5 > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
-            
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
     return use_data
 
 
