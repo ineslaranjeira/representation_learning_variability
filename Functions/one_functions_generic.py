@@ -483,6 +483,29 @@ def training_time(trials):
     return training_time_df
 
 
+
+def training_time_mice(mouse_names, one):
+
+    # Count training sessions until trained 1a or 1b; much faster than previous function; downloads data but does not concatenate in python
+    training_times = pd.DataFrame(columns=['mouse_name', 'training_time'], index=range(len(mouse_names)))
+    for m, mouse in enumerate(mouse_names):
+        files = download_subjectTables(one, mouse, trials=True, training=True,
+                            target_path=None, tag=None, overwrite=False, check_updates=True)
+        trials, training = [pd.read_parquet(file) for file in files]
+        training = training.reset_index()
+        trained_date = training.loc[training['training_status'].isin(['trained 1a', 'trained 1b']), 'date']
+        sessions = trials[['task_protocol', 'session_start_time', 'session']].drop_duplicates()
+        training_sessions = sessions.loc[sessions['task_protocol'].str.contains('training')]
+        training_time = np.sum(training_sessions['session_start_time']<np.min(trained_date))
+
+        # Save
+        training_times['mouse_name'][m] = mouse
+        training_times['training_time'][m] = training_time
+        print(m, mouse)
+    
+    return training_times
+
+
 def quartile(trials, criterion='training_time'):
 
     # crit can be 'training_time' or 'learning_onset'
@@ -663,3 +686,5 @@ def timeseries_PSTH(time, position, trials, event, t_init, t_end, subtract_basel
 
     return df_melted
 
+
+# %%
