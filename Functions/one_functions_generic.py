@@ -496,7 +496,8 @@ def training_time_mice(mouse_names, one):
         trained_date = training.loc[training['training_status'].isin(['trained 1a', 'trained 1b']), 'date']
         sessions = trials[['task_protocol', 'session_start_time', 'session']].drop_duplicates()
         training_sessions = sessions.loc[sessions['task_protocol'].str.contains('training')]
-        training_time = np.sum(training_sessions['session_start_time']<np.min(trained_date))
+        training_sessions = training_sessions[['session_start_time', 'session']].drop_duplicates()
+        training_time = len(training_sessions['session_start_time']<np.min(trained_date))
 
         # Save
         training_times['mouse_name'][m] = mouse
