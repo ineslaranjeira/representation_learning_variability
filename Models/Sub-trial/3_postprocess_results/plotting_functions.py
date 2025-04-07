@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.colors import ListedColormap, to_rgb, to_hex
 
 # # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 
@@ -650,3 +651,23 @@ def plot_binned_sequence(df_grouped, index, states_to_append):
         axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
         axs[0].set_title(title)
         plt.tight_layout()
+
+
+def create_grouped_gradient_palette(n_groups=4, shades_per_group=4, base_palette='tab10'):
+    # Pick n_groups distinct colors from base palette
+    base_colors = sns.color_palette(base_palette, n_colors=n_groups)
+    
+    # Function to generate shades for a given color
+    def generate_shades(color, n_shades):
+        color_rgb = np.array(to_rgb(color))
+        # Create shades by interpolating towards white (lighter) or black (darker)
+        factors = np.linspace(0.4, 1.0, n_shades)  # You can adjust range for more/less contrast
+        return [to_hex(color_rgb * factor + (1 - factor)) for factor in factors]
+    
+    # Build full palette
+    full_palette = []
+    for color in base_colors:
+        shades = generate_shades(color, shades_per_group)
+        full_palette.extend(shades)
+    
+    return ListedColormap(full_palette)
