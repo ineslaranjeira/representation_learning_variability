@@ -13,7 +13,7 @@ from scipy.stats import mode
 
 # # Custom functions
 functions_path =  '/home/ines/repositories/representation_learning_variability/Functions/'
-# functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
+functions_path = '/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 
@@ -390,13 +390,12 @@ def transition_probabilities(states, unique_states):
             interest_prev = np.where(previous==s_prev)[0]
             joint = len(np.intersect1d(interest_current, interest_prev))/ len(previous)
             marginal = len(interest_prev) / len(previous)
-            transition_matrix[s_p, s] = joint / marginal
+            transition_matrix[s_p, s] = joint / marginal if marginal > 0 else np.nan
         
     return transition_matrix
 
 
-def trans_mat_complete(mapping, state_label, unique_states, transition_matrix):
-    states_template = ['000', '001', '010', '100', '110', '101', '011', '111']
+def trans_mat_complete(mapping, state_label, unique_states, transition_matrix, states_template):
     matrix_df = np.zeros((len(states_template), len(states_template))) * np.nan
     for r, row in enumerate(states_template):
         for c, column in enumerate(states_template):
