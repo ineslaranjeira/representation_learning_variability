@@ -395,6 +395,7 @@ def transition_probabilities(states, unique_states):
     return transition_matrix
 
 
+## This function is now unnecessary
 def trans_mat_complete(mapping, state_label, unique_states, transition_matrix, states_template):
     matrix_df = np.zeros((len(states_template), len(states_template))) * np.nan
     for r, row in enumerate(states_template):
