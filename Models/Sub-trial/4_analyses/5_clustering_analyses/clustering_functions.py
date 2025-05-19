@@ -3,7 +3,7 @@ IMPORTS
 """
 
 prefix = '/home/ines/repositories/'
-prefix = '/Users/ineslaranjeira/Documents/Repositories/'
+# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
 import autograd.numpy as np
 import os 
@@ -20,6 +20,7 @@ from scipy.stats import entropy
 from kneed import KneeLocator
 
 # Get my functions
+
 functions_path =  prefix + 'representation_learning_variability/Models/Sub-trial//3_postprocess_results/'
 os.chdir(functions_path)
 from postprocessing_functions import trial_relative_frequency
