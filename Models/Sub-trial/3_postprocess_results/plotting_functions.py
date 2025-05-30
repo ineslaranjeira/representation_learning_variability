@@ -16,9 +16,9 @@ from matplotlib.colors import ListedColormap, to_rgb, to_hex
 
 # # Custom functions
 prefix = '/home/ines/repositories/'
-# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
+prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
-functions_path =  prefix + 'representation_learning_variability/Functions/'
+functions_path = prefix + 'representation_learning_variability/Functions/'
 os.chdir(functions_path)
 from one_functions_generic import prepro
 
