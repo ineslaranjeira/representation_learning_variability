@@ -633,14 +633,14 @@ def plot_states_trial_type(df_epoch):
     plt.show()
     
     
-def plot_binned_sequence(df_grouped, index, states_to_append):
+def plot_binned_sequence(df_grouped, index, states_to_append, palette):
         title = df_grouped['broader_label'][index]
         fig, axs = plt.subplots(2, 1, sharex=False, sharey=True, figsize=(5, 2))
         axs[0].imshow(np.concatenate([df_grouped['sequence'][index], states_to_append])[None,:],  
                 extent=(0, len(np.concatenate([df_grouped['sequence'][index], states_to_append])), 
                         0, 1),
                 aspect="auto",
-                cmap='viridis',
+                cmap=palette,
                 alpha=0.7) 
         axs[0].set_xlim([0, len(df_grouped['sequence'][index])])
 
@@ -648,11 +648,31 @@ def plot_binned_sequence(df_grouped, index, states_to_append):
                 extent=(0, len(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])), 
                         0, 1),
                 aspect="auto",
-                cmap='viridis',
+                cmap=palette,
                 alpha=0.7) 
         axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
         axs[0].set_title(title)
         plt.tight_layout()
+
+
+def plot_barcode(df_grouped, plot_trials, states_to_append, palette):
+        
+        for t, trial in enumerate(df_grouped['sample'].unique()[:plot_trials]):
+                fig, axs = plt.subplots(1, 4, sharex=False, sharey=True, figsize=(15, .5))
+
+                for e, epoch in enumerate(['Pre-quiescence', 'Quiescence', 'Choice', 'ITI']):
+                        epoch_data = df_grouped.loc[(df_grouped['broader_label']==epoch) &
+                                                        (df_grouped['sample']==trial)]
+                        epoch_sequence = list(epoch_data['sequence'])[0]
+                        axs[e].imshow(np.concatenate([epoch_sequence, states_to_append])[None,:],  
+                                extent=(0, len(np.concatenate([epoch_sequence, states_to_append])), 
+                                        0, 1),
+                                aspect="auto",
+                                cmap=palette,
+                                alpha=0.8) 
+                        axs[e].set_xlim([0, len(epoch_sequence)])
+                        axs[e].set_title(epoch)
+                plt.show()
 
 
 def create_grouped_gradient_palette(n_groups=4, shades_per_group=4, base_palette='tab10'):
