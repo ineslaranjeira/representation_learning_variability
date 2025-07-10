@@ -3,7 +3,7 @@ IMPORTS
 """
 
 prefix = '/home/ines/repositories/'
-# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
+prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
 import autograd.numpy as np
 import os 

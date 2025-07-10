@@ -13,7 +13,7 @@ from scipy.stats import mode
 
 # # Custom functions
 prefix = '/home/ines/repositories/'
-# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
+prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
 functions_path = prefix + '/representation_learning_variability/Functions/'
 os.chdir(functions_path)

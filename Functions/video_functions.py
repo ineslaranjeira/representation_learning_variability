@@ -13,15 +13,45 @@ from brainbox.io.one import SessionLoader
 # one = ONE(base_url='https://alyx.internationalbrainlab.org')
 
 
-def get_dlc_XYs(one, eid, view, likelihood_thresh=0.9):
+# def get_dlc_XYs(one, eid, view, likelihood_thresh=0.9):
 
+#     try:
+#         times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % view)
+#         cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % view)
+#     except KeyError:
+#         print('not all dlc data available')
+#         return None, None
+#     points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
+#     # Set values to nan if likelyhood is too low # for pqt: .to_numpy()
+#     XYs = {}
+#     for point in points:
+#         x = np.ma.masked_where(cam[point + '_likelihood'] < likelihood_thresh, cam[point + '_x'])
+#         x = x.filled(np.nan)
+#         y = np.ma.masked_where(cam[point + '_likelihood'] < likelihood_thresh, cam[point + '_y'])
+#         y = y.filled(np.nan)
+#         XYs[point] = np.array([x, y]).T
+#     return times, XYs
+
+
+def get_XYs(one, eid, view, likelihood_thresh=0.9, lp=True):
     try:
         times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % view)
-        cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % view)
+        if lp:
+            cam = one.load_dataset(eid, '_ibl_%sCamera.lightningPose.pqt' % view)
+        else:
+            cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % view)
     except KeyError:
-        print('not all dlc data available')
+        print('not all data available')
         return None, None
-    points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
+
+    if lp:
+        keys = cam.keys()
+        sufixes = np.array(['_'.join(x.split('_')[-1:]) for x in keys])
+        Xs = keys[np.where(sufixes == 'x')]
+        points = np.array(['_'.join(x.split('_')[:-1]) for x in Xs])
+    else:
+        points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
+
     # Set values to nan if likelyhood is too low # for pqt: .to_numpy()
     XYs = {}
     for point in points:
@@ -34,35 +64,35 @@ def get_dlc_XYs(one, eid, view, likelihood_thresh=0.9):
 
 
 """ LICKs """
+# This one is redundant with the above one?
+# def get_dlc_XYs_lick(one, eid, video_type, query_type='remote'):
 
-def get_dlc_XYs_lick(one, eid, video_type, query_type='remote'):
+#     #video_type = 'left'    
+#     # Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy',
+#     #                          query_type=query_type) 
+#     # cam = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.dlc.pqt', 
+#     #                        query_type=query_type)
+#     try:
+#         Times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % video_type)
+#         cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % video_type)
+#     except KeyError:
+#         print('not all dlc data available')
+#         return None, None
+#     points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
 
-    #video_type = 'left'    
-    # Times = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.times.npy',
-    #                          query_type=query_type) 
-    # cam = one.load_dataset(eid,f'alf/_ibl_{video_type}Camera.dlc.pqt', 
-    #                        query_type=query_type)
-    try:
-        Times = one.load_dataset(eid, '_ibl_%sCamera.times.npy' % video_type)
-        cam = one.load_dataset(eid, '_ibl_%sCamera.dlc.pqt' % video_type)
-    except KeyError:
-        print('not all dlc data available')
-        return None, None
-    points = np.unique(['_'.join(x.split('_')[:-1]) for x in cam.keys()])
+#     # Set values to nan if likelyhood is too low # for pqt: .to_numpy()
+#     XYs = {}
+#     for point in points:
+#         x = np.ma.masked_where(
+#             cam[point + '_likelihood'] < 0.9, cam[point + '_x'])
+#         x = x.filled(np.nan)
+#         y = np.ma.masked_where(
+#             cam[point + '_likelihood'] < 0.9, cam[point + '_y'])
+#         y = y.filled(np.nan)
+#         XYs[point] = np.array(
+#             [x, y])    
 
-    # Set values to nan if likelyhood is too low # for pqt: .to_numpy()
-    XYs = {}
-    for point in points:
-        x = np.ma.masked_where(
-            cam[point + '_likelihood'] < 0.9, cam[point + '_x'])
-        x = x.filled(np.nan)
-        y = np.ma.masked_where(
-            cam[point + '_likelihood'] < 0.9, cam[point + '_y'])
-        y = y.filled(np.nan)
-        XYs[point] = np.array(
-            [x, y])    
-
-    return Times, XYs  
+#     return Times, XYs  
 
 
 def get_licks(XYs):
@@ -75,7 +105,7 @@ def get_licks(XYs):
     
     licks = []
     for point in ['tongue_end_l', 'tongue_end_r']:
-        for c in XYs[point]:
+        for c in XYs[point].T:
            thr = np.nanstd(np.diff(c))/4
            licks.append(set(np.where(abs(np.diff(c))>thr)[0]))
     return sorted(list(set.union(*licks))) 
@@ -87,7 +117,7 @@ def get_lick_times(one, eid, combine=False, video_type='left'):
         # combine licking events from left and right cam
         lick_times = []
         for video_type in ['right','left']:
-            times, XYs = get_dlc_XYs_lick(one, eid, video_type, query_type='remote')
+            times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)
             r = get_licks(XYs)
             # cover case that there are less times than DLC points            
             idx = np.where(np.array(r)<len(times))[0][-1]            
@@ -96,7 +126,7 @@ def get_lick_times(one, eid, combine=False, video_type='left'):
         lick_times = sorted(np.concatenate(lick_times))
         
     else:
-        times, XYs = get_dlc_XYs_lick(one, eid, video_type, query_type='remote')    
+        times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)    
         r = get_licks(XYs)
         # cover case that there are less times than DLC points
         idx = np.where(np.array(r)<len(times))[0][-1]              
@@ -107,7 +137,7 @@ def get_lick_times(one, eid, combine=False, video_type='left'):
 
 def get_lick_on(one, eid, video_type='left'):
     
-    times, XYs = get_dlc_XYs_lick(one, eid, video_type, query_type='remote')    
+    times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)    
     r = get_licks(XYs)
     # Var which stores frames with lick
     lick_on = times * 0
@@ -137,7 +167,7 @@ def lick_psth(trials, licks, t_init, t_end, event='feedback_times'):
         temp_df['trial'] = np.ones(len(aligned_lick_times)) * t
         temp_df['correct'] = correct
         
-        licks_df = licks_df.append(temp_df)
+        licks_df = pd.concat([licks_df, temp_df])
         
     return licks_df
 
@@ -536,7 +566,7 @@ def get_raw_and_smooth_position(one, eid, video_type, ephys, position_function):
         raise NotImplementedError
 
     """ Load markers"""
-    _, markers = get_dlc_XYs(one, eid, view, likelihood_thresh=l_thresh)
+    _, markers = get_XYs(one, eid, view, likelihood_thresh=l_thresh, lp=True)
 
     # Get XY position directly based on string
     if type(position_function) == str:
@@ -758,7 +788,7 @@ def keypoint_speed(one, eid, ephys, body_part, split):
     # for each video
     speeds = {}
     for video_type in ['right','left']:
-        times, _ = get_dlc_XYs(one, eid, video_type)
+        times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)
         
         # Pupil requires averaging 4 keypoints
         _, x, _, y = get_raw_and_smooth_position(eid, video_type, ephys, body_part)
@@ -799,7 +829,7 @@ def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split):
     # if it is the paw, take speed from right paw only, i.e. closer to cam  
     # for each video
     speeds = {}
-    times, _ = get_dlc_XYs(one, eid, video_type)
+    times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)
     
     # Pupil requires averaging 4 keypoints
     _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part)
