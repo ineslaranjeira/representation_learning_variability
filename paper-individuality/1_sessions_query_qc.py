@@ -72,3 +72,5 @@ final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS']
                              (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))]
 
 #%%
+
+final_qc.to_pickle(ext_qc_path+'final_lp_qc07-10-2025')  

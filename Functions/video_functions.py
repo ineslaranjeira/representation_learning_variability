@@ -111,22 +111,24 @@ def get_licks(XYs):
     return sorted(list(set.union(*licks))) 
 
 
-def get_lick_times(one, eid, combine=False, video_type='left'):
+def get_lick_times(one, eid, lp, combine=False, video_type='left'):
     
     if combine:    
         # combine licking events from left and right cam
         lick_times = []
         for video_type in ['right','left']:
-            times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)
+            times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
             r = get_licks(XYs)
-            # cover case that there are less times than DLC points            
-            idx = np.where(np.array(r)<len(times))[0][-1]            
-            lick_times.append(times[r[:idx]])
-        
-        lick_times = sorted(np.concatenate(lick_times))
+            # Cover case in which one camera does not have data
+            if len(r)>0: 
+                # cover case that there are less times than DLC points            
+                idx = np.where(np.array(r)<len(times))[0][-1]            
+                lick_times.append(times[r[:idx]])
+                
+        lick_times = np.array(sorted(np.concatenate(lick_times)))
         
     else:
-        times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)    
+        times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)    
         r = get_licks(XYs)
         # cover case that there are less times than DLC points
         idx = np.where(np.array(r)<len(times))[0][-1]              
@@ -137,7 +139,7 @@ def get_lick_times(one, eid, combine=False, video_type='left'):
 
 def get_lick_on(one, eid, video_type='left'):
     
-    times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)    
+    times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)    
     r = get_licks(XYs)
     # Var which stores frames with lick
     lick_on = times * 0
