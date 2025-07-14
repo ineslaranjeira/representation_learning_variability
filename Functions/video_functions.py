@@ -536,7 +536,7 @@ def right_paw(XYs):
     return Y, X
 
 
-def get_raw_and_smooth_position(one, eid, video_type, ephys, position_function):
+def get_raw_and_smooth_position(one, eid, video_type, ephys, position_function, lp):
     """Params
     position_function: get_pupil_diameter, keypoint, ..."""
 
@@ -568,7 +568,7 @@ def get_raw_and_smooth_position(one, eid, video_type, ephys, position_function):
         raise NotImplementedError
 
     """ Load markers"""
-    _, markers = get_XYs(one, eid, view, likelihood_thresh=l_thresh, lp=True)
+    _, markers = get_XYs(one, eid, view, likelihood_thresh=l_thresh, lp=lp)
 
     # Get XY position directly based on string
     if type(position_function) == str:
@@ -779,7 +779,7 @@ def stack_pupil(position, time, trials, event, t_init, t_end):
     return stack, stack_time
 
 
-def keypoint_speed(one, eid, ephys, body_part, split):
+def keypoint_speed(one, eid, ephys, body_part, split, lp):
 
     if ephys ==True:
         fs = {'right':150,'left':60}   
@@ -790,10 +790,10 @@ def keypoint_speed(one, eid, ephys, body_part, split):
     # for each video
     speeds = {}
     for video_type in ['right','left']:
-        times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)
+        times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
         
         # Pupil requires averaging 4 keypoints
-        _, x, _, y = get_raw_and_smooth_position(eid, video_type, ephys, body_part)
+        _, x, _, y = get_raw_and_smooth_position(eid, video_type, ephys, body_part, lp)
         if body_part == get_pupil_diameter:
             if video_type == 'left': #make resolution same
                 x = x/2
@@ -821,7 +821,7 @@ def keypoint_speed(one, eid, ephys, body_part, split):
     return speeds
 
 
-def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split):
+def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split, lp):
 
     if ephys ==True:
         fs = {'right':150,'left':60}   
@@ -831,10 +831,10 @@ def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split):
     # if it is the paw, take speed from right paw only, i.e. closer to cam  
     # for each video
     speeds = {}
-    times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=True)
+    times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
     
     # Pupil requires averaging 4 keypoints
-    _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part)
+    _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part, lp)
     if body_part == get_pupil_diameter:
         if video_type == 'left': #make resolution same
             x = x/2
