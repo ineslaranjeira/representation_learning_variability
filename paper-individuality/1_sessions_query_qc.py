@@ -7,8 +7,9 @@
 import numpy as np
 import pandas as pd
 from dateutil import parser
+from datetime import datetime
 
-from functions import extended_qc
+from functions import extended_qc, download_subjectTables
 
 from one.api import ONE
 one = ONE(mode='remote')
@@ -60,7 +61,7 @@ bwm_df.reset_index(inplace=True, drop=True)
 # TODO there must be smarter way to do this
 # ADD VIDEO QC FILTER
 
-ext_qc = extended_qc(one, bwm_df)
+ext_qc = extended_qc(one, bwm_df)  #TODO: THIS CODE GIVES AN ERROR ON THE PC AND NOT ON MAC... 
 
 final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS'])) &
                              (ext_qc['_lightningPoseLeft_time_trace_length_match'].isin(['PASS'])) &   
@@ -72,5 +73,48 @@ final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS']
                              (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))]
 
 #%%
+## Save
+prefix = '/home/ines/repositories/'
+# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
-final_qc.to_pickle(ext_qc_path+'final_lp_qc07-10-2025')  
+save_path = prefix + '/representation_learning_variability/paper-individuality/'
+now = datetime.now() # current date and time
+date_time = now.strftime("%m-%d-%Y")
+filename = '1_bwm_qc_'
+
+final_qc.to_parquet(save_path+filename+date_time, compression='gzip')  
+
+#%%
+"""
+EXTEND DATA PRE_RECORDINGS
+"""
+
+# Find mouse names
+final_qc['mouse_name'] = final_qc['behavior'] * np.nan
+sessions = final_qc['eid'].unique()
+for s, session in enumerate(sessions):
+    file_path = one.eid2path(session)
+    final_qc.loc[final_qc['eid']==session, 'mouse_name'] = file_path.parts[8]
+
+
+# TODO: not all this code might be necessary
+unique_mice = np.unique(final_qc['mouse_name'])
+# session_count = []
+extended_sessions = pd.DataFrame(columns=['session', 'task_protocol', 'session_start_time', 'mouse_name'])
+for mouse_name in unique_mice:
+    recording_eids = final_qc.loc[final_qc['mouse_name']==mouse_name, 'eid']
+    
+    subject_trials, subject_training = download_subjectTables(one, subject=mouse_name, trials=True, training=True,
+                target_path=None, tag=None, overwrite=False, check_updates=True)
+    dsets = [subject_trials[0], subject_training[0]]
+    files = [one.cache_dir.joinpath(x) for x in dsets]
+    trials, training = [pd.read_parquet(file) for file in files]
+    training = training.reset_index()
+    ready4delay = list(training.loc[training['training_status']=='ready4delay', 'date'])[0]
+    ephys_rig_sessions = trials.loc[trials['session_start_time'] > 
+                                    ready4delay][['session', 'task_protocol', 'session_start_time']].drop_duplicates()
+    pre_recording_sessions = ephys_rig_sessions.loc[ephys_rig_sessions['task_protocol'].str.contains('biasedChoiceWorld')]
+    pre_recording_sessions['mouse_name'] = mouse_name
+    extended_sessions = pd.concat([extended_sessions, pre_recording_sessions])
+    #session_count.append(len(pre_recording_sessions))
+
