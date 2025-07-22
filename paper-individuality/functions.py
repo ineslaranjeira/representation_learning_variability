@@ -156,32 +156,54 @@ def get_feature_event_times(dlc, dlc_t, features):
     return dlc_t[np.unique(events)]
 
 
-def get_lick_times(poses, combine=False, video_type='left'):
+def merge_licks(poses, features, common_fs):
     
-    if combine:    
-        # combine licking events from left and right cam
-        lick_times = []
-        for video_type in ['right','left']:
-            camera_name = str(video_type+'Camera')
-            camera_licks = get_feature_event_times(poses.pose[camera_name], 
-                                                 poses.pose[camera_name]['times'], features)        
-            lick_times.append(camera_licks)
+    # Define total duration (max of both videos)
+    duration_sec = max(list(poses['leftCamera']['times'])[-1], list(poses['rightCamera']['times'])[-1])  # in seconds
+
+    # Set common sampling rate (high rather than low)
+    t_common = np.arange(0, duration_sec, 1/common_fs)  # uniform timestamps
+    
+    lick_trace_left = np.zeros_like(t_common, dtype=int)
+    lick_trace_right = np.zeros_like(t_common, dtype=int)
+
+    left_lick_times = get_feature_event_times(poses['leftCamera'], poses['leftCamera']['times'], features)
+    right_lick_times = get_feature_event_times(poses['rightCamera'], poses['rightCamera']['times'], features)
+
+    # Round licks to nearest timestamp in t_common
+    left_indices = np.searchsorted(t_common, left_lick_times)
+    right_indices = np.searchsorted(t_common, right_lick_times)
+
+    # Set licks to 1
+    lick_trace_left[left_indices[left_indices < len(t_common)]] = 1
+    lick_trace_right[right_indices[right_indices < len(t_common)]] = 1
+
+    combined_licks = np.maximum(lick_trace_left, lick_trace_right)
+    
+    return t_common, combined_licks 
+
+# def get_lick_times(poses, combine=False, video_type='left'):
+    
+#     if combine:    
+#         # combine licking events from left and right cam
+#         lick_times = []
+#         for video_type in ['right','left']:
+#             camera_name = str(video_type+'Camera')
+#             camera_licks = get_feature_event_times(poses.pose[camera_name], 
+#                                                  poses.pose[camera_name]['times'], features)        
+#             lick_times.append(camera_licks)
         
-        lick_times = np.array(sorted(np.concatenate(lick_times)))
+#         lick_times = np.array(sorted(np.concatenate(lick_times)))
         
-    else:
-        lick_times = get_feature_event_times(poses.pose[video_type], 
-                                             poses.pose[video_type]['times'], features)        
+#     else:
+#         lick_times = get_feature_event_times(poses.pose[video_type], 
+#                                              poses.pose[video_type]['times'], features)        
 
-    return lick_times
+#     return lick_times
 
 
-## WAVELET DECOMPOSITION
 def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None):
     # Function inspired on wh.interpolate from here: https://github.com/int-brain-lab/ibllib/blob/master/brainbox/behavior/wheel.py#L28 
-    # t = np.arange(t_init, t_end, 1 / freq)  # Evenly resample at frequency
-    if reference_time[-1] > timestamps[-1]:
-        reference_time = reference_time[:-1]  # Occasionally due to precision errors the last sample may be outside of range.
     yinterp = interpolate.interp1d(timestamps, data, kind=kind, fill_value='extrapolate')(reference_time)
     
     if fill_gaps:
@@ -194,6 +216,7 @@ def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None)
     return yinterp, reference_time
 
 
+# WAVELET DECOMPOSITION
 def morlet_conj_ft(omega_vals, omega0):
     """
     Computes the conjugate Fourier transform of the Morlet wavelet.
@@ -281,3 +304,88 @@ def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
     return amp, Q, x_hat
 
 
+# This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
+def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split, lp):
+
+    if ephys ==True:
+        fs = {'right':150,'left':60}   
+    else:
+        fs = {'right':150,'left':30}
+
+    # if it is the paw, take speed from right paw only, i.e. closer to cam  
+    # for each video
+    speeds = {}
+    times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
+    
+    # Pupil requires averaging 4 keypoints
+    x = XYs[body_part][:, 0]
+    y = XYs[body_part][:, 1]
+    # _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part, lp)
+
+    if video_type == 'left': #make resolution same
+        x = x/2
+        y = y/2
+        
+    dt = np.diff(times)
+    tv = times[:-1] + dt / 2
+    
+    # Calculate velocity for x and y separately if split is true
+    if split == True:
+        s_x = np.diff(x)*fs[video_type]
+        s_y = np.diff(y)*fs[video_type]
+        speeds[video_type] = [times, s_x, s_y]
+
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
+            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
+
+            speeds[video_type] = [times, ifcn_x(times), ifcn_y(times)]
+
+    else:
+        # Speed vector is given by the Pitagorean theorem
+        s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
+        speeds[video_type] = [times,s]
+
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+            
+            speeds[video_type] = [times,ifcn(times)]
+        
+    return speeds
+
+
+## This function is the brainbox function, should use for SessionLoader dataformat
+SAMPLING = {'left': 60,
+            'right': 150,
+            'body': 30}
+RESOLUTION = {'left': 2,
+              'right': 1,
+              'body': 1}
+
+def get_speed(dlc, dlc_t, camera, feature='paw_r'):
+    """
+    FIXME Document and add unit test!
+
+    :param dlc: dlc pqt table
+    :param dlc_t: dlc time points
+    :param camera: camera type e.g 'left', 'right', 'body'
+    :param feature: dlc feature to compute speed over
+    :return:
+    """
+    x = dlc[f'{feature}_x'] / RESOLUTION[camera]
+    y = dlc[f'{feature}_y'] / RESOLUTION[camera]
+
+    # get speed in px/sec [half res]
+    s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
+
+    dt = np.diff(dlc_t)
+    tv = dlc_t[:-1] + dt / 2
+
+    # interpolate over original time scale
+    if tv.size > 1:
+        ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+        return ifcn(dlc_t)
+    
+    

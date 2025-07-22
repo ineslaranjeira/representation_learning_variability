@@ -8,6 +8,7 @@ from scipy.interpolate import interp1d
 import math
 import matplotlib.pyplot as plt
 from brainbox.io.one import SessionLoader
+import scipy.interpolate as interpolate
 
 
 # one = ONE(base_url='https://alyx.internationalbrainlab.org')
@@ -137,7 +138,7 @@ def get_lick_times(one, eid, lp, combine=False, video_type='left'):
     return lick_times
 
 
-def get_lick_on(one, eid, video_type='left'):
+def get_lick_on(one, eid, lp, video_type='left'):
     
     times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)    
     r = get_licks(XYs)
@@ -820,7 +821,51 @@ def keypoint_speed(one, eid, ephys, body_part, split, lp):
         
     return speeds
 
+    
+    
+# # This function uses smoothing! More parameters to tune
+# def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split, lp):
 
+#     if ephys ==True:
+#         fs = {'right':150,'left':60}   
+#     else:
+#         fs = {'right':150,'left':30}
+
+#     # if it is the paw, take speed from right paw only, i.e. closer to cam  
+#     # for each video
+#     speeds = {}
+#     times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
+    
+#     # Pupil requires averaging 4 keypoints
+#     _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part, lp)
+#     if body_part == get_pupil_diameter:
+#         if video_type == 'left': #make resolution same
+#             x = x/2
+            
+#         # get speed in px/sec [half res]    
+#         s = np.diff(x)*fs[video_type]
+#         speeds[video_type] = [times,s]
+    
+#     else:
+#         if video_type == 'left': #make resolution same
+#             x = x/2
+#             y = y/2
+        
+#         # Calculate velocity for x and y separately if split is true
+#         if split == True:
+#             s_x = np.diff(x)*fs[video_type]
+#             s_y = np.diff(y)*fs[video_type]
+#             speeds[video_type] = [times, s_x, s_y]
+
+#         else:
+#             # Speed vector is given by the Pitagorean theorem
+#             s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
+#             speeds[video_type] = [times,s]
+        
+#     return speeds
+
+
+# This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
 def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split, lp):
 
     if ephys ==True:
@@ -831,37 +876,80 @@ def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split, lp)
     # if it is the paw, take speed from right paw only, i.e. closer to cam  
     # for each video
     speeds = {}
-    times, _ = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
+    times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
     
     # Pupil requires averaging 4 keypoints
-    _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part, lp)
-    if body_part == get_pupil_diameter:
-        if video_type == 'left': #make resolution same
-            x = x/2
-            
-        # get speed in px/sec [half res]    
-        s = np.diff(x)*fs[video_type]
-        speeds[video_type] = [times,s]
-    
-    else:
-        if video_type == 'left': #make resolution same
-            x = x/2
-            y = y/2
-        
-        # Calculate velocity for x and y separately if split is true
-        if split == True:
-            s_x = np.diff(x)*fs[video_type]
-            s_y = np.diff(y)*fs[video_type]
-            speeds[video_type] = [times, s_x, s_y]
+    x = XYs[body_part][:, 0]
+    y = XYs[body_part][:, 1]
+    # _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part, lp)
 
-        else:
-            # Speed vector is given by the Pitagorean theorem
-            s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
-            speeds[video_type] = [times,s]
+    if video_type == 'left': #make resolution same
+        x = x/2
+        y = y/2
+        
+    dt = np.diff(times)
+    tv = times[:-1] + dt / 2
+    
+    # Calculate velocity for x and y separately if split is true
+    if split == True:
+        s_x = np.diff(x)*fs[video_type]
+        s_y = np.diff(y)*fs[video_type]
+        speeds[video_type] = [times, s_x, s_y]
+
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
+            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
+
+            speeds[video_type] = [times, ifcn_x(times), ifcn_y(times)]
+
+    else:
+        # Speed vector is given by the Pitagorean theorem
+        s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
+        speeds[video_type] = [times,s]
+
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+            
+            speeds[video_type] = [times,ifcn(times)]
         
     return speeds
 
 
+## This function is the brainbox function, should use for SessionLoader dataformat
+SAMPLING = {'left': 60,
+            'right': 150,
+            'body': 30}
+RESOLUTION = {'left': 2,
+              'right': 1,
+              'body': 1}
+
+def get_speed(dlc, dlc_t, camera, feature='paw_r'):
+    """
+    FIXME Document and add unit test!
+
+    :param dlc: dlc pqt table
+    :param dlc_t: dlc time points
+    :param camera: camera type e.g 'left', 'right', 'body'
+    :param feature: dlc feature to compute speed over
+    :return:
+    """
+    x = dlc[f'{feature}_x'] / RESOLUTION[camera]
+    y = dlc[f'{feature}_y'] / RESOLUTION[camera]
+
+    # get speed in px/sec [half res]
+    s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
+
+    dt = np.diff(dlc_t)
+    tv = dlc_t[:-1] + dt / 2
+
+    # interpolate over original time scale
+    if tv.size > 1:
+        ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+        return ifcn(dlc_t)
+    
+    
 
 def downsample (metric, to_shorten, reference):
     """ Make all arrays be the same size """
