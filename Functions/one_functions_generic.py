@@ -17,7 +17,7 @@ from brainbox.task.trials import find_trial_ids
 from brainbox.behavior.training import get_sessions, get_training_status
 
 from one.api import ONE
-from one.alf.files import add_uuid_string
+from one.alf.path import add_uuid_string
 from one.remote import aws
 # one = ONE(base_url='https://openalyx.internationalbrainlab.org')  # public database
 # one = ONE(base_url='https://alyx.internationalbrainlab.org')
