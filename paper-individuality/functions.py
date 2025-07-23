@@ -1,26 +1,14 @@
 import pandas as pd
-import os
 import numpy as np
-from one.api import ONE
-import pickle
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
-import brainbox.behavior.wheel as wh
-from scipy.stats import zscore
-import concurrent.futures
-from brainbox.io.one import SessionLoader
 import scipy.interpolate as interpolate
 from joblib import Parallel, delayed
 from scipy.fftpack import fft, ifft, fftshift
-from sklearn.preprocessing import StandardScaler, Normalizer
-import gc
-import os
 import uuid
 from pathlib import Path
-from one.alf.files import add_uuid_string
-from one.remote import aws
 
+from one.api import ONE
+from one.alf.path import add_uuid_string
+from one.remote import aws
 
 """
 SCRIPT 1: QUERY BWM DATA WITH QC
@@ -179,27 +167,8 @@ def merge_licks(poses, features, common_fs):
     lick_trace_right[right_indices[right_indices < len(t_common)]] = 1
 
     combined_licks = np.maximum(lick_trace_left, lick_trace_right)
-    
+
     return t_common, combined_licks 
-
-# def get_lick_times(poses, combine=False, video_type='left'):
-    
-#     if combine:    
-#         # combine licking events from left and right cam
-#         lick_times = []
-#         for video_type in ['right','left']:
-#             camera_name = str(video_type+'Camera')
-#             camera_licks = get_feature_event_times(poses.pose[camera_name], 
-#                                                  poses.pose[camera_name]['times'], features)        
-#             lick_times.append(camera_licks)
-        
-#         lick_times = np.array(sorted(np.concatenate(lick_times)))
-        
-#     else:
-#         lick_times = get_feature_event_times(poses.pose[video_type], 
-#                                              poses.pose[video_type]['times'], features)        
-
-#     return lick_times
 
 
 def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None):
@@ -220,15 +189,15 @@ def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None)
 def morlet_conj_ft(omega_vals, omega0):
     """
     Computes the conjugate Fourier transform of the Morlet wavelet.
-    
+
     Parameters:
     - w: Angular frequency values (array or scalar)
     - omega0: Dimensionless Morlet wavelet parameter
-    
+
     Returns:
     - out: Conjugate Fourier transform of the Morlet wavelet
     """
-    
+
     return np.pi**(-1/4) * np.exp(-0.5 * (omega_vals - omega0)**2)
 
 
@@ -305,66 +274,7 @@ def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
 
 
 # This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
-def keypoint_speed_one_camera(one, eid, ephys, video_type, body_part, split, lp):
-
-    if ephys ==True:
-        fs = {'right':150,'left':60}   
-    else:
-        fs = {'right':150,'left':30}
-
-    # if it is the paw, take speed from right paw only, i.e. closer to cam  
-    # for each video
-    speeds = {}
-    times, XYs = get_XYs(one, eid, video_type, likelihood_thresh=0.9, lp=lp)
-    
-    # Pupil requires averaging 4 keypoints
-    x = XYs[body_part][:, 0]
-    y = XYs[body_part][:, 1]
-    # _, x, _, y = get_raw_and_smooth_position(one, eid, video_type, ephys, body_part, lp)
-
-    if video_type == 'left': #make resolution same
-        x = x/2
-        y = y/2
-        
-    dt = np.diff(times)
-    tv = times[:-1] + dt / 2
-    
-    # Calculate velocity for x and y separately if split is true
-    if split == True:
-        s_x = np.diff(x)*fs[video_type]
-        s_y = np.diff(y)*fs[video_type]
-        speeds[video_type] = [times, s_x, s_y]
-
-        # interpolate over original time scale
-        if tv.size > 1:
-            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
-            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
-
-            speeds[video_type] = [times, ifcn_x(times), ifcn_y(times)]
-
-    else:
-        # Speed vector is given by the Pitagorean theorem
-        s = ((np.diff(x)**2 + np.diff(y)**2)**.5)*fs[video_type]
-        speeds[video_type] = [times,s]
-
-        # interpolate over original time scale
-        if tv.size > 1:
-            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
-            
-            speeds[video_type] = [times,ifcn(times)]
-        
-    return speeds
-
-
-## This function is the brainbox function, should use for SessionLoader dataformat
-SAMPLING = {'left': 60,
-            'right': 150,
-            'body': 30}
-RESOLUTION = {'left': 2,
-              'right': 1,
-              'body': 1}
-
-def get_speed(dlc, dlc_t, camera, feature='paw_r'):
+def get_speed(poses, times, camera, split, feature='paw_r'):
     """
     FIXME Document and add unit test!
 
@@ -374,18 +284,45 @@ def get_speed(dlc, dlc_t, camera, feature='paw_r'):
     :param feature: dlc feature to compute speed over
     :return:
     """
-    x = dlc[f'{feature}_x'] / RESOLUTION[camera]
-    y = dlc[f'{feature}_y'] / RESOLUTION[camera]
+    SAMPLING = {'left': 60,
+                'right': 150,
+                'body': 30}
+    RESOLUTION = {'left': 2,
+                  'right': 1,
+                  'body': 1}
+
+    speeds = {}
+    x = poses[f'{feature}_x'] / RESOLUTION[camera]
+    y = poses[f'{feature}_y'] / RESOLUTION[camera]
 
     # get speed in px/sec [half res]
     s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
 
-    dt = np.diff(dlc_t)
-    tv = dlc_t[:-1] + dt / 2
+    dt = np.diff(times)
+    tv = times[:-1] + dt / 2
 
-    # interpolate over original time scale
-    if tv.size > 1:
-        ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
-        return ifcn(dlc_t)
-    
-    
+
+    # Calculate velocity for x and y separately if split is true
+    if split == True:
+        s_x = np.diff(x) * SAMPLING[camera]
+        s_y = np.diff(y) * SAMPLING[camera]
+        speeds[camera] = [times, s_x, s_y]
+
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
+            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
+
+            speeds[camera] = [times, ifcn_x(times), ifcn_y(times)]
+
+    else:
+        # Speed vector is given by the Pitagorean theorem
+        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * SAMPLING[camera]
+        speeds[camera] = [times, s]
+
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+            
+            speeds[camera] = [times, ifcn(times)]
+    return speeds   
