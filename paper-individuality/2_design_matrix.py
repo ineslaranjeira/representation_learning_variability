@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 import gc
 import concurrent.futures
 
-from functions import get_speed, merge_licks, resample_common_time, fast_wavelet_morlet_convolution_parallel
+from functions import get_speed, merge_licks, resample_common_time, lowpass_filter, fast_wavelet_morlet_convolution_parallel
 
 from one.api import ONE
 one = ONE(mode='remote')
@@ -95,8 +95,8 @@ def process_design_matrix(session):
         l_paw_y = np.array(poses['leftCamera']['paw_r_y'])
         # Right paw
         r_paw_time = np.array(r_paw_speeds['right'][0])
-        r_paw_x = np.array(poses['rightCamera']['paw_r_x'])
-        r_paw_y = np.array(poses['rightCamera']['paw_r_y'])
+        r_paw_x = lowpass_filter(np.array(poses['rightCamera']['paw_r_y']), cutoff=30, fs=150, order=4)
+        r_paw_y = lowpass_filter(np.array(poses['rightCamera']['paw_r_y']), cutoff=30, fs=150, order=4)
 
         # Wheel
         wheel = sl.wheel
@@ -114,11 +114,11 @@ def process_design_matrix(session):
         
         motion_energy = motion_energy[np.where((me_time >= onset) & (me_time <= offset))[0]]
         me_time = me_time[np.where((me_time >= onset) & (me_time <= offset))[0]]
-        donwsampled_me, corrected_me_t = resample_common_time(reference_time, me_time, motion_energy, kind='linear', fill_gaps=None)
+        donwsampled_me, corrected_me_t = resample_common_time(reference_time, me_time, motion_energy, kind='cubic', fill_gaps=None)
 
         wheel_vel = wheel_vel[np.where((wheel_time >= onset) & (wheel_time < offset))]
         wheel_time = wheel_time[np.where((wheel_time >= onset) & (wheel_time < offset))]
-        donwsampled_wheel, corrected_wheel_t = resample_common_time(reference_time, wheel_time, wheel_vel, kind='linear', fill_gaps=None)
+        donwsampled_wheel, corrected_wheel_t = resample_common_time(reference_time, wheel_time, wheel_vel, kind='cubic', fill_gaps=None)
 
         licks = licks[np.where((licks_time >= onset) & (licks_time < offset))]
         licks_time = licks_time[np.where((licks_time >= onset) & (licks_time < offset))]
@@ -126,15 +126,15 @@ def process_design_matrix(session):
 
         l_paw_time = l_paw_time[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
         l_paw_x = l_paw_x[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
-        donwsampled_l_paw_x, corrected_l_paw_x_t = resample_common_time(reference_time, l_paw_time, l_paw_x, kind='linear', fill_gaps=None)
+        donwsampled_l_paw_x, corrected_l_paw_x_t = resample_common_time(reference_time, l_paw_time, l_paw_x, kind='cubic', fill_gaps=None)
         l_paw_y = l_paw_y[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
-        donwsampled_l_paw_y, corrected_l_paw_y_t = resample_common_time(reference_time, l_paw_time, l_paw_y, kind='linear', fill_gaps=None)
+        donwsampled_l_paw_y, corrected_l_paw_y_t = resample_common_time(reference_time, l_paw_time, l_paw_y, kind='cubic', fill_gaps=None)
     
         r_paw_time = r_paw_time[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
         r_paw_x = r_paw_x[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
-        donwsampled_r_paw_x, corrected_r_paw_x_t = resample_common_time(reference_time, r_paw_time, r_paw_x, kind='linear', fill_gaps=None)
+        donwsampled_r_paw_x, corrected_r_paw_x_t = resample_common_time(reference_time, r_paw_time, r_paw_x, kind='cubic', fill_gaps=None)
         r_paw_y = r_paw_y[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
-        donwsampled_r_paw_y, corrected_r_paw_y_t = resample_common_time(reference_time, r_paw_time, r_paw_y, kind='linear', fill_gaps=None)
+        donwsampled_r_paw_y, corrected_r_paw_y_t = resample_common_time(reference_time, r_paw_time, r_paw_y, kind='cubic', fill_gaps=None)
 
         # Check integrity of data
         assert (corrected_me_t == corrected_wheel_t).all(), print('Assertion error')
@@ -242,7 +242,7 @@ for s, sess in enumerate(sessions):
 len(sessions_to_process)
 
 #%%
-for s, session in enumerate(sessions_to_process[:10]):
+for s, session in enumerate(sessions_to_process):
     process_design_matrix(session)
 
 # %%

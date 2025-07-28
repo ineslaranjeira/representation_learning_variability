@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import scipy.interpolate as interpolate
+from scipy.signal import butter, filtfilt
 from joblib import Parallel, delayed
 from scipy.fftpack import fft, ifft, fftshift
 import uuid
@@ -273,14 +274,21 @@ def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
     return amp, Q, x_hat
 
 
+def lowpass_filter(data, cutoff, fs, order=4):
+    nyq = 0.5 * fs  # Nyquist frequency
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return filtfilt(b, a, data)
+
+
 def interpolate_nans(pose, camera):
-    
-    # threshold (in seconds) above which we will not interpolate nans, but keep them
-    # (for long stretches interpolation may not be appropriate)
+
+    # threshold (in seconds) above which we will not interpolate nans,
+    # but keep them (for long stretches interpolation may not be appropriate)
     nan_thresh = .1
     SAMPLING = {'left': 60,
-            'right': 150,
-            'body': 30}
+                'right': 150,
+                'body': 30}
     fr = SAMPLING[camera]
 
     # don't interpolate long strings of nans
@@ -327,6 +335,10 @@ def get_speed(poses, times, camera, split, feature):
     # interpolated_y = poses[f'{feature}_y']
     x = interpolated_x / RESOLUTION[camera]
     y = interpolated_y / RESOLUTION[camera]
+    if camera == 'right':
+        x = lowpass_filter(x, cutoff=30, RESOLUTION[camera], order=4)
+        y = lowpass_filter(y, cutoff=30, RESOLUTION[camera], order=4)
+
     # get speed in px/sec [half res]
     # s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
     dt = np.diff(times)
