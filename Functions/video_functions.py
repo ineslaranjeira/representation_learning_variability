@@ -925,7 +925,7 @@ RESOLUTION = {'left': 2,
               'right': 1,
               'body': 1}
 
-def get_speed(dlc, dlc_t, camera, feature='paw_r'):
+def get_speed(dlc, dlc_t, camera, feature):
     """
     FIXME Document and add unit test!
 

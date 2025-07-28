@@ -66,24 +66,38 @@ def process_design_matrix(session):
 
     # Check if all data is available
     if np.sum(sl.data_info['is_loaded']) >= 4:
-        
+
         # Motion energy
         me = sl.motion_energy
         me_time = np.array(me['leftCamera']['times'])
         motion_energy = np.array(zscore(me['leftCamera']['whiskerMotionEnergy'], nan_policy='omit'))
-        
+
         # Licks 
         features = ['tongue_end_l_x', 'tongue_end_l_y','tongue_end_r_x', 'tongue_end_r_y']        
         common_fs = 150 
         poses = sl.pose
         licks_time, licks = merge_licks(poses, features, common_fs)
 
-        # Paws
-        paw_speeds = get_speed(poses['leftCamera'], poses['leftCamera']['times'], 'left', True, feature='paw_r')
-        paw_time = np.array(paw_speeds['left'][0])
-        paw_x = paw_speeds['left'][1]
-        paw_y = paw_speeds['left'][2]
-        
+        # Left paw
+        l_paw_speeds = get_speed(poses['leftCamera'], poses['leftCamera']['times'], 'left', True, feature='paw_r')
+        l_paw_time = np.array(l_paw_speeds['left'][0])
+        l_paw_x = l_paw_speeds['left'][1]
+        l_paw_y = l_paw_speeds['left'][2]
+        # Right paw
+        r_paw_speeds = get_speed(poses['rightCamera'], poses['rightCamera']['times'], 'right', True, feature='paw_r')
+        r_paw_time = np.array(r_paw_speeds['right'][0])
+        r_paw_x = r_paw_speeds['right'][1]
+        r_paw_y = r_paw_speeds['right'][2]
+
+        # Left paw
+        l_paw_time = np.array(l_paw_speeds['left'][0])
+        l_paw_x = np.array(poses['leftCamera']['paw_r_x'])
+        l_paw_y = np.array(poses['leftCamera']['paw_r_y'])
+        # Right paw
+        r_paw_time = np.array(r_paw_speeds['right'][0])
+        r_paw_x = np.array(poses['rightCamera']['paw_r_x'])
+        r_paw_y = np.array(poses['rightCamera']['paw_r_y'])
+
         # Wheel
         wheel = sl.wheel
         wheel_time = np.array(wheel['times'])
@@ -110,30 +124,39 @@ def process_design_matrix(session):
         licks_time = licks_time[np.where((licks_time >= onset) & (licks_time < offset))]
         donwsampled_lick, corrected_lick_t = resample_common_time(reference_time, licks_time, licks, kind='nearest', fill_gaps=None)
 
-        paw_time = paw_time[np.where((paw_time >= onset) & (paw_time < offset))]
-        paw_x = paw_x[np.where((paw_time >= onset) & (paw_time < offset))]
-        donwsampled_paw_x, corrected_paw_x_t = resample_common_time(reference_time, paw_time, paw_x, kind='linear', fill_gaps=None)
-        paw_y = paw_y[np.where((paw_time >= onset) & (paw_time < offset))]
-        donwsampled_paw_y, corrected_paw_y_t = resample_common_time(reference_time, paw_time, paw_y, kind='linear', fill_gaps=None)
+        l_paw_time = l_paw_time[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
+        l_paw_x = l_paw_x[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
+        donwsampled_l_paw_x, corrected_l_paw_x_t = resample_common_time(reference_time, l_paw_time, l_paw_x, kind='linear', fill_gaps=None)
+        l_paw_y = l_paw_y[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
+        donwsampled_l_paw_y, corrected_l_paw_y_t = resample_common_time(reference_time, l_paw_time, l_paw_y, kind='linear', fill_gaps=None)
+    
+        r_paw_time = r_paw_time[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
+        r_paw_x = r_paw_x[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
+        donwsampled_r_paw_x, corrected_r_paw_x_t = resample_common_time(reference_time, r_paw_time, r_paw_x, kind='linear', fill_gaps=None)
+        r_paw_y = r_paw_y[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
+        donwsampled_r_paw_y, corrected_r_paw_y_t = resample_common_time(reference_time, r_paw_time, r_paw_y, kind='linear', fill_gaps=None)
 
         # Check integrity of data
         assert (corrected_me_t == corrected_wheel_t).all(), print('Assertion error')
         assert (corrected_wheel_t == corrected_lick_t).all(), print('Assertion error')
-        assert (corrected_lick_t == corrected_paw_x_t).all(), print('Assertion error')
-        assert (corrected_paw_x_t == corrected_paw_y_t).all(), print('Assertion error')
+        assert (corrected_lick_t == corrected_l_paw_x_t).all(), print('Assertion error')
+        assert (corrected_l_paw_x_t == corrected_r_paw_x_t).all(), print('Assertion error')
 
         # Wavelet decomposition of wheel velocity
         dt = np.round(np.mean(np.diff(corrected_wheel_t)), 3)
         amp, Q, x_hat = fast_wavelet_morlet_convolution_parallel(donwsampled_wheel, f, omega0, dt)
 
         """ GROUP DATA INTO DESIGN MATRIX """
-        design_matrix = pd.DataFrame(columns=['Bin', 'avg_wheel_vel', 'whisker_me', 'Lick count', 'paw_x', 'paw_y'])
+        design_matrix = pd.DataFrame(columns=['Bin', 'avg_wheel_vel', 'whisker_me', 'Lick count', 
+                                              'l_paw_x', 'l_paw_y', 'r_paw_x', 'r_paw_y'])
         design_matrix['Bin'] = corrected_me_t.copy()
         design_matrix['Lick count'] = donwsampled_lick.copy()
         design_matrix['avg_wheel_vel'] = donwsampled_wheel.copy()
         design_matrix['whisker_me'] = donwsampled_me.copy()
-        design_matrix['paw_x'] = donwsampled_paw_x.copy()
-        design_matrix['paw_y'] = donwsampled_paw_y.copy()
+        design_matrix['l_paw_x'] = donwsampled_l_paw_x.copy()
+        design_matrix['l_paw_y'] = donwsampled_l_paw_y.copy()
+        design_matrix['r_paw_x'] = donwsampled_r_paw_x.copy()
+        design_matrix['r_paw_y'] = donwsampled_r_paw_y.copy()
 
         # Wavelet transforms
         for i, frequency in enumerate(f):

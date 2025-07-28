@@ -273,8 +273,37 @@ def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
     return amp, Q, x_hat
 
 
+def interpolate_nans(pose, camera):
+    
+    # threshold (in seconds) above which we will not interpolate nans, but keep them
+    # (for long stretches interpolation may not be appropriate)
+    nan_thresh = .1
+    SAMPLING = {'left': 60,
+            'right': 150,
+            'body': 30}
+    fr = SAMPLING[camera]
+
+    # don't interpolate long strings of nans
+    t = np.diff(1 * np.isnan(np.array(pose)))
+    begs = np.where(t == 1)[0]
+    ends = np.where(t == -1)[0]
+    if np.isnan(np.array(pose)[0]):
+        begs = begs[:-1]
+        ends = ends[1:]
+    if begs.shape[0] > ends.shape[0]:
+        begs = begs[:ends.shape[0]]
+
+    interp_pose = pose.copy()
+    interp_pose = np.array(interp_pose.interpolate(method='cubic'))
+    for b, e in zip(begs, ends):
+        if (e - b) > (fr * nan_thresh):
+            interp_pose[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
+        
+    return interp_pose
+
+
 # This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
-def get_speed(poses, times, camera, split, feature='paw_r'):
+def get_speed(poses, times, camera, split, feature):
     """
     FIXME Document and add unit test!
 
@@ -292,12 +321,14 @@ def get_speed(poses, times, camera, split, feature='paw_r'):
                   'body': 1}
 
     speeds = {}
-    x = poses[f'{feature}_x'] / RESOLUTION[camera]
-    y = poses[f'{feature}_y'] / RESOLUTION[camera]
-
+    interpolated_x = interpolate_nans(poses[f'{feature}_x'], camera)
+    interpolated_y = interpolate_nans(poses[f'{feature}_y'], camera)
+    # interpolated_x = poses[f'{feature}_x']
+    # interpolated_y = poses[f'{feature}_y']
+    x = interpolated_x / RESOLUTION[camera]
+    y = interpolated_y / RESOLUTION[camera]
     # get speed in px/sec [half res]
-    s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
-
+    # s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
     dt = np.diff(times)
     tv = times[:-1] + dt / 2
 
@@ -307,22 +338,18 @@ def get_speed(poses, times, camera, split, feature='paw_r'):
         s_x = np.diff(x) * SAMPLING[camera]
         s_y = np.diff(y) * SAMPLING[camera]
         speeds[camera] = [times, s_x, s_y]
-
         # interpolate over original time scale
         if tv.size > 1:
             ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
             ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
-
             speeds[camera] = [times, ifcn_x(times), ifcn_y(times)]
-
     else:
         # Speed vector is given by the Pitagorean theorem
         s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * SAMPLING[camera]
         speeds[camera] = [times, s]
-
         # interpolate over original time scale
         if tv.size > 1:
             ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
-            
             speeds[camera] = [times, ifcn(times)]
-    return speeds   
+
+    return speeds        
