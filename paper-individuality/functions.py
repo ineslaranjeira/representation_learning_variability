@@ -303,11 +303,24 @@ def interpolate_nans(pose, camera):
 
     interp_pose = pose.copy()
     interp_pose = np.array(interp_pose.interpolate(method='cubic'))
+
+    # If needed, low_pass_filter:
+    if camera == 'right':
+        # Sometimes array starts with NaNs, should ignore those
+        not_nan = interp_pose[np.where(~np.isnan(interp_pose))]
+        low_pass = lowpass_filter(not_nan, cutoff=30, fs=fr, order=4)
+
+        smoothed = interp_pose.copy()
+        smoothed[np.where(~np.isnan(interp_pose))] = low_pass
+    else:
+        smoothed = interp_pose.copy()
+
+    # Restore long NaNs
     for b, e in zip(begs, ends):
         if (e - b) > (fr * nan_thresh):
-            interp_pose[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
+            smoothed[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
         
-    return interp_pose
+    return smoothed
 
 
 # This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
@@ -335,9 +348,10 @@ def get_speed(poses, times, camera, split, feature):
     # interpolated_y = poses[f'{feature}_y']
     x = interpolated_x / RESOLUTION[camera]
     y = interpolated_y / RESOLUTION[camera]
-    if camera == 'right':
-        x = lowpass_filter(x, cutoff=30, RESOLUTION[camera], order=4)
-        y = lowpass_filter(y, cutoff=30, RESOLUTION[camera], order=4)
+    # if camera == 'right':
+    #     fs = SAMPLING[camera]
+    #     x = lowpass_filter(x, cutoff=30, fs=fs, order=4)
+    #     y = lowpass_filter(y, cutoff=30, fs=fs, order=4)
 
     # get speed in px/sec [half res]
     # s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]

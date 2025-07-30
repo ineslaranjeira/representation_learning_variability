@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 import gc
 import concurrent.futures
 
-from functions import get_speed, merge_licks, resample_common_time, lowpass_filter, fast_wavelet_morlet_convolution_parallel
+from functions import get_speed, merge_licks, resample_common_time, interpolate_nans, fast_wavelet_morlet_convolution_parallel
 
 from one.api import ONE
 one = ONE(mode='remote')
@@ -24,7 +24,6 @@ one = ONE(mode='remote')
 """ PARAMETERS """
 
 bin_size = 0.017  # np.round(1/60, 3)  # No binning, number indicates sampling rate
-video_type = 'left'    
 first_90 = False  # Use full sessions #TODO consider removing this from here?
 
 # Wavelet decomposition
@@ -81,22 +80,23 @@ def process_design_matrix(session):
         # Left paw
         l_paw_speeds = get_speed(poses['leftCamera'], poses['leftCamera']['times'], 'left', True, feature='paw_r')
         l_paw_time = np.array(l_paw_speeds['left'][0])
-        l_paw_x = l_paw_speeds['left'][1]
-        l_paw_y = l_paw_speeds['left'][2]
+        # l_paw_x = l_paw_speeds['left'][1]
+        # l_paw_y = l_paw_speeds['left'][2]
         # Right paw
         r_paw_speeds = get_speed(poses['rightCamera'], poses['rightCamera']['times'], 'right', True, feature='paw_r')
         r_paw_time = np.array(r_paw_speeds['right'][0])
-        r_paw_x = r_paw_speeds['right'][1]
-        r_paw_y = r_paw_speeds['right'][2]
+        # r_paw_x = r_paw_speeds['right'][1]
+        # r_paw_y = r_paw_speeds['right'][2]
 
         # Left paw
         l_paw_time = np.array(l_paw_speeds['left'][0])
-        l_paw_x = np.array(poses['leftCamera']['paw_r_x'])
-        l_paw_y = np.array(poses['leftCamera']['paw_r_y'])
+        l_paw_x = interpolate_nans(poses['leftCamera']['paw_r_x'], 'left')
+        l_paw_y = interpolate_nans(poses['leftCamera']['paw_r_y'], 'left')
+
         # Right paw
         r_paw_time = np.array(r_paw_speeds['right'][0])
-        r_paw_x = lowpass_filter(np.array(poses['rightCamera']['paw_r_y']), cutoff=30, fs=150, order=4)
-        r_paw_y = lowpass_filter(np.array(poses['rightCamera']['paw_r_y']), cutoff=30, fs=150, order=4)
+        r_paw_x = interpolate_nans(poses['rightCamera']['paw_r_x'], 'right')
+        r_paw_y = interpolate_nans(poses['rightCamera']['paw_r_y'], 'right')
 
         # Wheel
         wheel = sl.wheel
@@ -114,27 +114,27 @@ def process_design_matrix(session):
         
         motion_energy = motion_energy[np.where((me_time >= onset) & (me_time <= offset))[0]]
         me_time = me_time[np.where((me_time >= onset) & (me_time <= offset))[0]]
-        donwsampled_me, corrected_me_t = resample_common_time(reference_time, me_time, motion_energy, kind='cubic', fill_gaps=None)
+        donwsampled_me, corrected_me_t = resample_common_time(reference_time, me_time, motion_energy, kind='linear', fill_gaps=None)
 
         wheel_vel = wheel_vel[np.where((wheel_time >= onset) & (wheel_time < offset))]
         wheel_time = wheel_time[np.where((wheel_time >= onset) & (wheel_time < offset))]
-        donwsampled_wheel, corrected_wheel_t = resample_common_time(reference_time, wheel_time, wheel_vel, kind='cubic', fill_gaps=None)
+        donwsampled_wheel, corrected_wheel_t = resample_common_time(reference_time, wheel_time, wheel_vel, kind='linear', fill_gaps=None)
 
         licks = licks[np.where((licks_time >= onset) & (licks_time < offset))]
         licks_time = licks_time[np.where((licks_time >= onset) & (licks_time < offset))]
         donwsampled_lick, corrected_lick_t = resample_common_time(reference_time, licks_time, licks, kind='nearest', fill_gaps=None)
 
-        l_paw_time = l_paw_time[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
         l_paw_x = l_paw_x[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
-        donwsampled_l_paw_x, corrected_l_paw_x_t = resample_common_time(reference_time, l_paw_time, l_paw_x, kind='cubic', fill_gaps=None)
         l_paw_y = l_paw_y[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
-        donwsampled_l_paw_y, corrected_l_paw_y_t = resample_common_time(reference_time, l_paw_time, l_paw_y, kind='cubic', fill_gaps=None)
+        l_paw_time = l_paw_time[np.where((l_paw_time >= onset) & (l_paw_time < offset))]
+        donwsampled_l_paw_x, corrected_l_paw_x_t = resample_common_time(reference_time, l_paw_time, l_paw_x, kind='linear', fill_gaps=None)
+        donwsampled_l_paw_y, corrected_l_paw_y_t = resample_common_time(reference_time, l_paw_time, l_paw_y, kind='linear', fill_gaps=None)
     
-        r_paw_time = r_paw_time[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
         r_paw_x = r_paw_x[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
-        donwsampled_r_paw_x, corrected_r_paw_x_t = resample_common_time(reference_time, r_paw_time, r_paw_x, kind='cubic', fill_gaps=None)
         r_paw_y = r_paw_y[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
-        donwsampled_r_paw_y, corrected_r_paw_y_t = resample_common_time(reference_time, r_paw_time, r_paw_y, kind='cubic', fill_gaps=None)
+        r_paw_time = r_paw_time[np.where((r_paw_time >= onset) & (r_paw_time < offset))]
+        donwsampled_r_paw_x, corrected_r_paw_x_t = resample_common_time(reference_time, r_paw_time, r_paw_x, kind='linear', fill_gaps=None)
+        donwsampled_r_paw_y, corrected_r_paw_y_t = resample_common_time(reference_time, r_paw_time, r_paw_y, kind='linear', fill_gaps=None)
 
         # Check integrity of data
         assert (corrected_me_t == corrected_wheel_t).all(), print('Assertion error')
@@ -191,17 +191,17 @@ def process_design_matrix(session):
 
         """ SAVE DATA """       
         # Save unnormalized design matrix
-        data_path =  prefix + 'representation_learning_variability/DATA/Sub-trial/Design matrix/v6_21Jul2025/' + str(bin_size) + '/'
+        data_path = prefix + 'representation_learning_variability/DATA/Sub-trial/Design matrix/v6_21Jul2025/' + str(bin_size) + '/'
         filename = data_path + "design_matrix_" + str(session) + '_'  + mouse_name
         design_matrix.to_parquet(filename, compression='gzip')  
 
         # Save standardized design matrix
-        data_path =  prefix + 'representation_learning_variability/DATA/Sub-trial/Design matrix/v6_21Jul2025/' + str(bin_size) + '/'
+        data_path = prefix + 'representation_learning_variability/DATA/Sub-trial/Design matrix/v6_21Jul2025/' + str(bin_size) + '/'
         filename = data_path + "standardized_design_matrix_" + str(session) + '_'  + mouse_name
         np.save(filename, std_design_matrix)
 
         # Save trials
-        data_path =  prefix + 'representation_learning_variability/DATA/Sub-trial/Design matrix/v6_21Jul2025/' + str(bin_size) + '/'
+        data_path = prefix + 'representation_learning_variability/DATA/Sub-trial/Design matrix/v6_21Jul2025/' + str(bin_size) + '/'
         filename = data_path + "session_trials_" + str(session) + '_'  + mouse_name
         use_trials.to_parquet(filename, compression='gzip')  
         
