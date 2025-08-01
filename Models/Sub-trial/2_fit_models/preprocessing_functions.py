@@ -1,7 +1,7 @@
 """ 
 IMPORTS
 """
-import autograd.numpy as np
+import numpy as np
 import pickle
 import pandas as pd
 from collections import defaultdict

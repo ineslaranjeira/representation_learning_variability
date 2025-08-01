@@ -1,7 +1,7 @@
 """
 IMPORTS
 """
-import autograd.numpy as np
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.metrics import f1_score, confusion_matrix
