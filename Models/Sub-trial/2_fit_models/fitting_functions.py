@@ -3,7 +3,7 @@ IMPORTS
 """
 import os
 import sys
-import autograd.numpy as np
+import numpy as np
 import pickle
 import pandas as pd
 
