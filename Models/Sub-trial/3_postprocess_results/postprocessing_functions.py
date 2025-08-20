@@ -22,12 +22,33 @@ from one_functions_generic import prepro
 
 """ Model comparison """
 
+def conditional_nanmean(arr, axis):
+    arr = np.asanyarray(arr)
+    
+    # Count NaNs along axis
+    nan_count = np.isnan(arr).sum(axis=axis)
+    total_count = arr.shape[axis]
+    
+    # Boolean mask: True where we should return NaN
+    too_many_nans = nan_count >= (total_count / 2)
+    
+    # Compute nanmean
+    mean_vals = np.nanmean(arr, axis=axis)
+    
+    # Where too_many_nans, set result to NaN
+    result = np.where(too_many_nans, np.nan, mean_vals)
+    
+    return result
+
+
 def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, Lags, subtract_baseline=False):
     
     # Find best params per mouse
     best_lag = {}
     best_kappa = {}
     mean_bits_LL = {}
+    all_bits_LL = {}
+    all_LL = {} 
                   
     # Get size of folds
     num_timesteps = np.shape(design_matrix)[0]
@@ -37,7 +58,9 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
     mean_bits_LL = np.ones((len(Lags), len(kappas))) * np.nan
     mean_LL = np.ones((len(Lags), len(kappas))) * np.nan
     best_fold = np.ones((len(Lags), len(kappas))) * np.nan
-    
+    all_bits_LL = np.ones((len(Lags), len(kappas), num_train_batches)) * np.nan
+    all_LL = np.ones((len(Lags), len(kappas), num_train_batches)) * np.nan
+
     for l, lag in enumerate(Lags):
         
         # Reshape
@@ -49,7 +72,7 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
             lag_lls.append(all_lls[lag][k])
             b_lag_lls.append(all_baseline_lls[lag][k])
             # Best fold
-            if np.abs(np.nansum(all_lls[lag][k])) > 0:  # accounts for possibility that all folds are nan
+            if np.abs(np.nansum(all_lls[lag][k])) > len(all_lls[k])/2:  # accounts for possibility that all folds are nan
                 b_f = np.where(all_lls[lag][k]==np.nanmax(all_lls[lag][k]))[0][0]
             else:
                 b_f = np.nan
@@ -59,8 +82,13 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
         baseline_lls = np.array(b_lag_lls)
         bits_LL = (np.array(avg_val_lls) - np.array(baseline_lls)) / fold_len * np.log(2)
         
-        mean_bits_LL[l,:] = np.nanmean(bits_LL, axis=1)        
-        mean_LL[l,:] = np.nanmean(avg_val_lls, axis=1)     
+        # mean_bits_LL[l,:] = np.nanmean(bits_LL, axis=1)    
+        # mean_LL[l,:] = np.nanmean(avg_val_lls, axis=1)     
+        mean_bits_LL[l,:] = conditional_nanmean(bits_LL, axis=1)
+        mean_LL[l,:] = conditional_nanmean(avg_val_lls, axis=1)
+        all_bits_LL[l, :] = bits_LL
+        all_LL[l, :] = avg_val_lls
+
         best_fold[l, :] = b_fold
         
     # Save best params for the mouse
@@ -70,7 +98,7 @@ def best_lag_kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, 
     else:
         best_kappa = kappas[np.where(mean_LL==np.nanmax(mean_LL))[1][0]]
     
-    return best_lag, best_kappa, mean_bits_LL, mean_LL, best_fold
+    return best_lag, best_kappa, mean_bits_LL, all_bits_LL, all_LL, mean_LL, best_fold
 
 
 def best_lag_kappa_bic(all_lls, all_baseline_lls, design_matrix, num_train_batches, kappas, Lags, num_states):
@@ -115,8 +143,11 @@ def best_lag_kappa_bic(all_lls, all_baseline_lls, design_matrix, num_train_batch
         bic = num_params * np.log(fold_len*num_train_batches) - 2 * np.nansum(avg_val_lls, axis=1)
         bic = num_params * 2 - 2 * np.nansum(avg_val_lls, axis=1)
 
-        mean_bits_LL[l,:] = np.nanmean(bits_LL, axis=1)        
-        mean_LL[l,:] = np.nanmean(avg_val_lls, axis=1)  
+        # mean_bits_LL[l,:] = np.nanmean(bits_LL, axis=1)        
+        # mean_LL[l,:] = np.nanmean(avg_val_lls, axis=1)  
+        mean_bits_LL[l,:] = conditional_nanmean(bits_LL, axis=1)
+        mean_LL[l,:] = conditional_nanmean(avg_val_lls, axis=1)
+
         all_bic[l,:] = bic
         best_fold[l, :] = b_fold
         
@@ -132,7 +163,8 @@ def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kap
     # Find best params per mouse
     best_kappa = {}
     mean_bits_LL = {}
-                  
+    all_LL = np.ones((len(kappas), num_train_batches)) * np.nan
+
     # Get size of folds
     num_timesteps = np.shape(design_matrix)[0]
     shortened_array = np.array(design_matrix[:(num_timesteps // num_train_batches) * num_train_batches])
@@ -143,22 +175,28 @@ def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kap
     b_lls = []
     b_fold = []
         
-    for k in kappas:
+    for k_index, k in enumerate(kappas):
         lls.append(all_lls[k])
         b_lls.append(all_baseline_lls[k])
         # Best fold
-        if np.abs(np.nansum(all_lls[k])) > 0:  # accounts for possibility that all folds are nan
+        if np.abs(np.nansum(all_lls[k])) > len(all_lls[k])/2:  # nan if half of the folds are nan
             b_f = np.where(all_lls[k]==np.nanmax(all_lls[k]))[0][0]
         else:
             b_f = np.nan
             
         b_fold.append(b_f)
+        
+        all_LL[k_index, :] = all_lls[k]
 
     avg_val_lls = np.array(lls)
     baseline_lls = np.array(b_lls)
     bits_LL = (np.array(avg_val_lls) - np.array(baseline_lls)) / fold_len * np.log(2)
-    mean_bits_LL = np.nanmean(bits_LL, axis=1)       
-    mean_LL = np.nanmean(lls, axis=1) 
+
+    # TODO: need to validate these two lines of code!!
+    mean_bits_LL = conditional_nanmean(bits_LL, axis=1)
+    mean_LL = conditional_nanmean(lls, axis=1)
+    # # mean_bits_LL = np.nanmean(bits_LL, axis=1)       
+    # # mean_LL = np.nanmean(lls, axis=1) 
     best_fold = b_fold
     
     if subtract_baseline:  
@@ -167,7 +205,7 @@ def best__kappa(all_lls, all_baseline_lls, design_matrix, num_train_batches, kap
     else:
         best_kappa = kappas[np.where(mean_LL==np.nanmax(mean_LL))[0][0]]
     
-    return best_kappa, mean_bits_LL, mean_LL, best_fold
+    return best_kappa, mean_bits_LL, all_LL, mean_LL, best_fold
 
 
 def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_name, var_interest):
