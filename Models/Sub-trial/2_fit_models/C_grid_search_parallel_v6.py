@@ -12,6 +12,7 @@ from jax import devices, default_device
 import jax.numpy as jnp
 import jax.random as jr
 from functools import partial
+from scipy.stats import zscore
 from jax import vmap
 from pprint import pprint
 import jax.numpy as jnp
@@ -29,7 +30,7 @@ from preprocessing_functions import idxs_from_files
 
 """" AR-HMM FITTING FUNCTIONS """
 
-def cross_validate_armodel(model, key, train_emissions, train_inputs, method_to_use, num_train_batches, method='sgd', num_iters=100):
+def cross_validate_armodel(model, key, train_emissions, train_inputs, method_to_use, num_train_batches, method, num_iters=100):
     # Initialize the parameters using K-Means on the full training set
     #init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
     init_params, props = model.initialize(key=key, method=method_to_use, emissions=train_emissions)
@@ -86,7 +87,7 @@ def compute_inputs(emissions, num_lags, emission_dim):
     
 """" POISSON-HMM FITTING FUNCTIONS """
 
-def cross_validate_poismodel(model, key, train_emissions, num_train_batches, method='em', num_iters=100):
+def cross_validate_poismodel(model, key, train_emissions, num_train_batches, fit_method, num_iters=100):
     # Initialize the parameters using K-Means on the full training set
     init_params, props = model.initialize(key=key)
 
@@ -101,12 +102,12 @@ def cross_validate_poismodel(model, key, train_emissions, num_train_batches, met
         return model.marginal_log_prob(init_params, y_val) # np.shape(y_val)[1]
     
     # Then actually fit the model to data
-    if method == 'em':
+    if fit_method == 'em':
         def _fit_fold(y_train, y_val):
             fit_params, train_lps = model.fit_em(init_params, props, y_train, 
                                                 num_iters=num_iters, verbose=False)
             return model.marginal_log_prob(fit_params, y_val) , fit_params  
-    elif method == 'sgd':
+    elif fit_method == 'sgd':
         def _fit_fold(y_train, y_val):
             fit_params, train_lps = model.fit_sgd(init_params, props, y_train, 
                                                 num_epochs=num_iters)
@@ -121,9 +122,9 @@ def cross_validate_poismodel(model, key, train_emissions, num_train_batches, met
 """" GRID SEARCH FUNCTIONS """
 
 # Function to perform grid search for a single session
-def grid_search_versatile(id, var_interest, zscore, fixed_states,
+def grid_search_versatile(id, var_interest, zsc, fixed_states, truncate,
                           params, sticky, save_path, data_path, num_train_batches, method, fit_method):
-
+    print(params)
     print(jax.devices())
     # Time job
     start = time.time()
@@ -134,7 +135,7 @@ def grid_search_versatile(id, var_interest, zscore, fixed_states,
     original_design_matrix = pd.read_parquet(filename)
 
     # Zscore if needed (paws)
-    if zscore == True:
+    if zsc == True:
       array_matrix = zscore(np.array(original_design_matrix), axis=0, nan_policy='omit')
     else:
       array_matrix = np.array(original_design_matrix)
@@ -142,7 +143,11 @@ def grid_search_versatile(id, var_interest, zscore, fixed_states,
     # Remove NaNs
     filtered_matrix = array_matrix[~np.isnan(array_matrix).any(axis=1)]
     keys = np.where(original_design_matrix.keys().isin(var_interest))
-    design_matrix = filtered_matrix[:, keys]
+    if truncate:
+        design_matrix = filtered_matrix[:100000, keys]  # Truncate session
+    else:
+        design_matrix = filtered_matrix[:, keys] 
+    
     design_matrix = np.reshape(design_matrix,(np.shape(design_matrix)[0], np.shape(design_matrix)[2]))
 
     fit_id = str(mouse_name + session)
@@ -165,7 +170,7 @@ def grid_search_versatile(id, var_interest, zscore, fixed_states,
             for kappa in kappas:
                 test_poishmm = PoissonHMM(num_states, emission_dim, transition_matrix_stickiness=kappa)
                 all_val_lls, fit_params, init_params, baseline_lls = cross_validate_poismodel(test_poishmm, jr.PRNGKey(0),
-                                                                                            train_emissions, num_train_batches, num_iters=100)
+                                                                                            train_emissions, num_train_batches, fit_method, num_iters=100)
 
                 all_lls[kappa] = all_val_lls
                 all_baseline_lls[kappa] = baseline_lls
@@ -177,7 +182,7 @@ def grid_search_versatile(id, var_interest, zscore, fixed_states,
                 for kappa in kappas:
                     test_poishmm = PoissonHMM(state, emission_dim, transition_matrix_stickiness=kappa)
                     all_val_lls, fit_params, init_params, baseline_lls = cross_validate_poismodel(test_poishmm, jr.PRNGKey(0),
-                                                                                               train_emissions, num_train_batches, num_iters=100)
+                                                                                               train_emissions, num_train_batches, fit_method, num_iters=100)
 
                     all_lls[state][kappa] = all_val_lls
                     all_baseline_lls[state][kappa] = baseline_lls
@@ -233,26 +238,32 @@ def grid_search_versatile(id, var_interest, zscore, fixed_states,
 
 
 # Main function for parallel processing
-def run_grid_search_parallel(idxs, var_interest, zscore, fixed_states, params, sticky,
+def run_grid_search_parallel(idxs, var_interest, zsc, fixed_states, truncate, params, sticky,
                              save_path, data_path, num_train_batches, method, fit_method, n_jobs):
+
+    # Create folder where to dump data
+    if not os.path.exists(save_path):
+        # Create a new directory because it does not exist
+        os.makedirs(save_path)
+   
     # Identify sessions to process
     sessions_to_process = []
     for m, mat in enumerate(idxs):
         mouse_name = mat[37:]
         session = mat[:36]
         fit_id = str(mouse_name + session)
-        result_filename = os.path.join(save_path, f"{'best_sticky' if sticky else 'best'}_results_{var_interest}_{fit_id}")
+        result_filename = os.path.join(save_path, f"{'best_sticky' if sticky else 'best'}_results_{var_interest[0]}_{fit_id}")
         if not os.path.exists(result_filename):
             sessions_to_process.append((mouse_name, session))
-    sessions_to_process = sessions_to_process
+    # sessions_to_process = sessions_to_process
 
     print(f"Found {len(sessions_to_process)} sessions to process.")
 
     # Run grid search in parallel
     Parallel(n_jobs=n_jobs)(
         delayed(grid_search_versatile)(
-            id, var_interest, zscore,
-            fixed_states, params, sticky, save_path, data_path, num_train_batches, method, fit_method
+            id, var_interest, zsc,
+            fixed_states, truncate, params, sticky, save_path, data_path, num_train_batches, method, fit_method
         ) for id in sessions_to_process
     )
 
@@ -265,7 +276,7 @@ def run_grid_search_parallel(idxs, var_interest, zscore, fixed_states, params, s
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 # Parameters
-n_jobs = 3  # Number of CPU cores to use
+n_jobs = 2  # Number of CPU cores to use
 bin_size = 0.017
 # LOAD DATA
 data_path ='/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Design matrix/' + 'v6_21Jul2025/' + str(bin_size) + '/'
@@ -274,38 +285,70 @@ design_matrices = [item for item in all_files if 'design_matrix' in item and 'st
 idxs, mouse_names = idxs_from_files(design_matrices, bin_size)
 
 
-# all_num_lags=list(range(1, 20, 2))
-# kappas=[0, 1, 10, 100]
-all_num_lags=list(range(1, 40, 5))
-kappas=[0, 1, 5, 10, 50, 100, 1000]
-kappas=[0, 1, 3, 5, 10, 100]
+var_interest = ['l_paw_x', 'l_paw_y']
+var_interest = ['r_paw_x', 'r_paw_y']
+var_interest = ['whisker_me']
+# var_interest = ['Lick count']
+
+""" GRID """
 all_num_lags = [1, 3, 5, 7, 10, 15, 20, 30]
 all_num_lags=list(range(1, 20, 2))
 kappas=[0, 0.5, 1, 2, 3, 4, 5, 10, 20, 100]
-all_num_lags=[1, 5, 10, 15]
-# all_num_lags=[1, 10, 20, 30, 40, 45, 50, 55, 60, 65]
-kappas=[0, 1, 50, 100]
 
 fixed_states = True
+num_states = 2
 
-if fixed_states == True:
+if var_interest == ['whisker_me']:
+    n_jobs = 1
+    all_num_lags=[1, 10, 20, 40, 60] 
+    # all_num_lags=list(range(1, 60, 10))
+    kappas=[0, 5, 50]
     num_states = 2
-    save_path = '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/'  + str(bin_size) + '/'+str(num_states)+'_states/grid_search/individual_sessions/v6_21Jul2025/'
-else:
-    save_path = '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/'  + str(bin_size) + '/grid_search/individual_sessions/v6_21Jul2025/'
-    num_states = list(range(1, 10, 1))
+elif var_interest == ['avg_wheel_vel']:
+    n_jobs = 2
+    all_num_lags=[1, 5, 7, 10, 15, 20] 
+    kappas=[0, 1, 5, 50, 100]
+    num_states = 3
+elif var_interest == ['Lick count']:
+    n_jobs = 3
+    kappas=[0, 1, 5, 10, 50, 100, 500, 1000]
+    num_states = 2
+elif var_interest == ['l_paw_x', 'l_paw_y'] or var_interest == ['r_paw_x', 'r_paw_y']:
+    n_jobs = 2
+    all_num_lags=list(range(1, 40, 5))
+    kappas=[0, 1, 5, 50, 100]
+    num_states = 2
 
 params = num_states, all_num_lags, kappas
-var_interest = ['avg_wheel_vel']
-zscore = False
-device = 'cpu'
 
+""" FITTING PARAMETERS """
+num_train_batches = 5
+method='prior'
+fit_method='em'
+zsc = False
+truncate = False
 
-with default_device(devices(device)[0]):
-    
-    # Run the grid search
-    run_grid_search_parallel(
-        idxs, var_interest, zscore,
-        fixed_states=fixed_states, params=params, sticky=False,
-        save_path=save_path,  data_path=data_path, num_train_batches=20, method='kmeans', fit_method='em', n_jobs=n_jobs)
+if var_interest == ['whisker_me']:
+    zsc = False
+elif var_interest == ['avg_wheel_vel']:
+    zsc = True
+elif var_interest == ['Lick count']:
+    zsc = False
+elif var_interest == ['l_paw_x', 'l_paw_y'] or var_interest == ['r_paw_x', 'r_paw_y']:
+    zsc = True
+
+fitting_params = str(num_train_batches)+'_'+method+'_'+fit_method+'_zsc_'+str(zsc)+'/'
+if truncate:
+    fitting_params = str(num_train_batches)+'_'+method+'_'+fit_method+'_zsc_'+str(zsc)+'_truncated/'
+if fixed_states == True:
+    save_path = '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/'  + str(bin_size) + '/'+str(num_states)+'_states/grid_search/individual_sessions/v6_21Jul2025/'+fitting_params
+else:
+    save_path = '/home/ines/repositories/representation_learning_variability/DATA/Sub-trial/Results/'  + str(bin_size) + '/grid_search/individual_sessions/v6_21Jul2025/'+fitting_params
+    num_states = list(range(1, 10, 1))
+
+# Run the grid search
+run_grid_search_parallel(
+    idxs, var_interest, zsc,
+    fixed_states=fixed_states, truncate=truncate, params=params, sticky=False,
+    save_path=save_path,  data_path=data_path, num_train_batches=num_train_batches, method=method, fit_method=fit_method, n_jobs=n_jobs)
 
