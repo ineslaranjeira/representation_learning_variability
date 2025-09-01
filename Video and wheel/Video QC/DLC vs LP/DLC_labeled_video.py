@@ -8,7 +8,7 @@ import matplotlib
 import pandas as pd
 # conda install -c conda-forge pyarrow
 import os
-from neurodsp.smooth import smooth_interpolate_savgol
+# from neurodsp.smooth import smooth_interpolate_savgol
 from brainbox.io.one import SessionLoader
 from copy import deepcopy
 
@@ -124,7 +124,46 @@ def load_lp(eid, cam, masked=True, paws=True,
     return d
 
 
-def load_dlc(eid, cam, smoothed=False, manual=True):
+# def load_dlc(eid, cam, smoothed=False, manual=True):
+
+#     '''
+#     cam in left, right, body 
+#     '''
+
+#     if manual:
+#         pth = one.eid2path(eid)    
+#         d = pd.read_parquet(pth / 'alf' / f'_ibl_{cam}Camera.dlc.pqt')
+#         d['times'] = np.load(one.eid2path(eid) / 'alf'
+#                     / f'_ibl_{cam}Camera.times.npy')
+                    
+#         ls = [len(d[x]) for x in d]
+#         if not all(ls == np.mean(ls)):
+#             lsd = {x:len(d[x]) for x in d}
+#             print(f'length mismatch: {lsd}')
+#             print(eid, cam)
+#             print('cutting times')
+#             d['times'] = d['times'][:ls[0]]            
+
+#     else:
+#         # load DLC
+#         sess_loader = SessionLoader(one, eid)
+#         sess_loader.load_pose(views=[cam])
+#         d = sess_loader.pose[f'{cam}Camera']
+    
+#     if smoothed:
+#         print('smoothing dlc traces')
+#         window = 13 if cam == 'right' else 7
+#         sers = [x for x in d.keys() if (x[-1] in ['x','y'])]# and 'paw' in x
+#         for ser in sers:
+#             d[ser] = smooth_interpolate_savgol(
+#                 d[ser].to_numpy(),
+#                 window=window,order=3, interp_kind='linear')   
+
+#     return d
+
+
+
+def load_dlc(eid, cam, manual=True):
 
     '''
     cam in left, right, body 
@@ -149,18 +188,8 @@ def load_dlc(eid, cam, smoothed=False, manual=True):
         sess_loader = SessionLoader(one, eid)
         sess_loader.load_pose(views=[cam])
         d = sess_loader.pose[f'{cam}Camera']
-    
-    if smoothed:
-        print('smoothing dlc traces')
-        window = 13 if cam == 'right' else 7
-        sers = [x for x in d.keys() if (x[-1] in ['x','y'])]# and 'paw' in x
-        for ser in sers:
-            d[ser] = smooth_interpolate_savgol(
-                d[ser].to_numpy(),
-                window=window,order=3, interp_kind='linear')   
 
     return d
-
 
 
 
@@ -255,8 +284,9 @@ def Viewer(eid, video_type, frame_start, frame_stop, save_video=True,
         
     else: 
         print('loading dlc')
-        cam = load_dlc(eid, video_type, smoothed=smooth_dlc)
-                                                      
+        # cam = load_dlc(eid, video_type, smoothed=smooth_dlc)
+        cam = load_dlc(eid, video_type)
+
     # get video info
     cap = cv2.VideoCapture(video_path.as_uri())
     length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -556,4 +586,6 @@ for s, session in enumerate(pass_qc['session_uuid'].unique()[46:]):
     Viewer(session, 'left', 1, 10000, lp=False)
 
 # %%
-Viewer("03063955-2523-47bd-ae57-f7489dd40f15", 'left', 231*60, 235*60, lp=False)
+session = '32d27583-56aa-4510-bc03-669036edad20'
+Viewer(session, 'left', 231*60, 232*60, lp=False)
+# %%
