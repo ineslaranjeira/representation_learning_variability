@@ -201,3 +201,21 @@ Models/Sub-trial/4_analyses/1_HMM_states/epoch_seq_wheel_10_07-04-2025
 paper-individuality/1_bwm_qc_07-10-2025
 
 Video and wheel/Video QC/sessions_LP_ines
+
+Video and wheel/Video QC/DLC vs LP/reconstructed_camLeft
+
+Video and wheel/Video QC/DLC vs LP/reconstructed_camRight
+
+Video and wheel/Video QC/DLC vs LP/rightCamera_keypoints
+
+Functions/p2ds.npy
+
+Models/Sub-trial/2_fit_models/Wavelets/supersession_wavelets08-20-2025
+
+Models/Sub-trial/2_fit_models/Wavelets/supersession_wavelets_paw09-02-2025
+
+Video and wheel/Video QC/DLC vs LP/leftCamera_keypoints
+
+Video and wheel/Behavioral variables/Paw/pts_array_2d.npy
+
+Models/Sub-trial/2_fit_models/Wavelets/supersession_wavelets_paw09-03-2025
