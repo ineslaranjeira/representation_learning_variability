@@ -281,6 +281,13 @@ def lowpass_filter(data, cutoff, fs, order=4):
     return filtfilt(b, a, data)
 
 
+def low_pass(signal, cutoff, sf):    
+    not_nan = signal[np.where(~np.isnan(signal))]
+    low_pass = lowpass_filter(not_nan, cutoff, fs=sf, order=4)
+    signal[not_nan] = low_pass
+    return signal
+
+
 def interpolate_nans(pose, camera):
 
     # threshold (in seconds) above which we will not interpolate nans,
@@ -304,23 +311,23 @@ def interpolate_nans(pose, camera):
     interp_pose = pose.copy()
     interp_pose = np.array(interp_pose.interpolate(method='cubic'))
 
-    # If needed, low_pass_filter:
-    if camera == 'right':
-        # Sometimes array starts with NaNs, should ignore those
-        not_nan = interp_pose[np.where(~np.isnan(interp_pose))]
-        low_pass = lowpass_filter(not_nan, cutoff=30, fs=fr, order=4)
+    # # If needed, low_pass_filter:
+    # if camera == 'right':
+    #     # Sometimes array starts with NaNs, should ignore those
+    #     not_nan = interp_pose[np.where(~np.isnan(interp_pose))]
+    #     low_pass = lowpass_filter(not_nan, cutoff=30, fs=fr, order=4)
 
-        smoothed = interp_pose.copy()
-        smoothed[np.where(~np.isnan(interp_pose))] = low_pass
-    else:
-        smoothed = interp_pose.copy()
+    #     smoothed = interp_pose.copy()
+    #     smoothed[np.where(~np.isnan(interp_pose))] = low_pass
+    # else:
+    #     smoothed = interp_pose.copy()
 
     # Restore long NaNs
     for b, e in zip(begs, ends):
         if (e - b) > (fr * nan_thresh):
-            smoothed[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
+            interp_pose[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
         
-    return smoothed
+    return interp_pose
 
 
 # This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
