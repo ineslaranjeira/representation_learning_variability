@@ -1,12 +1,13 @@
 import pandas as pd
 import numpy as np
+from matplotlib import pyplot as plt
 import scipy.interpolate as interpolate
 from scipy.signal import butter, filtfilt
 from joblib import Parallel, delayed
 from scipy.fftpack import fft, ifft, fftshift
 import uuid
 from pathlib import Path
-
+from sklearn import mixture
 from one.api import ONE
 from one.alf.path import add_uuid_string
 from one.remote import aws
@@ -186,6 +187,121 @@ def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None)
     return yinterp, reference_time
 
 
+def lowpass_filter(data, cutoff, fs, order=4):
+    nyq = 0.5 * fs  # Nyquist frequency
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return filtfilt(b, a, data)
+
+
+def low_pass(signal, cutoff, sf):    
+    not_nan = signal[np.where(~np.isnan(signal))]
+    low_pass = lowpass_filter(not_nan, cutoff, fs=sf, order=4)
+    signal[np.where(~np.isnan(signal))] = low_pass
+    return signal
+
+
+def interpolate_nans(pose, camera):
+
+    # threshold (in seconds) above which we will not interpolate nans,
+    # but keep them (for long stretches interpolation may not be appropriate)
+    nan_thresh = .1
+    SAMPLING = {'left': 60,
+                'right': 150,
+                'body': 30}
+    fr = SAMPLING[camera]
+
+    # don't interpolate long strings of nans
+    t = np.diff(1 * np.isnan(np.array(pose)))
+    begs = np.where(t == 1)[0]
+    ends = np.where(t == -1)[0]
+    if np.isnan(np.array(pose)[0]):
+        begs = begs[:-1]
+        ends = ends[1:]
+    if begs.shape[0] > ends.shape[0]:
+        begs = begs[:ends.shape[0]]
+
+    interp_pose = pose.copy()
+    interp_pose = np.array(interp_pose.interpolate(method='cubic'))
+
+    # Restore long NaNs
+    for b, e in zip(begs, ends):
+        if (e - b) > (fr * nan_thresh):
+            interp_pose[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
+        
+    return interp_pose
+
+
+def idxs_from_files(design_matrices):
+    
+    idxs = []
+    mouse_names = []
+    for m, mat in enumerate(design_matrices):
+        mouse_name = design_matrices[m][51:]
+        eid = design_matrices[m][14:50]
+        idx = str(eid + '_' + mouse_name)
+
+        if len(idxs) == 0:
+            idxs = idx
+            mouse_names = mouse_name
+        else:
+            idxs = np.hstack((idxs, idx))
+            mouse_names = np.hstack((mouse_names, mouse_name))
+            
+    return idxs, mouse_names
+
+"""
+SCRIPT 2: PAW WAVELET DECOMPOSITION
+"""
+
+# This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
+def get_speed(poses, times, camera, split, feature):
+    """
+    FIXME Document and add unit test!
+
+    :param dlc: dlc pqt table
+    :param dlc_t: dlc time points
+    :param camera: camera type e.g 'left', 'right', 'body'
+    :param feature: dlc feature to compute speed over
+    :return:
+    """
+    SAMPLING = {'left': 60,
+                'right': 150,
+                'body': 30}
+    RESOLUTION = {'left': 2,
+                  'right': 1,
+                  'body': 1}
+
+    speeds = {}
+    times = np.array(times)
+    x = poses[f'{feature}_x'] / RESOLUTION[camera]
+    y = poses[f'{feature}_y'] / RESOLUTION[camera]
+
+    dt = np.diff(times)
+    tv = times[:-1] + dt / 2
+
+
+    # Calculate velocity for x and y separately if split is true
+    if split == True:
+        s_x = np.diff(x) * SAMPLING[camera]
+        s_y = np.diff(y) * SAMPLING[camera]
+        speeds = [times, s_x, s_y]
+        # interpolate over original time scale
+        # if tv.size > 1:
+        #     ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
+        #     ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
+        #     speeds = [times, ifcn_x(times), ifcn_y(times)]
+    else:
+        # Speed vector is given by the Pitagorean theorem
+        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * SAMPLING[camera]
+        speeds = [times, s]
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+            speeds = [times, ifcn(times)]
+
+    return speeds  
+
 # WAVELET DECOMPOSITION
 def morlet_conj_ft(omega_vals, omega0):
     """
@@ -274,115 +390,45 @@ def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
     return amp, Q, x_hat
 
 
-def lowpass_filter(data, cutoff, fs, order=4):
-    nyq = 0.5 * fs  # Nyquist frequency
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    return filtfilt(b, a, data)
+def plot_kde(X_embedded, kernel):
+    xmin = -150
+    xmax = 150
+    ymin=-150
+    ymax=150
+    X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    Z = np.reshape(kernel(positions).T, X.shape)
 
+    fig, ax = plt.subplots()
+    ax.imshow(np.rot90(Z), cmap=plt.cm.gist_earth_r,
+            extent=[xmin, xmax, ymin, ymax])
+    ax.plot(X_embedded[:, 0], X_embedded[:, 1], 'k.', markersize=2)
+    ax.set_xlim([xmin, xmax])
+    ax.set_ylim([ymin, ymax])
+    plt.show()
+    
+    
+def GMM_neg_log_likelihood(embedding, components):
+    
+    LL = np.zeros(len(components)) * np.nan
+    
+    for i, k in enumerate(components):
+        # g = mixture.GaussianMixture(n_components=k)
+        # generate random sample, two components
+        np.random.seed(0)
 
-def low_pass(signal, cutoff, sf):    
-    not_nan = signal[np.where(~np.isnan(signal))]
-    low_pass = lowpass_filter(not_nan, cutoff, fs=sf, order=4)
-    signal[np.where(~np.isnan(signal))] = low_pass
-    return signal
+        # concatenate the two datasets into the final training set
+        cutoff = int(np.shape(embedding)[0]*0.8)
+        train_indices = np.random.choice(embedding.shape[0], cutoff, replace=False)
+        X_train = np.vstack([embedding[train_indices, 0], embedding[train_indices, 1]]).T
 
+        # fit a Gaussian Mixture Model with two components
+        clf = mixture.GaussianMixture(n_components=k, covariance_type='full')
+        clf.fit(X_train)
 
-def interpolate_nans(pose, camera):
-
-    # threshold (in seconds) above which we will not interpolate nans,
-    # but keep them (for long stretches interpolation may not be appropriate)
-    nan_thresh = .1
-    SAMPLING = {'left': 60,
-                'right': 150,
-                'body': 30}
-    fr = SAMPLING[camera]
-
-    # don't interpolate long strings of nans
-    t = np.diff(1 * np.isnan(np.array(pose)))
-    begs = np.where(t == 1)[0]
-    ends = np.where(t == -1)[0]
-    if np.isnan(np.array(pose)[0]):
-        begs = begs[:-1]
-        ends = ends[1:]
-    if begs.shape[0] > ends.shape[0]:
-        begs = begs[:ends.shape[0]]
-
-    interp_pose = pose.copy()
-    interp_pose = np.array(interp_pose.interpolate(method='cubic'))
-
-    # # If needed, low_pass_filter:
-    # if camera == 'right':
-    #     # Sometimes array starts with NaNs, should ignore those
-    #     not_nan = interp_pose[np.where(~np.isnan(interp_pose))]
-    #     low_pass = lowpass_filter(not_nan, cutoff=30, fs=fr, order=4)
-
-    #     smoothed = interp_pose.copy()
-    #     smoothed[np.where(~np.isnan(interp_pose))] = low_pass
-    # else:
-    #     smoothed = interp_pose.copy()
-
-    # Restore long NaNs
-    for b, e in zip(begs, ends):
-        if (e - b) > (fr * nan_thresh):
-            interp_pose[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
+        all_indices = np.arange(0, embedding.shape[0], 1)
+        test_indices = [idx for idx in all_indices if idx not in train_indices]
+        X_test = np.vstack([embedding[test_indices, 0], embedding[test_indices, 1]])
+        LL[i] = -clf.score(X_test.T)
         
-    return interp_pose
-
-
-# This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
-def get_speed(poses, times, camera, split, feature):
-    """
-    FIXME Document and add unit test!
-
-    :param dlc: dlc pqt table
-    :param dlc_t: dlc time points
-    :param camera: camera type e.g 'left', 'right', 'body'
-    :param feature: dlc feature to compute speed over
-    :return:
-    """
-    SAMPLING = {'left': 60,
-                'right': 150,
-                'body': 30}
-    RESOLUTION = {'left': 2,
-                  'right': 1,
-                  'body': 1}
-
-    speeds = {}
-    interpolated_x = interpolate_nans(poses[f'{feature}_x'], camera)
-    interpolated_y = interpolate_nans(poses[f'{feature}_y'], camera)
-    # interpolated_x = poses[f'{feature}_x']
-    # interpolated_y = poses[f'{feature}_y']
-    x = interpolated_x / RESOLUTION[camera]
-    y = interpolated_y / RESOLUTION[camera]
-    # if camera == 'right':
-    #     fs = SAMPLING[camera]
-    #     x = lowpass_filter(x, cutoff=30, fs=fs, order=4)
-    #     y = lowpass_filter(y, cutoff=30, fs=fs, order=4)
-
-    # get speed in px/sec [half res]
-    # s = ((np.diff(x) ** 2 + np.diff(y) ** 2) ** .5) * SAMPLING[camera]
-    dt = np.diff(times)
-    tv = times[:-1] + dt / 2
-
-
-    # Calculate velocity for x and y separately if split is true
-    if split == True:
-        s_x = np.diff(x) * SAMPLING[camera]
-        s_y = np.diff(y) * SAMPLING[camera]
-        speeds[camera] = [times, s_x, s_y]
-        # interpolate over original time scale
-        if tv.size > 1:
-            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
-            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
-            speeds[camera] = [times, ifcn_x(times), ifcn_y(times)]
-    else:
-        # Speed vector is given by the Pitagorean theorem
-        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * SAMPLING[camera]
-        speeds[camera] = [times, s]
-        # interpolate over original time scale
-        if tv.size > 1:
-            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
-            speeds[camera] = [times, ifcn(times)]
-
-    return speeds        
+    return LL
