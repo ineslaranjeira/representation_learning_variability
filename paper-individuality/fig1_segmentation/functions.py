@@ -284,7 +284,7 @@ def lowpass_filter(data, cutoff, fs, order=4):
 def low_pass(signal, cutoff, sf):    
     not_nan = signal[np.where(~np.isnan(signal))]
     low_pass = lowpass_filter(not_nan, cutoff, fs=sf, order=4)
-    signal[not_nan] = low_pass
+    signal[np.where(~np.isnan(signal))] = low_pass
     return signal
 
 
