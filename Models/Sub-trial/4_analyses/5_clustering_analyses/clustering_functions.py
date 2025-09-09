@@ -3,9 +3,9 @@ IMPORTS
 """
 
 prefix = '/home/ines/repositories/'
-prefix = '/Users/ineslaranjeira/Documents/Repositories/'
+# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
-import autograd.numpy as np
+import numpy as np
 import os 
 import pandas as pd
 
