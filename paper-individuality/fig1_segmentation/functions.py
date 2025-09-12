@@ -255,7 +255,7 @@ SCRIPT 2: PAW WAVELET DECOMPOSITION
 """
 
 # This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
-def get_speed(poses, times, camera, split, feature):
+def get_speed(poses, times, camera, rampling_rate, split, feature):
     """
     FIXME Document and add unit test!
 
@@ -265,12 +265,11 @@ def get_speed(poses, times, camera, split, feature):
     :param feature: dlc feature to compute speed over
     :return:
     """
-    SAMPLING = {'left': 60,
-                'right': 150,
-                'body': 30}
+
     RESOLUTION = {'left': 2,
                   'right': 1,
                   'body': 1}
+    rampling_rate = 60
 
     speeds = {}
     times = np.array(times)
@@ -283,17 +282,17 @@ def get_speed(poses, times, camera, split, feature):
 
     # Calculate velocity for x and y separately if split is true
     if split == True:
-        s_x = np.diff(x) * SAMPLING[camera]
-        s_y = np.diff(y) * SAMPLING[camera]
+        s_x = np.diff(x) * rampling_rate
+        s_y = np.diff(y) * rampling_rate
         speeds = [times, s_x, s_y]
         # interpolate over original time scale
-        # if tv.size > 1:
-        #     ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
-        #     ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
-        #     speeds = [times, ifcn_x(times), ifcn_y(times)]
+        if tv.size > 1:
+            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
+            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
+            speeds = [times, ifcn_x(times), ifcn_y(times)]
     else:
         # Speed vector is given by the Pitagorean theorem
-        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * SAMPLING[camera]
+        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * rampling_rate
         speeds = [times, s]
         # interpolate over original time scale
         if tv.size > 1:
