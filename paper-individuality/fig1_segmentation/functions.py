@@ -1,237 +1,11 @@
-import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
-import scipy.interpolate as interpolate
-from scipy.signal import butter, filtfilt
-from joblib import Parallel, delayed
-from scipy.fftpack import fft, ifft, fftshift
-import uuid
-from pathlib import Path
-from sklearn import mixture
-from one.api import ONE
-from one.alf.path import add_uuid_string
-from one.remote import aws
-
-"""
-SCRIPT 1: QUERY BWM DATA WITH QC
-"""
-
-def extended_qc(one, eids):
-    
-    # Initialize df
-    df = pd.DataFrame()
-
-    for e, eid in enumerate(eids):
-        
-        extended_qc = one.get_details(eid, True)['extended_qc']
-        transposed_df = pd.DataFrame.from_dict(extended_qc, orient='index').T
-        transposed_df['eid'] = eid
-        df = pd.concat([df, transposed_df])
-    
-    return df
-
-
-# Function written by Julia 
-def download_subjectTables(one, subject=None, trials=True, training=True,
-                           target_path=None, tag=None, overwrite=False, check_updates=True):
-    """
-    Function to download the aggregated clusters information associated with the given data release tag from AWS.
-    Parameters
-    ----------
-    one: one.api.ONE
-        Instance to be used to connect to database.
-    trials: bool
-        Whether to download the subjectTrials.table.pqt, default is True
-    training: bool
-        Whether to donwnload the subjectTraining.table.pqt, defaults is True
-    subject: str, uuid or None
-        Nickname or UUID of the subject to download all trials from. If None, download all available trials tables
-        (associated with 'tag' if one is given)
-    target_path: str or pathlib.Path
-        Directory to which files should be downloaded. If None, downloads to one.cache_dir/aggregates
-    tag: str
-        Data release tag to download _ibl_subjectTrials.table datasets from. Default is None.
-    overwrite : bool
-        If True, will re-download files even if file exists locally and file sizes match.
-    check_updates : bool
-        If True, will check if file sizes match and skip download if they do. If False, will just return the paths
-        and not check if the data was updated on AWS.
-    Returns
-    -------
-    trials_tables: list of pathlib.Path
-        Paths to the downloaded subjectTrials files
-    training_tables: list of pathlib.Path
-        Paths to the downloaded subjectTraining files
-    """
-
-    if target_path is None:
-        target_path = Path(one.cache_dir).joinpath('aggregates')
-        target_path.mkdir(exist_ok=True)
-    else:
-        assert target_path.exists(), 'The target_path you passed does not exist.'
-
-    # Get the datasets
-    trials_ds = []
-    training_ds = []
-    if subject:
-        try:
-            subject_id = uuid.UUID(subject)
-        except ValueError:
-            subject_id = one.alyx.rest('subjects', 'list', nickname=subject)[0]['id']
-        if trials:
-            trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt',
-                                           django=f'object_id,{subject_id}'))
-        if training:
-            training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt',
-                                             django=f'object_id,{subject_id}'))
-    else:
-        if tag:
-            if trials:
-                trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt', tag=tag))
-            if training:
-                training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt', tag=tag))
-        else:
-            if trials:
-                trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt'))
-            if training:
-                training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt'))
-
-    # Set up the bucket
-    s3, bucket_name = aws.get_s3_from_alyx(alyx=one.alyx)
-
-    all_out = []
-    for ds_list in [trials_ds, training_ds]:
-        out_paths = []
-        for ds in ds_list:
-            relative_path = add_uuid_string(ds['file_records'][0]['relative_path'], ds['url'][-36:])
-            src_path = 'aggregates/' + str(relative_path)
-            dst_path = target_path.joinpath(relative_path)
-            if check_updates:
-                out = aws.s3_download_file(src_path, dst_path, s3=s3, bucket_name=bucket_name, overwrite=overwrite)
-            else:
-                out = dst_path
-
-            if out and out.exists():
-                out_paths.append(out)
-            else:
-                print(f'Downloading of {src_path} table failed.')
-        all_out.append(out_paths)
-
-    return all_out[0], all_out[1]
-
+from scipy.stats import mode
 
 
 """
-SCRIPT 2: DESIGN MATRIX
+SCRIPT: Syllables per trial epoch
 """
-
-## LICKS
-def get_feature_event_times(dlc, dlc_t, features):
-    """
-    Detect events from the dlc traces. Based on the standard deviation between frames
-    :param dlc: dlc pqt table
-    :param dlc_t: dlc times
-    :param features: features to consider
-    :return:
-    """
-
-    for i, feat in enumerate(features):
-        f = dlc[feat]
-        threshold = np.nanstd(np.diff(f)) / 4
-        if i == 0:
-            events = np.where(np.abs(np.diff(f)) > threshold)[0]
-        else:
-            events = np.r_[events, np.where(np.abs(np.diff(f)) > threshold)[0]]
-
-    return dlc_t[np.unique(events)]
-
-
-def merge_licks(poses, features, common_fs):
-    
-    # Define total duration (max of both videos)
-    duration_sec = max(list(poses['leftCamera']['times'])[-1], list(poses['rightCamera']['times'])[-1])  # in seconds
-
-    # Set common sampling rate (high rather than low)
-    t_common = np.arange(0, duration_sec, 1/common_fs)  # uniform timestamps
-    
-    lick_trace_left = np.zeros_like(t_common, dtype=int)
-    lick_trace_right = np.zeros_like(t_common, dtype=int)
-
-    left_lick_times = get_feature_event_times(poses['leftCamera'], poses['leftCamera']['times'], features)
-    right_lick_times = get_feature_event_times(poses['rightCamera'], poses['rightCamera']['times'], features)
-
-    # Round licks to nearest timestamp in t_common
-    left_indices = np.searchsorted(t_common, left_lick_times)
-    right_indices = np.searchsorted(t_common, right_lick_times)
-
-    # Set licks to 1
-    lick_trace_left[left_indices[left_indices < len(t_common)]] = 1
-    lick_trace_right[right_indices[right_indices < len(t_common)]] = 1
-
-    combined_licks = np.maximum(lick_trace_left, lick_trace_right)
-
-    return t_common, combined_licks 
-
-
-def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None):
-    # Function inspired on wh.interpolate from here: https://github.com/int-brain-lab/ibllib/blob/master/brainbox/behavior/wheel.py#L28 
-    yinterp = interpolate.interp1d(timestamps, data, kind=kind, fill_value='extrapolate')(reference_time)
-    
-    if fill_gaps:
-        #  Find large gaps and forward fill @fixme This is inefficient
-        gaps, = np.where(np.diff(timestamps) >= fill_gaps)
-
-        for i in gaps:
-            yinterp[(reference_time >= timestamps[i]) & (reference_time < timestamps[i + 1])] = data[i]
-            
-    return yinterp, reference_time
-
-
-def lowpass_filter(data, cutoff, fs, order=4):
-    nyq = 0.5 * fs  # Nyquist frequency
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    return filtfilt(b, a, data)
-
-
-def low_pass(signal, cutoff, sf):    
-    not_nan = signal[np.where(~np.isnan(signal))]
-    low_pass = lowpass_filter(not_nan, cutoff, fs=sf, order=4)
-    signal[np.where(~np.isnan(signal))] = low_pass
-    return signal
-
-
-def interpolate_nans(pose, camera):
-
-    # threshold (in seconds) above which we will not interpolate nans,
-    # but keep them (for long stretches interpolation may not be appropriate)
-    nan_thresh = .1
-    SAMPLING = {'left': 60,
-                'right': 150,
-                'body': 30}
-    fr = SAMPLING[camera]
-
-    # don't interpolate long strings of nans
-    t = np.diff(1 * np.isnan(np.array(pose)))
-    begs = np.where(t == 1)[0]
-    ends = np.where(t == -1)[0]
-    if np.isnan(np.array(pose)[0]):
-        begs = begs[:-1]
-        ends = ends[1:]
-    if begs.shape[0] > ends.shape[0]:
-        begs = begs[:ends.shape[0]]
-
-    interp_pose = pose.copy()
-    interp_pose = np.array(interp_pose.interpolate(method='cubic'))
-
-    # Restore long NaNs
-    for b, e in zip(begs, ends):
-        if (e - b) > (fr * nan_thresh):
-            interp_pose[(b + 1):(e + 1)] = np.nan  # offset by 1 due to earlier diff
-        
-    return interp_pose
-
-
 def idxs_from_files(design_matrices):
     
     idxs = []
@@ -250,184 +24,343 @@ def idxs_from_files(design_matrices):
             
     return idxs, mouse_names
 
-"""
-SCRIPT 2: PAW WAVELET DECOMPOSITION
-"""
 
-# This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
-def get_speed(poses, times, camera, rampling_rate, split, feature):
-    """
-    FIXME Document and add unit test!
+""" State post-processing """
+def prepro(trials):
 
-    :param dlc: dlc pqt table
-    :param dlc_t: dlc time points
-    :param camera: camera type e.g 'left', 'right', 'body'
-    :param feature: dlc feature to compute speed over
-    :return:
-    """
+    """ Performance """
+    # Some preprocessing
+    trials['contrastLeft'] = trials['contrastLeft'].fillna(0)
+    trials['contrastRight'] = trials['contrastRight'].fillna(0)
+    trials['signed_contrast'] = - trials['contrastLeft'] + trials['contrastRight']
+    trials['contrast'] = trials['contrastLeft'] + trials['contrastRight']
+    trials['correct_easy'] = trials['feedbackType']
+    trials.loc[trials['correct_easy']==-1, 'correct_easy'] = 0
+    trials['correct'] = trials['feedbackType']
+    trials.loc[trials['contrast']<.5, 'correct_easy'] = np.nan
+    trials.loc[trials['correct']==-1, 'correct'] = 0
 
-    RESOLUTION = {'left': 2,
-                  'right': 1,
-                  'body': 1}
-    rampling_rate = 60
+    """ Response/ reaction times """
+    trials['response'] = trials['response_times'] - trials['goCue_times']
+    trials['reaction'] = trials['firstMovement_times'] - trials['goCue_times']
+    """ Quiescence elongation """
+    trials['elongation'] = trials['goCue_times'] - trials['quiescencePeriod'] - trials['intervals_0']
+    """ Win stay lose shift """
+    trials['prev_choice'] = trials['choice'] * np.nan
+    trials['prev_choice'][1:] = trials['choice'][:-1]
+    trials['prev_feedback'] = trials['feedbackType'] * np.nan
+    trials['prev_feedback'][1:] = trials['feedbackType'][:-1]
+    trials['wsls'] = trials['choice'] * np.nan
+    trials.loc[(trials['prev_feedback']==1.) & (trials['choice']==trials['prev_choice']), 'wsls'] = 'wst'
+    trials.loc[(trials['prev_feedback']==1.) & (trials['choice']!=trials['prev_choice']), 'wsls'] = 'wsh'
+    trials.loc[(trials['prev_feedback']==-1.) & (trials['choice']!=trials['prev_choice']), 'wsls'] = 'lsh'
+    trials.loc[(trials['prev_feedback']==-1.) & (trials['choice']==trials['prev_choice']), 'wsls'] = 'lst'
+    #TODO : trials['days_to_trained'] = trials['training_time']
 
-    speeds = {}
-    times = np.array(times)
-    x = poses[f'{feature}_x'] / RESOLUTION[camera]
-    y = poses[f'{feature}_y'] / RESOLUTION[camera]
-
-    dt = np.diff(times)
-    tv = times[:-1] + dt / 2
-
-
-    # Calculate velocity for x and y separately if split is true
-    if split == True:
-        s_x = np.diff(x) * rampling_rate
-        s_y = np.diff(y) * rampling_rate
-        speeds = [times, s_x, s_y]
-        # interpolate over original time scale
-        if tv.size > 1:
-            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
-            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
-            speeds = [times, ifcn_x(times), ifcn_y(times)]
-    else:
-        # Speed vector is given by the Pitagorean theorem
-        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * rampling_rate
-        speeds = [times, s]
-        # interpolate over original time scale
-        if tv.size > 1:
-            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
-            speeds = [times, ifcn(times)]
-
-    return speeds  
-
-# WAVELET DECOMPOSITION
-def morlet_conj_ft(omega_vals, omega0):
-    """
-    Computes the conjugate Fourier transform of the Morlet wavelet.
-
-    Parameters:
-    - w: Angular frequency values (array or scalar)
-    - omega0: Dimensionless Morlet wavelet parameter
-
-    Returns:
-    - out: Conjugate Fourier transform of the Morlet wavelet
-    """
-
-    return np.pi**(-1/4) * np.exp(-0.5 * (omega_vals - omega0)**2)
+    return trials
 
 
-def fast_wavelet_morlet_convolution_parallel(x, f, omega0, dt):
-    """
-    Fast Morlet wavelet transform using parallel computation.
-
-    Args:
-        x (array): 1D array of projection values to transform.
-        f (array): Center frequencies of the wavelet frequency channels (Hz).
-        omega0 (float): Dimensionless Morlet wavelet parameter.
-        dt (float): Sampling time (seconds).
-
-    Returns:
-        amp (array): Wavelet amplitudes.
-        W (array): Wavelet coefficients (complex-valued, optional).
-    """
-    N = len(x)
-    L = len(f)
-    amp = np.zeros((L, N))
-    Q = np.zeros((L, N))
-
-    # Ensure N is even
-    if N % 2 == 1:
-        x = np.append(x, 0)
-        N += 1
-        test = True
-    else:
-        test = False
-
-    # Add zero padding to x
-    # Zero padding serves to compensate for the fact that the kernel does not have the same size as 
-    # 
-    x = np.concatenate((np.zeros(N // 2), x, np.zeros(N // 2)))
-    M = N
-    N = len(x)
-
-    # Compute scales
-    scales = (omega0 + np.sqrt(2 + omega0**2)) / (4 * np.pi * f)
-    # angular frequencies to compute FT for (depends on sampling frequency); is as long as N 
-    omega_vals = 2 * np.pi * np.arange(-N // 2, N // 2) / (N * dt)  
-
-    # Fourier transform of x; shift folds it around zero so that it is more interpretable (frequencies at the right of nyquist become negative)
-    x_hat = fftshift(fft(x))
-
-    # Index for truncation to recover the actual x without padding
-    if test:
-        idx = np.arange(M // 2, M // 2 + M - 1)
-    else:
-        idx = np.arange(M // 2, M // 2 + M)
-
-    # Function for parallel processing
-    def process_frequency(i):
-        # Take the Morlet conjugate of the Fourier transform
-        m = morlet_conj_ft(-omega_vals * scales[i], omega0)
-        # Convolution on the Fourier domain (as opposed to time domain in DWT)
-        conv = m * x_hat
-        # Inverse Fourier transform (normalized?)
-        # q are the wavelet coefficients; normalized to ensure the energy of the wavelet is preserved across different scales
-        q = ifft(conv) * np.sqrt(scales[i])
-        # Recover q without padding
-        q = q[idx]
-        amp_row = np.abs(q) * np.pi**-0.25 * np.exp(0.25 * (omega0 - np.sqrt(omega0**2 + 2))**2) / np.sqrt(2 * scales[i])
-        return amp_row, q
-
-    # Parallel processing
-    results = Parallel(n_jobs=-1)(delayed(process_frequency)(i) for i in range(L))
-
-    for i, (amp_row, q) in enumerate(results):
-        amp[i, :] = amp_row
-        Q[i, :] = q
-
-    return amp, Q, x_hat
-
-
-def plot_kde(X_embedded, kernel):
-    xmin = -150
-    xmax = 150
-    ymin=-150
-    ymax=150
-    X, Y = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
-    positions = np.vstack([X.ravel(), Y.ravel()])
-    Z = np.reshape(kernel(positions).T, X.shape)
-
-    fig, ax = plt.subplots()
-    ax.imshow(np.rot90(Z), cmap=plt.cm.gist_earth_r,
-            extent=[xmin, xmax, ymin, ymax])
-    ax.plot(X_embedded[:, 0], X_embedded[:, 1], 'k.', markersize=2)
-    ax.set_xlim([xmin, xmax])
-    ax.set_ylim([ymin, ymax])
-    plt.show()
+def state_identifiability(combined_states, design_matrix_heading, use_sets):
     
-    
-def GMM_neg_log_likelihood(embedding, components):
-    
-    LL = np.zeros(len(components)) * np.nan
-    
-    for i, k in enumerate(components):
-        # g = mixture.GaussianMixture(n_components=k)
-        # generate random sample, two components
-        np.random.seed(0)
+    unique_states = np.unique(combined_states)
+    new_states = unique_states.copy()
 
-        # concatenate the two datasets into the final training set
-        cutoff = int(np.shape(embedding)[0]*0.8)
-        train_indices = np.random.choice(embedding.shape[0], cutoff, replace=False)
-        X_train = np.vstack([embedding[train_indices, 0], embedding[train_indices, 1]]).T
-
-        # fit a Gaussian Mixture Model with two components
-        clf = mixture.GaussianMixture(n_components=k, covariance_type='full')
-        clf.fit(X_train)
-
-        all_indices = np.arange(0, embedding.shape[0], 1)
-        test_indices = [idx for idx in all_indices if idx not in train_indices]
-        X_test = np.vstack([embedding[test_indices, 0], embedding[test_indices, 1]])
-        LL[i] = -clf.score(X_test.T)
+    # Create new mapping depending on empirical data for each state
+    for v, var in enumerate(use_sets):
+        zeros = [s[v] == '0' if s != 'nan' else False for s in combined_states]
+        ones = [s[v] == '1' if s != 'nan' else False for s in combined_states]
         
-    return LL
+        # For an empty variable, do not make changes (wavelet)
+        if len(var) == 0:
+            var_0 = np.nan
+            var_1 = np.nan
+        elif var == ['avg_wheel_vel']:
+            var_0 = np.array(np.abs(design_matrix_heading[var]))[zeros]
+            var_1 = np.array(np.abs(design_matrix_heading[var]))[ones]
+        elif var == ['left_X', 'left_Y', 'right_X', 'right_Y']:
+            var_0 = np.array(np.abs(np.diff(design_matrix_heading[var], axis=0)))[zeros[1:]]
+            var_1 = np.array(np.abs(np.diff(design_matrix_heading[var], axis=0)))[ones[1:]]
+        elif var == ['nose_x', 'nose_Y']:
+            print('Not implemented yet')
+        else:
+            var_0 = np.array(design_matrix_heading[var])[zeros]
+            var_1 = np.array(design_matrix_heading[var])[ones]
+        
+        if np.nanmean(var_0)> np.nanmean(var_1):
+            var_state_0 = [s[v] == '0' if s != 'nan' else False for s in unique_states]
+            new_states[var_state_0] = np.array([s[:v] + '1' + s[v+1:] for s in new_states[var_state_0]])
+            var_state_1 = [s[v] == '1' if s != 'nan' else False for s in unique_states]
+            new_states[var_state_1] = np.array([s[:v] + '0' + s[v+1:] for s in new_states[var_state_1]])
+
+    identifiable_mapping = {unique: key for unique, key in zip(unique_states, new_states)}
+
+    # Use np.vectorize to apply the mapping
+    replace_func = np.vectorize(identifiable_mapping.get)
+    identifiable_states = replace_func(combined_states)
+    
+    return identifiable_states
+
+
+def align_bin_design_matrix (init, end, event_type_list, session_trials, design_matrix, most_likely_states, multiplier):
+    
+    for e, this_event in enumerate(event_type_list):
+        
+        # Initialize variables
+        # Before there was a function for keeping validation set apart, now deprecated
+        reduced_design_matrix = design_matrix.copy()
+        reduced_design_matrix['most_likely_states'] = most_likely_states
+        reduced_design_matrix['new_bin'] = reduced_design_matrix['Bin'] * np.nan
+        reduced_design_matrix['correct'] = reduced_design_matrix['Bin'] * np.nan
+        reduced_design_matrix['choice'] = reduced_design_matrix['Bin'] * np.nan
+        reduced_design_matrix['contrast'] = reduced_design_matrix['Bin'] * np.nan        
+        reduced_design_matrix['block'] = reduced_design_matrix['Bin'] * np.nan        
+
+        feedback = session_trials['feedbackType']
+        choice = session_trials['choice']
+        contrast = np.abs(prepro(session_trials)['signed_contrast'])
+        block = session_trials['probabilityLeft']
+        reaction = prepro(session_trials)['reaction']
+        response = prepro(session_trials)['response']
+        elongation = prepro(session_trials)['elongation']
+        wsls = prepro(session_trials)['wsls']
+        trial_id = session_trials['index'] 
+
+        events = session_trials[this_event]
+                
+        for t, trial in enumerate(events[:-1]):
+            event = events[t]
+            trial_start = session_trials['intervals_0'][t]
+            trial_end = session_trials['intervals_0'][t+1]
+            
+            # Check feedback
+            if feedback[t] ==1:
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'correct'] = 1
+            elif feedback[t] == -1:
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'correct'] = 0
+            # Check choice
+            if choice[t] ==1:
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'choice'] = 'right'
+            elif choice[t] == -1:
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'choice'] = 'left'
+            
+            # Check reaction
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'reaction'] = reaction[t]
+            # Check response
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'response'] = response[t]
+            # Check elongation
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']>trial_start*multiplier), 
+                                            'elongation'] = elongation[t]
+
+            # Check contrast
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'contrast'] = contrast[t]
+
+            # Check block
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'block'] = block[t]
+            
+            # Check wsls
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'wsls'] = wsls[t]
+
+            # Check trial id
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            'trial_id'] = trial_id[t]
+            
+            # Add reliable timestamp to identify trial
+            reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            this_event] = event
+            
+            # Rename bins so that they are aligned on stimulus onset
+            if event > 0:
+                event_window = reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
+                                                         (reduced_design_matrix['Bin']> event*multiplier + init)]
+                onset_bin = reduced_design_matrix.loc[reduced_design_matrix['Bin']>= event*multiplier, 'Bin']
+                if (len(event_window)>0) & len(onset_bin)>0:
+                    bin = list(onset_bin)[0]
+                    reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
+                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
+                                            'new_bin'] = reduced_design_matrix.loc[(reduced_design_matrix['Bin']< event*multiplier + end) & 
+                                            (reduced_design_matrix['Bin']>= event*multiplier + init), 'Bin'] - bin
+                else:
+                    reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) & 
+                                              (reduced_design_matrix['Bin']> event*multiplier + init), 'new_bin'] = np.nan
+            else:
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) & 
+                                          (reduced_design_matrix['Bin']> event*multiplier + init), 'new_bin'] = np.nan
+                
+    return reduced_design_matrix
+
+
+def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
+    
+    # Split session into trial phases and gather most likely states of those trial phases
+    use_data = reduced_design_matrix.dropna()
+    use_data['label'] = use_data['Bin'] * np.nan
+    trial_num = len(session_trials)
+
+    # Pre-quiescence 
+    pre_qui_init = session_trials['intervals_0']
+    pre_qui_end = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
+
+    # Quiescence
+    qui_init = session_trials['goCueTrigger_times'] - session_trials['quiescencePeriod']
+    qui_end = session_trials['goCueTrigger_times']
+    
+    # ITI
+    iti_init = session_trials['feedback_times']
+    iti_end_correct = session_trials['intervals_1']
+    iti_end_incorrect = session_trials['intervals_1'] - 1
+    
+    # Reaction time 
+    rt_init = session_trials['goCueTrigger_times']
+    rt_end = session_trials['firstMovement_times']
+
+    # Movement time 
+    move_init = session_trials['firstMovement_times']
+    move_end = session_trials['feedback_times']
+    
+
+    for t in range(trial_num):
+          
+        # Pre-quiescence
+        use_data.loc[(use_data['Bin'] <= pre_qui_end[t]*multiplier) & 
+                     (use_data['Bin'] > pre_qui_init[t]*multiplier), 'label'] = 'Pre-quiescence'
+
+        # Quiescence
+        use_data.loc[(use_data['Bin'] <= qui_end[t]*multiplier) &
+                     (use_data['Bin'] > qui_init[t]*multiplier), 'label'] = 'Quiescence'
+        
+        # ITI
+        if session_trials['feedbackType'][t] == -1.:
+            use_data.loc[(use_data['Bin'] <= iti_end_incorrect[t]*multiplier) & 
+                            (use_data['Bin'] > iti_init[t]*multiplier), 'label'] = 'ITI'
+        elif session_trials['feedbackType'][t] == 1.:
+            use_data.loc[(use_data['Bin'] <= iti_end_correct[t]*multiplier) & 
+                            (use_data['Bin'] > iti_init[t]*multiplier), 'label'] = 'ITI'
+        # Move
+        if session_trials['choice'][t] == -1:
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Left choice'
+        elif session_trials['choice'][t] == 1.:
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Right choice'
+            
+        # React        
+        if prepro(session_trials)['signed_contrast'][t] < 0:
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
+        elif prepro(session_trials)['signed_contrast'][t] > 0:
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
+    return use_data
+
+
+def broader_label(df):
+    
+    df['broader_label'] = df['label']
+    # df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Stimulus'
+    # df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Stimulus'
+    df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Quiescence', 'broader_label'] = 'Quiescence'
+    df.loc[df['broader_label']=='Pre-quiescence', 'broader_label'] = 'Pre-quiescence'
+    df.loc[df['broader_label']=='Left choice', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Right choice', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Correct feedback', 'broader_label'] = 'ITI'
+    df.loc[df['broader_label']=='Incorrect feedback', 'broader_label'] = 'ITI'
+    df.loc[df['broader_label']=='ITI_correct', 'broader_label'] = 'ITI'
+    df.loc[df['broader_label']=='ITI_incorrect', 'broader_label'] = 'ITI'
+    
+    return df
+
+
+def define_trial_types(states_trial_type, trial_type_agg):
+    
+    """ Define trial types"""
+    states_trial_type['correct_str'] = states_trial_type['correct']
+    states_trial_type.loc[states_trial_type['correct_str']==1., 'correct_str'] = 'correct'
+    states_trial_type.loc[states_trial_type['correct_str']==0., 'correct_str'] = 'incorrect'
+    states_trial_type['contrast_str'] = states_trial_type['contrast'].astype(str)
+    states_trial_type['block_str'] = states_trial_type['block'].astype(str)
+    states_trial_type['perseverence'] = states_trial_type['wsls'].copy()
+    states_trial_type.loc[states_trial_type['wsls'].isin(['wst', 'lst']), 'perseverence']  = 'stay'
+    states_trial_type.loc[states_trial_type['wsls'].isin(['wsh', 'lsh']), 'perseverence']  = 'shift'
+    states_trial_type['trial_type'] = states_trial_type[trial_type_agg].agg(' '.join, axis=1)
+    states_trial_type['trial_str'] = states_trial_type['trial_id'].astype(str)
+    states_trial_type['sample'] = states_trial_type[['session', 'trial_str']].agg(' '.join, axis=1)
+    if 'ballistic' in states_trial_type.columns:
+        states_trial_type.loc[states_trial_type['ballistic']==True, 'ballistic'] = 1
+        states_trial_type.loc[states_trial_type['ballistic']==False, 'ballistic'] = 0
+    return states_trial_type
+
+
+def rescale_sequence(seq, target_length):
+    """
+    Rescales a categorical sequence to a fixed target length.
+    
+    - If `target_length` is smaller than the original length, it takes the mode of each bin.
+    - If `target_length` is larger, it repeats values evenly.
+    
+    Parameters:
+        seq (array-like): The original categorical sequence.
+        target_length (int): The desired length of the output sequence.
+    
+    Returns:
+        np.ndarray: The transformed sequence with the specified target length.
+    """
+    original_length = len(seq)
+
+    if original_length == target_length:
+        return np.array(seq)  # No change needed
+
+    if target_length < original_length:
+        # Compression: Split into bins and take mode of each bin
+        bins = np.array_split(seq, target_length)
+        # return np.array([mode(b)[0][0] for b in bins])  # Extract mode from result
+        return np.array([mode(b)[0] for b in bins])  # Extract mode from result
+
+    else:
+        # Stretching: Repeat values to fit new size
+        stretched_indices = np.floor(np.linspace(0, original_length - 1, target_length)).astype(int)
+        return np.array(seq)[stretched_indices]  # Map stretched indices to original values
+
+
+def plot_binned_sequence(df_grouped, index, states_to_append, palette):
+        title = df_grouped['broader_label'][index]
+        fig, axs = plt.subplots(2, 1, sharex=False, sharey=True, figsize=(5, 2))
+        axs[0].imshow(np.concatenate([df_grouped['sequence'][index], states_to_append])[None,:],  
+                extent=(0, len(np.concatenate([df_grouped['sequence'][index], states_to_append])), 
+                        0, 1),
+                aspect="auto",
+                cmap=palette,
+                alpha=0.7) 
+        axs[0].set_xlim([0, len(df_grouped['sequence'][index])])
+
+        axs[1].imshow(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])[None,:],  
+                extent=(0, len(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])), 
+                        0, 1),
+                aspect="auto",
+                cmap=palette,
+                alpha=0.7) 
+        axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
+        axs[0].set_title(title)
+        plt.tight_layout()
