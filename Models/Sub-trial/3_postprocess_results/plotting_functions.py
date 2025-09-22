@@ -2,7 +2,7 @@
 IMPORTS
 """
 import os
-import autograd.numpy as np
+import numpy as np
 import pandas as pd
 
 from one.api import ONE
@@ -339,7 +339,7 @@ def wheel_over_wavelet_clusters(init, inter, empirical_data, session_trials):
     ax.imshow(np.concatenate([empirical_data.loc[empirical_data['Bin']>=init, 'most_likely_states']])[None,:],
                 extent=(0, len(np.concatenate([empirical_data.loc[empirical_data['Bin']>=init, 'most_likely_states']])), -10, 10),
                 aspect="auto",
-                cmap='viridis',
+                cmap='Set1',
                 alpha=0.3)
     ax.vlines(np.array(session_trials['goCueTrigger_times'] -init)*frame_rate, plot_min, plot_max, label='Stim On', 
                 color='Black', linewidth=2)
