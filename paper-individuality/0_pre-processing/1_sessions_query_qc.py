@@ -61,7 +61,7 @@ bwm_df.reset_index(inplace=True, drop=True)
 # TODO there must be smarter way to do this
 # ADD VIDEO QC FILTER
 
-ext_qc = extended_qc(one, bwm_df)  #TODO: THIS CODE GIVES AN ERROR ON THE PC AND NOT ON MAC... 
+ext_qc = extended_qc(one, bwm_df['eid'].unique())  #TODO: THIS CODE GIVES AN ERROR ON THE PC AND NOT ON MAC... 
 
 final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS'])) &
                       (ext_qc['_lightningPoseLeft_time_trace_length_match'].isin(['PASS'])) &   
@@ -69,7 +69,7 @@ final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS']
                       (ext_qc['_lightningPoseLeft_trace_all_nan'].isin(['PASS'])) &
                       (ext_qc['_videoLeft_framerate'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
                       (ext_qc['_videoLeft_camera_times'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
-                      (ext_qc['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &  # can make more conservative by removing or  x == None
+                      (ext_qc['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or  x == None or x == 'PASS')) &  # can make more conservative by removing or  x == None
                       (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))]
 
 #%%
