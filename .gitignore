@@ -261,3 +261,5 @@ Functions/trial_clusters
 paper-individuality/fig1_segmentation/trial_clusters
 
 paper-individuality/fig4_clustering/11_cluster_per_session_simple_paw
+paper-individuality/fig4_clustering/cluster_entropy
+paper-individuality/fig4_clustering/mouse_decoding_accuracy

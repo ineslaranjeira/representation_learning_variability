@@ -57,7 +57,8 @@ def plot_cm(decoding_result, trial_epochs, size, control=False):
     # Results on original model
     plt.rc('font', size=9) 
     plt.figure(figsize=size)
-    hmap = sns.color_palette("mako", as_cmap=True)
+    # hmap = sns.color_palette("mako", as_cmap=True)
+    hmap=plt.cm.get_cmap('Greys')
     data = decoding_result.loc[decoding_result['shuffle'] == 0]
     sns.heatmap(data['confusion_matrix'].mean(), annot=False, square=True,
         yticklabels=trial_epochs, xticklabels=trial_epochs, 
