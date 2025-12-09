@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import mode
+import scipy.interpolate as interpolate
 
 
 """
@@ -23,6 +24,53 @@ def idxs_from_files(design_matrices):
             mouse_names = np.hstack((mouse_names, mouse_name))
             
     return idxs, mouse_names
+
+# This function uses get_XYs, not smoothing, is closer to brainbox function: https://github.com/int-brain-lab/ibllib/blob/78e82df8a51de0be880ee4076d2bb093bbc1d2c1/brainbox/behavior/dlc.py#L63
+def get_speed(poses, times, camera, sampling_rate, split, feature):
+    """
+    FIXME Document and add unit test!
+
+    :param dlc: dlc pqt table
+    :param dlc_t: dlc time points
+    :param camera: camera type e.g 'left', 'right', 'body'
+    :param feature: dlc feature to compute speed over
+    :return:
+    """
+
+    RESOLUTION = {'left': 2,
+                  'right': 1,
+                  'body': 1}
+    sampling_rate = 60
+
+    speeds = {}
+    times = np.array(times)
+    x = poses[f'{feature}_x'] / RESOLUTION[camera]
+    y = poses[f'{feature}_y'] / RESOLUTION[camera]
+
+    dt = np.diff(times)
+    tv = times[:-1] + dt / 2
+
+
+    # Calculate velocity for x and y separately if split is true
+    if split == True:
+        s_x = np.diff(x) * sampling_rate
+        s_y = np.diff(y) * sampling_rate
+        speeds = [times, s_x, s_y]
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn_x = interpolate.interp1d(tv, s_x, fill_value="extrapolate")
+            ifcn_y = interpolate.interp1d(tv, s_y, fill_value="extrapolate")
+            speeds = [times, ifcn_x(times), ifcn_y(times)]
+    else:
+        # Speed vector is given by the Pitagorean theorem
+        s = ((np.diff(x)**2 + np.diff(y)**2)**.5) * sampling_rate
+        speeds = [times, s]
+        # interpolate over original time scale
+        if tv.size > 1:
+            ifcn = interpolate.interp1d(tv, s, fill_value="extrapolate")
+            speeds = [times, ifcn(times)]
+
+    return speeds  
 
 
 """ State post-processing """
