@@ -256,10 +256,53 @@ paper-individuality/fig4_clustering/cluster_per_session
 
 paper-individuality/fig1_segmentation/all_sequences_raw_10-01-2025
 
+<<<<<<< Updated upstream
 Functions/trial_clusters
 
 paper-individuality/fig1_segmentation/trial_clusters
 
+=======
+paper-individuality/fig1_segmentation/trial_clusters
+
+Functions/trial_clusters
+
+>>>>>>> Stashed changes
 paper-individuality/fig4_clustering/11_cluster_per_session_simple_paw
 paper-individuality/fig4_clustering/cluster_entropy
 paper-individuality/fig4_clustering/mouse_decoding_accuracy
+
+Functions/ibl_camera_params.toml
+
+Functions/leftCamera_keypoints
+
+Functions/rightCamera_keypoints
+
+paper-individuality/fig1_segmentation/all_sequences_1_bin_09-29-2025
+
+paper-individuality/fig1_segmentation/all_sequences_3_bin_09-29-2025
+
+paper-individuality/fig2_decoding/mouse_decoder_trial.ipynb
+
+paper-individuality/fig4_clustering/4_cluster_per_session_simple_paw
+
+paper-individuality/fig4_clustering/trial_movements
+
+*.mp4
+
+paper-individuality/fig3_learning_prediction/learning_metrics_
+
+paper-individuality/fig4_clustering/9_cluster_per_trial
+
+paper-individuality/fig4_clustering/6_cluster_per_session
+
+paper-individuality/fig3_learning_prediction/training_times
+
+paper-individuality/fig4_clustering/6_cluster_per_mice_repeated_measures
+
+paper-individuality/fig1_segmentation/all_sequences_11-19-2025
+
+paper-individuality/fig1_segmentation/all_sequences_11-20-2025
+
+paper-individuality/fig4_clustering/mouse_cluster_coef
+
+paper-individuality/fig5_mixed_models/mean_df_female.csv
