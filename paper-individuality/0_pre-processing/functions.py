@@ -284,7 +284,6 @@ def get_speed(poses, times, camera, sampling_rate, split, feature):
     dt = np.diff(times)
     tv = times[:-1] + dt / 2
 
-
     # Calculate velocity for x and y separately if split is true
     if split == True:
         s_x = np.diff(x) * sampling_rate
