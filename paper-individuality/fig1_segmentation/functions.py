@@ -108,7 +108,7 @@ def prepro(trials):
     return trials
 
 
-def state_identifiability(combined_states, design_matrix_heading, use_sets):
+def state_identifiability_old(combined_states, design_matrix_heading, use_sets):
     
     unique_states = np.unique(combined_states)
     new_states = unique_states.copy()
@@ -147,6 +147,32 @@ def state_identifiability(combined_states, design_matrix_heading, use_sets):
     identifiable_states = replace_func(combined_states)
     
     return identifiable_states
+
+
+def state_identifiability(session_states, use_sets):
+    # Create new mapping depending on empirical data for each state
+    for v, var in enumerate(use_sets):
+        var_states = var+'_states'
+        
+        # For an empty variable, do not make changes (wavelet)
+        if len(var) == 0:
+            var_0 = np.nan
+            var_1 = np.nan
+        elif var == ['avg_wheel_vel']:
+            var_0 = np.nanmean(np.abs(session_states.loc[session_states[var_states]==0, var]))
+            var_1 = np.nanmean(np.abs(session_states.loc[session_states[var_states]==1, var]))
+        elif var == ['left_X', 'left_Y', 'right_X', 'right_Y']:
+            var_0 = np.array(np.abs(np.diff(session_states.loc[session_states[var_states]==0, var])))
+            var_1 = np.array(np.abs(np.diff(session_states.loc[session_states[var_states]==0, var])))
+        elif var == ['nose_x', 'nose_Y']:
+            print('Not implemented yet')
+        else:
+            var_0 = session_states.loc[session_states[var_states]==0, var]
+            var_1 = session_states.loc[session_states[var_states]==1, var]
+        
+        if np.nanmean(var_0)> np.nanmean(var_1):
+            session_states[var_states] = session_states[var_states] * -1 + 1
+    return session_states
 
 
 def align_bin_design_matrix (init, end, event_type_list, session_trials, design_matrix, most_likely_states, multiplier):

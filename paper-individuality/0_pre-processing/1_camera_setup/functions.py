@@ -1004,3 +1004,31 @@ def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_nam
     # Display the plot
     plt.show()
     
+
+
+
+
+def state_identifiability(session_states, use_sets):
+    # Create new mapping depending on empirical data for each state
+    for v, var in enumerate(use_sets):
+        var_states = var+'_states'
+        
+        # For an empty variable, do not make changes (wavelet)
+        if len(var) == 0:
+            var_0 = np.nan
+            var_1 = np.nan
+        elif var == ['avg_wheel_vel']:
+            var_0 = np.nanmean(np.abs(session_states.loc[session_states[var_states]==0, var]))
+            var_1 = np.nanmean(np.abs(session_states.loc[session_states[var_states]==1, var]))
+        elif var == ['left_X', 'left_Y', 'right_X', 'right_Y']:
+            var_0 = np.array(np.abs(np.diff(session_states.loc[session_states[var_states]==0, var])))
+            var_1 = np.array(np.abs(np.diff(session_states.loc[session_states[var_states]==0, var])))
+        elif var == ['nose_x', 'nose_Y']:
+            print('Not implemented yet')
+        else:
+            var_0 = session_states.loc[session_states[var_states]==0, var]
+            var_1 = session_states.loc[session_states[var_states]==1, var]
+        
+        if np.nanmean(var_0)> np.nanmean(var_1):
+            session_states[var_states] = session_states[var_states] * -1 + 1
+    return session_states
