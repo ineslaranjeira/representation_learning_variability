@@ -206,15 +206,15 @@ def low_pass(signal, cutoff, sf):
     return signal
 
 
-def interpolate_nans(pose, camera):
+def interpolate_nans(pose, fr):
 
     # threshold (in seconds) above which we will not interpolate nans,
     # but keep them (for long stretches interpolation may not be appropriate)
     nan_thresh = .1
-    SAMPLING = {'left': 60,
-                'right': 150,
-                'body': 30}
-    fr = SAMPLING[camera]
+    # SAMPLING = {'left': 60,
+    #             'right': 150,
+    #             'body': 30}
+    # fr = SAMPLING[camera]
 
     # don't interpolate long strings of nans
     t = np.diff(1 * np.isnan(np.array(pose)))
