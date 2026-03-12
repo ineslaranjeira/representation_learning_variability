@@ -72,6 +72,23 @@ final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS']
                       (ext_qc['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or  x == None or x == 'PASS')) &  # can make more conservative by removing or  x == None
                       (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))]
 
+
+# Includes right camera; no need to confirm frame rate, run this on the 12Mar2026
+final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS'])) &
+                      (ext_qc['_lightningPoseLeft_time_trace_length_match'].isin(['PASS'])) &   
+                      (ext_qc['_videoLeft_pin_state'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &
+                      (ext_qc['_lightningPoseLeft_trace_all_nan'].isin(['PASS'])) & 
+                      (ext_qc['_videoLeft_camera_times'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
+                      (ext_qc['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or  x == None or x == 'PASS')) &  # can make more conservative by removing or  x == None
+                      (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))&
+                      (ext_qc['_lightningPoseRight_lick_detection'].isin(['PASS'])) &
+                      (ext_qc['_lightningPoseRight_time_trace_length_match'].isin(['PASS'])) &   
+                      (ext_qc['_videoRight_pin_state'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &
+                      (ext_qc['_lightningPoseRight_trace_all_nan'].isin(['PASS'])) & 
+                      (ext_qc['_videoRight_camera_times'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
+                      (ext_qc['_videoRight_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or  x == None or x == 'PASS')) &  # can make more conservative by removing or  x == None
+                      (ext_qc['_videoRight_timestamps'].isin([True, 'PASS']))]
+
 #%%
 ## Save
 prefix = '/home/ines/repositories/'
