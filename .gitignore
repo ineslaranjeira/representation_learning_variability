@@ -395,3 +395,21 @@ paper-individuality/clustering/6_mouse_cluster_coef
 paper-individuality/lightningAction/all_decoders_25022026
 
 paper-individuality/lightningAction/paw_states_24022026
+paper-individuality/clustering/reaction_PLS_5_bins
+paper-individuality/clustering/mouse_LDA_wheel_5_bins
+paper-individuality/clustering/mouse_LDA_7_bins_qcut
+paper-individuality/clustering/mouse_LDA_5_bins_qcut
+paper-individuality/clustering/learning_PLS_5_bins
+paper-individuality/clustering/mouse_LDA_4_bins_qcut
+paper-individuality/clustering/mouse_paw_LDA_5_bins_qcut
+paper-individuality/clustering/mouse_LDA_4_bins_cut
+paper-individuality/clustering/mouse_LDA_5_bins_cut
+paper-individuality/clustering/mouse_paw_LDA_5_bins_cut
+paper-individuality/clustering/mouse_PLS_4_bins
+paper-individuality/clustering/mouse_PLS_5_bins
+paper-individuality/clustering/mouse_PLS_6_bins
+paper-individuality/trial_modes/pupil_per_trial
+paper-individuality/clustering/elongation_PLS_5_bins
+paper-individuality/clustering/all_sequences_02-16-2026
+paper-individuality/clustering/accuracy_PLS_5_bins
+paper-individuality/trial_modes/merged_behavioral_and_states.pqt
