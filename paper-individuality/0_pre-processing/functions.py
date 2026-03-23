@@ -746,3 +746,11 @@ def plot_grid_search(best_kappa, best_lag, mean_bits_LL, kappas, Lags, mouse_nam
     # Display the plot
     plt.show()
     
+    
+def get_metadata(one, sessions):
+    metadata = pd.DataFrame(columns=['session', 'lab'], index=range(len(sessions)))
+    for s, session in enumerate(sessions):
+        session_details = one.get_details(session, full=False)
+        metadata['session'][s] = session
+        metadata['lab'][s] = session_details['lab']
+    return metadata
