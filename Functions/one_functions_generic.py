@@ -99,6 +99,11 @@ def download_subjectTables(one, subject=None, trials=True, training=True,
     for ds_list in [trials_ds, training_ds]:
         out_paths = []
         for ds in ds_list:
+            # Check if file_records exists and is not empty
+            if not ds.get('file_records') or len(ds['file_records']) == 0:
+                print(f"Warning: No file records found for dataset {ds.get('url', 'unknown')}")
+                continue
+            
             relative_path = add_uuid_string(ds['file_records'][0]['relative_path'], ds['url'][-36:])
             src_path = 'aggregates/' + str(relative_path)
             dst_path = target_path.joinpath(relative_path)
