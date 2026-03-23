@@ -438,3 +438,4 @@ def plot_binned_sequence(df_grouped, index, states_to_append, palette):
         axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
         axs[0].set_title(title)
         plt.tight_layout()
+        
