@@ -287,7 +287,8 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
 def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
     
     # Split session into trial phases and gather most likely states of those trial phases
-    use_data = reduced_design_matrix.dropna()
+    # use_data = reduced_design_matrix.dropna()
+    use_data = reduced_design_matrix.copy()
     use_data['label'] = use_data['Bin'] * np.nan
     trial_num = len(session_trials)
 
