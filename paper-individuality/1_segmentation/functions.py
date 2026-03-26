@@ -379,7 +379,8 @@ def define_trial_types(states_trial_type, trial_type_agg):
     states_trial_type['perseverence'] = states_trial_type['wsls'].copy()
     states_trial_type.loc[states_trial_type['wsls'].isin(['wst', 'lst']), 'perseverence']  = 'stay'
     states_trial_type.loc[states_trial_type['wsls'].isin(['wsh', 'lsh']), 'perseverence']  = 'shift'
-    states_trial_type['trial_type'] = states_trial_type[trial_type_agg].agg(' '.join, axis=1)
+    states_trial_type['trial_type'] = states_trial_type[trial_type_agg].fillna('unknown').agg(' '.join, axis=1)
+    # states_trial_type['trial_type'] = states_trial_type[trial_type_agg].agg(' '.join, axis=1)
     states_trial_type['trial_str'] = states_trial_type['trial_id'].astype(str)
     states_trial_type['sample'] = states_trial_type[['session', 'trial_str']].agg(' '.join, axis=1)
     if 'ballistic' in states_trial_type.columns:
