@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from dateutil import parser
 from datetime import datetime
-
+import os
 from functions import extended_qc, download_subjectTables
 
 from one.api import ONE
@@ -63,15 +63,14 @@ bwm_df.reset_index(inplace=True, drop=True)
 
 ext_qc = extended_qc(one, bwm_df['eid'].unique())  #TODO: THIS CODE GIVES AN ERROR ON THE PC AND NOT ON MAC... 
 
-final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS'])) &
-                      (ext_qc['_lightningPoseLeft_time_trace_length_match'].isin(['PASS'])) &   
-                      (ext_qc['_videoLeft_pin_state'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &
-                      (ext_qc['_lightningPoseLeft_trace_all_nan'].isin(['PASS'])) &
-                      (ext_qc['_videoLeft_framerate'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
-                      (ext_qc['_videoLeft_camera_times'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
-                      (ext_qc['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or  x == None or x == 'PASS')) &  # can make more conservative by removing or  x == None
-                      (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))]
-
+# final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS'])) &
+#                       (ext_qc['_lightningPoseLeft_time_trace_length_match'].isin(['PASS'])) &   
+#                       (ext_qc['_videoLeft_pin_state'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &
+#                       (ext_qc['_lightningPoseLeft_trace_all_nan'].isin(['PASS'])) &
+#                       (ext_qc['_videoLeft_framerate'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
+#                       (ext_qc['_videoLeft_camera_times'].apply(lambda x: (isinstance(x, list) and True in x) or x == 'PASS')) &   
+#                       (ext_qc['_videoLeft_dropped_frames'].apply(lambda x: (isinstance(x, list) and True in x) or  x == None or x == 'PASS')) &  # can make more conservative by removing or  x == None
+#                       (ext_qc['_videoLeft_timestamps'].isin([True, 'PASS']))]
 
 # Includes right camera; no need to confirm frame rate, run this on the 12Mar2026
 final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS'])) &
@@ -92,7 +91,7 @@ final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS']
 #%%
 ## Save
 prefix = '/home/ines/repositories/'
-# prefix = '/Users/ineslaranjeira/Documents/Repositories/'
+prefix = '/Users/ineslaranjeira/Documents/Repositories/'
 
 save_path = prefix + '/representation_learning_variability/paper-individuality/'
 now = datetime.now() # current date and time
@@ -100,6 +99,19 @@ date_time = now.strftime("%m-%d-%Y")
 filename = '1_bwm_qc_'
 
 final_qc.to_parquet(save_path+filename+date_time, compression='gzip')  
+
+#%% 
+# Save to google drive
+# Define your target path within Google Drive
+gdrive_path = "/Users/ineslaranjeira/Google Drive/O meu disco/CCU/PhD Project/paper-individuality/data/segmentation/"
+# Ensure the directory exists
+os.makedirs(gdrive_path, exist_ok=True)
+
+# Save your file
+now = datetime.now() # current date and time
+date_time = now.strftime("%m-%d-%Y")
+file_path = os.path.join(gdrive_path, filename + date_time)
+final_qc.to_pickle(file_path, compression='gzip')  
 
 #%%
 """
