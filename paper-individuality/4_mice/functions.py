@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import mode
 import scipy.interpolate as interpolate
-
+import pandas as pd
 
 """
 SCRIPT: Syllables per trial epoch
@@ -440,4 +440,12 @@ def plot_binned_sequence(df_grouped, index, states_to_append, palette):
         axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
         axs[0].set_title(title)
         plt.tight_layout()
-        
+
+
+def get_metadata(one, sessions):
+    metadata = pd.DataFrame(columns=['session', 'lab'], index=range(len(sessions)))
+    for s, session in enumerate(sessions):
+        session_details = one.get_details(session, full=False)
+        metadata['session'][s] = session
+        metadata['lab'][s] = session_details['lab']
+    return metadata
