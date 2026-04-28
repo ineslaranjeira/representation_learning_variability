@@ -5,8 +5,8 @@ import scipy.interpolate as interpolate
 from scipy.signal import butter, filtfilt
 from joblib import Parallel, delayed
 from scipy.fftpack import fft, ifft, fftshift
-from jax import vmap
-import jax.numpy as jnp
+# from jax import vmap
+# import jax.numpy as jnp
 from matplotlib.patches import Rectangle
 from scipy.stats import mode
 
@@ -123,7 +123,6 @@ def download_subjectTables(one, subject=None, trials=True, training=True,
         all_out.append(out_paths)
 
     return all_out[0], all_out[1]
-
 
 
 """
