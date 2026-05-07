@@ -76,10 +76,10 @@ def download_subjectTables(one, subject=None, trials=True, training=True,
             subject_id = one.alyx.rest('subjects', 'list', nickname=subject)[0]['id']
         if trials:
             trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt',
-                                           django=f'object_id,{subject_id}'))
+                                           django=f'object_id,{subject_id}'), default=True)
         if training:
             training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt',
-                                             django=f'object_id,{subject_id}'))
+                                             django=f'object_id,{subject_id}'), default=True)
     else:
         if tag:
             if trials:
@@ -88,9 +88,9 @@ def download_subjectTables(one, subject=None, trials=True, training=True,
                 training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt', tag=tag))
         else:
             if trials:
-                trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt'))
+                trials_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTrials.table.pqt'), default=True)
             if training:
-                training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt'))
+                training_ds.extend(one.alyx.rest('datasets', 'list', name='_ibl_subjectTraining.table.pqt'), default=True)
 
     # Set up the bucket
     s3, bucket_name = aws.get_s3_from_alyx(alyx=one.alyx)
