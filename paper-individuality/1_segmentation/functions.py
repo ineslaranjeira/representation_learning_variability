@@ -389,7 +389,37 @@ def define_trial_types(states_trial_type, trial_type_agg):
     return states_trial_type
 
 
-def rescale_sequence(seq, target_length):
+# def rescale_sequence(seq, target_length):
+#     """
+#     Rescales a categorical sequence to a fixed target length.
+    
+#     - If `target_length` is smaller than the original length, it takes the mode of each bin.
+#     - If `target_length` is larger, it repeats values evenly.
+    
+#     Parameters:
+#         seq (array-like): The original categorical sequence.
+#         target_length (int): The desired length of the output sequence.
+    
+#     Returns:
+#         np.ndarray: The transformed sequence with the specified target length.
+#     """
+#     original_length = len(seq)
+
+#     if original_length == target_length:
+#         return np.array(seq)  # No change needed
+
+#     if target_length < original_length:
+#         # Compression: Split into bins and take mode of each bin
+#         bins = np.array_split(seq, target_length)
+#         # return np.array([mode(b)[0][0] for b in bins])  # Extract mode from result
+#         return np.array([mode(b)[0] for b in bins])  # Extract mode from result
+
+#     else:
+#         # Stretching: Repeat values to fit new size
+#         stretched_indices = np.floor(np.linspace(0, original_length - 1, target_length)).astype(int)
+#         return np.array(seq)[stretched_indices]  # Map stretched indices to original values
+
+def rescale_sequence(seq, target_length, estimator):
     """
     Rescales a categorical sequence to a fixed target length.
     
@@ -412,32 +442,57 @@ def rescale_sequence(seq, target_length):
         # Compression: Split into bins and take mode of each bin
         bins = np.array_split(seq, target_length)
         # return np.array([mode(b)[0][0] for b in bins])  # Extract mode from result
-        return np.array([mode(b)[0] for b in bins])  # Extract mode from result
+        if estimator == 'mode':
+            result = np.array([mode(b)[0] for b in bins])
+        elif estimator == 'mean':
+            result = np.array([np.mean(b) for b in bins])
+        return result  
 
     else:
         # Stretching: Repeat values to fit new size
         stretched_indices = np.floor(np.linspace(0, original_length - 1, target_length)).astype(int)
         return np.array(seq)[stretched_indices]  # Map stretched indices to original values
+    
 
+# def plot_binned_sequence(df_grouped, index, states_to_append, palette):
+#         title = df_grouped['broader_label'][index]
+#         fig, axs = plt.subplots(2, 1, sharex=False, sharey=True, figsize=(5, 2))
+#         axs[0].imshow(np.concatenate([df_grouped['sequence'][index], states_to_append])[None,:],  
+#                 extent=(0, len(np.concatenate([df_grouped['sequence'][index], states_to_append])), 
+#                         0, 1),
+#                 aspect="auto",
+#                 cmap=palette,
+#                 alpha=0.7) 
+#         axs[0].set_xlim([0, len(df_grouped['sequence'][index])])
 
-def plot_binned_sequence(df_grouped, index, states_to_append, palette):
+#         axs[1].imshow(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])[None,:],  
+#                 extent=(0, len(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])), 
+#                         0, 1),
+#                 aspect="auto",
+#                 cmap=palette,
+#                 alpha=0.7) 
+#         axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
+#         axs[0].set_title(title)
+#         plt.tight_layout()
+        
+
+def plot_binned_sequence(df_grouped, index, states_to_append, var_name, palette):
         title = df_grouped['broader_label'][index]
         fig, axs = plt.subplots(2, 1, sharex=False, sharey=True, figsize=(5, 2))
-        axs[0].imshow(np.concatenate([df_grouped['sequence'][index], states_to_append])[None,:],  
-                extent=(0, len(np.concatenate([df_grouped['sequence'][index], states_to_append])), 
+        axs[0].imshow(np.concatenate([df_grouped[var_name+'_sequence'][index], states_to_append])[None,:],  
+                extent=(0, len(np.concatenate([df_grouped[var_name+'_sequence'][index], states_to_append])), 
                         0, 1),
                 aspect="auto",
                 cmap=palette,
                 alpha=0.7) 
-        axs[0].set_xlim([0, len(df_grouped['sequence'][index])])
+        axs[0].set_xlim([0, len(df_grouped[var_name+'_sequence'][index])])
 
-        axs[1].imshow(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])[None,:],  
-                extent=(0, len(np.concatenate([df_grouped['binned_sequence'][index], states_to_append])), 
+        axs[1].imshow(np.concatenate([df_grouped[var_name+'_binned_sequence'][index], states_to_append])[None,:],  
+                extent=(0, len(np.concatenate([df_grouped[var_name+'_binned_sequence'][index], states_to_append])), 
                         0, 1),
                 aspect="auto",
                 cmap=palette,
                 alpha=0.7) 
-        axs[1].set_xlim([0, len(df_grouped['binned_sequence'][index])])
+        axs[1].set_xlim([0, len(df_grouped[var_name+'_binned_sequence'][index])])
         axs[0].set_title(title)
         plt.tight_layout()
-        
