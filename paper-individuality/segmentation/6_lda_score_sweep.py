@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 # --Machine learning and statistics
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from scipy.stats import zscore
 
@@ -250,6 +251,7 @@ def run_lda(design_df, session_syllables, n_component, norm_pop):
 #### LOOP ###
 
 datasets = ['10_bin_raw_16-06-2026', '10_k_10_bin_syllables_17-06-2026', 
+            '9_k_10_bin_syllables_18-06-2026', 
             '8_k_10_bin_syllables_17-06-2026', '6_k_10_bin_syllables_17-06-2026']
 paw_states = [np.nan,  10, 9, 8, 6]
 n_components = np.arange(5, 30, 5)
@@ -327,14 +329,11 @@ for b, n_component in enumerate(n_components):
 # --- Your original plotting code ---
 labels = ['Raw data', '12-state syllables', '11-state syllables', 
           '10-state syllables', '8-state syllables']
-colors = [
-    '#2C3E50',  # Neutral dark slate/black
-    '#0A369D',  # 12-state: Deep, dark blue
-    '#4A7BB0',  # 10-state: Medium steel blue
-    "#66C4F0"   # 8-state: Light sky blue
-]
-colors = ['#1A1A1A', '#990000', '#D9383A',  "#E46D6F", '#F28F8F']
-for d in range(len(datasets)):
+labels = ['Raw data', '12-state syllables', '11-state syllables', 
+          '10-state syllables']
+
+colors = ['#1A1A1A', '#990000', '#D9383A',  "#E46D6F", '#F28F8F'] #, "#F8C2C2"]
+for d in range(len(datasets)-1):
     plt.plot(n_components, scores[d, :], color=colors[d], label=labels[d])
 
     plt.fill_between(n_components, 
