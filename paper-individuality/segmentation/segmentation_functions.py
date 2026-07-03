@@ -1116,15 +1116,25 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
                                             (reduced_design_matrix['Bin']> trial_start*multiplier), 
                                             'correct'] = 0
             # Check choice
+            # choice is -1/0/1 (ONE convention); 0 means no-go (no response given).
+            # All three values are assigned explicitly so no-go trials get a real
+            # label instead of silently staying NaN and being dropped later by any
+            # dropna(subset=[...,'choice',...]) downstream.
             if choice[t] ==1:
                 reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
-                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier),
                                             'choice'] = 'right'
             elif choice[t] == -1:
                 reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
-                                            (reduced_design_matrix['Bin']> trial_start*multiplier), 
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier),
                                             'choice'] = 'left'
-            
+            elif choice[t] == 0:
+                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
+                                            (reduced_design_matrix['Bin']> trial_start*multiplier),
+                                            'choice'] = 'no_go'
+            else:
+                raise ValueError(f"Unexpected choice value {choice[t]!r} at trial {t}")
+
             # Check reaction
             reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= trial_end*multiplier) &
                                             (reduced_design_matrix['Bin']> trial_start*multiplier), 
@@ -1164,22 +1174,25 @@ def align_bin_design_matrix (init, end, event_type_list, session_trials, design_
                                             this_event] = event
             
             # Rename bins so that they are aligned on stimulus onset
+            window_mask = ((reduced_design_matrix['Bin'] <= event*multiplier + end) &
+                            (reduced_design_matrix['Bin'] > event*multiplier + init))
             if event > 0:
-                event_window = reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                                         (reduced_design_matrix['Bin']> event*multiplier + init)]
                 onset_bin = reduced_design_matrix.loc[reduced_design_matrix['Bin']>= event*multiplier, 'Bin']
-                if (len(event_window)>0) & len(onset_bin)>0:
+                # Use plain Python `and` on the two scalar counts, not `&`: bitwise-and
+                # on a bool and an int binds tighter than `>`, so the old
+                # `(len(event_window)>0) & len(onset_bin)>0` silently evaluated to
+                # False whenever len(onset_bin) was even, regardless of whether both
+                # were actually non-empty.
+                if (window_mask.sum() > 0) and (len(onset_bin) > 0):
                     bin = list(onset_bin)[0]
-                    reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) &
-                                            (reduced_design_matrix['Bin']> event*multiplier + init), 
-                                            'new_bin'] = reduced_design_matrix.loc[(reduced_design_matrix['Bin']< event*multiplier + end) & 
-                                            (reduced_design_matrix['Bin']>= event*multiplier + init), 'Bin'] - bin
+                    # Reuse the exact same mask for both the assignment target and the
+                    # source values, so a bin landing exactly on the window boundary
+                    # can't fall into the target but not the source (or vice versa).
+                    reduced_design_matrix.loc[window_mask, 'new_bin'] = reduced_design_matrix.loc[window_mask, 'Bin'] - bin
                 else:
-                    reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) & 
-                                              (reduced_design_matrix['Bin']> event*multiplier + init), 'new_bin'] = np.nan
+                    reduced_design_matrix.loc[window_mask, 'new_bin'] = np.nan
             else:
-                reduced_design_matrix.loc[(reduced_design_matrix['Bin']<= event*multiplier + end) & 
-                                          (reduced_design_matrix['Bin']> event*multiplier + init), 'new_bin'] = np.nan
+                reduced_design_matrix.loc[window_mask, 'new_bin'] = np.nan
                 
     return reduced_design_matrix
 
@@ -1232,20 +1245,33 @@ def states_per_trial_phase(reduced_design_matrix, session_trials, multiplier):
             use_data.loc[(use_data['Bin'] <= iti_end_correct[t]*multiplier) & 
                             (use_data['Bin'] > iti_init[t]*multiplier), 'label'] = 'ITI'
         # Move
+        # choice is -1/0/1; 0 is no-go and needs its own label, same reasoning as
+        # the choice-column fix in align_bin_design_matrix - otherwise no-go trials
+        # silently get no label for this phase instead of an explicit one.
         if session_trials['choice'][t] == -1:
-            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) &
                          (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Left choice'
         elif session_trials['choice'][t] == 1.:
-            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) & 
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) &
                          (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'Right choice'
-            
-        # React        
+        elif session_trials['choice'][t] == 0:
+            use_data.loc[(use_data['Bin'] <= move_end[t]*multiplier) &
+                         (use_data['Bin'] > move_init[t]*multiplier), 'label'] = 'No go'
+
+        # React
+        # signed_contrast == 0 (a real, common condition - ~12% of trials in the
+        # task design) previously fell through both branches and got no label for
+        # this phase at all, even though the trial and its contrast value survive
+        # everywhere else downstream.
         if prepro(session_trials)['signed_contrast'][t] < 0:
-            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) &
                          (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus left'
         elif prepro(session_trials)['signed_contrast'][t] > 0:
-            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) & 
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) &
                          (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus right'
+        elif prepro(session_trials)['signed_contrast'][t] == 0:
+            use_data.loc[(use_data['Bin'] <= rt_end[t]*multiplier) &
+                         (use_data['Bin'] > rt_init[t]*multiplier), 'label'] = 'Stimulus zero'
     return use_data
 
 
@@ -1256,6 +1282,8 @@ def broader_label(df):
     # df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Stimulus'
     df.loc[df['broader_label']=='Stimulus right', 'broader_label'] = 'Choice'
     df.loc[df['broader_label']=='Stimulus left', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='Stimulus zero', 'broader_label'] = 'Choice'
+    df.loc[df['broader_label']=='No go', 'broader_label'] = 'Choice'
     df.loc[df['broader_label']=='Quiescence', 'broader_label'] = 'Quiescence'
     df.loc[df['broader_label']=='Pre-quiescence', 'broader_label'] = 'Pre-quiescence'
     df.loc[df['broader_label']=='Left choice', 'broader_label'] = 'Choice'
