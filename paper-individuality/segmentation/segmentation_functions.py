@@ -804,7 +804,7 @@ def get_bits_LL_kappa_Lag(all_lls, all_baseline_lls, design_matrix, num_train_ba
     # Reshape
     for k_index, k in enumerate(kappas):
         for lag_index, l in enumerate(Lags):
-            all_LL[k_index, lag_index :] = all_lls[l][k]
+            all_LL[k_index, lag_index, :] = all_lls[l][k]
             all_baseline_LL[k_index, lag_index, :] = all_baseline_lls[l][k]
         
     # Get size of folds
