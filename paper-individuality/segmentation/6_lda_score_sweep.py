@@ -118,16 +118,21 @@ def encode_data(filename, all_sequences, n_paw_states):
     elif 'trial' in filename:
         design_df = all_sequences.dropna()
         design_df['choice'] = design_df['choice'].map({'left': 0, 'right': 1}).astype(float)
+        design_df['feedback'] = design_df['feedback'].map({'incorrect': 0, 'correct': 1}).astype(float)
         bias_df = (design_df[design_df['contrast'] == 0]
                 .groupby(['session', 'block'])['choice'].mean()
                 .unstack(level='block'))
         bias_df['bias'] = bias_df[0.8] - bias_df[0.2]
         merged = (design_df.groupby(['session', 'mouse_name'])
-                .agg({'reaction': 'median', 'elongation': 'median', 'correct': 'mean', 'choice': 'mean'})
+                .agg({'trial_id': 'count', 'reaction': 'median', 
+                    'elongation': 'median', 'feedback': 'mean', 
+                    'choice': 'mean', 'p_state1':'mean'
+                    })
                 .merge(bias_df['bias'], on='session', how='left'))
 
         merged['log_reaction'], merged['log_elongation'] = np.log(merged['reaction']), np.log(merged['elongation'])
-        features = ['correct', 'choice', 'log_reaction', 'log_elongation', 'bias']
+        features = ['trial_id', 'feedback', 'choice', 'p_state1',
+                    'log_reaction', 'log_elongation', 'bias']
         # use_format = merged[features].to_numpy()
         # use_format = zscore(use_format, axis=0, nan_policy='omit')
         clean_df = merged[features].dropna()
@@ -135,7 +140,6 @@ def encode_data(filename, all_sequences, n_paw_states):
         use_format = zscore(use_format, axis=0)
         
         design_df = clean_df.reset_index().merge(design_df[['mouse_name', 'session']], on='session').drop_duplicates()
-        
         
     return use_format, design_df
 
