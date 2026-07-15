@@ -5,8 +5,8 @@ import scipy.interpolate as interpolate
 from scipy.signal import butter, filtfilt
 from joblib import Parallel, delayed
 from scipy.fftpack import fft, ifft, fftshift
-# from jax import vmap
-# import jax.numpy as jnp
+from jax import vmap
+import jax.numpy as jnp
 from matplotlib.patches import Rectangle
 from sklearn import mixture
 from scipy.stats import mode
@@ -80,7 +80,39 @@ def merge_licks(poses, features, common_fs):
 
     combined_licks = np.maximum(lick_trace_left, lick_trace_right)
 
-    return t_common, combined_licks 
+    return t_common, combined_licks
+
+
+def get_left_licks(poses, features, common_fs):
+    # Single-camera version of merge_licks: only the left camera is available.
+
+    # Define total duration
+    duration_sec = list(poses['leftCamera']['times'])[-1]  # in seconds
+
+    # Set common sampling rate (high rather than low)
+    t_common = np.arange(0, duration_sec, 1/common_fs)  # uniform timestamps
+
+    lick_trace_left = np.zeros_like(t_common, dtype=int)
+
+    left_lick_times = get_feature_event_times(poses['leftCamera'], poses['leftCamera']['times'], features)
+
+    # Round licks to nearest timestamp in t_common
+    left_indices = np.searchsorted(t_common, left_lick_times)
+
+    # Set licks to 1
+    lick_trace_left[left_indices[left_indices < len(t_common)]] = 1
+
+    return t_common, lick_trace_left
+
+
+def get_frame_rate(times, standard_rates=(30, 60, 150)):
+    """
+    Estimate camera frame rate (Hz) from timestamp differences and snap the
+    (noisy) estimate to the nearest standard acquisition rate. Used for the
+    single-camera setup where videos can be recorded at either 30 or 60 Hz.
+    """
+    fr = 1 / np.nanmean(np.diff(times))
+    return min(standard_rates, key=lambda r: abs(r - fr))
 
 
 def resample_common_time(reference_time, timestamps, data, kind, fill_gaps=None):

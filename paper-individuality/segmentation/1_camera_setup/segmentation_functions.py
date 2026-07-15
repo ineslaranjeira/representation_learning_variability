@@ -1404,3 +1404,93 @@ def plot_binned_sequence(df_grouped, index, states_to_append, var_name, palette)
         axs[1].set_xlim([0, len(df_grouped[var_name+'_binned_sequence'][index])])
         axs[0].set_title(title)
         plt.tight_layout()
+
+
+def process_design_matrix(session, one, data_path, mouse_name=None):
+    """
+    Build and save the wheel-velocity design matrix + trials table for one session.
+
+    Loads wheel velocity (via SessionLoader), resamples it to a common 30 Hz grid,
+    trims to after the first go cue, and writes two parquet files to `data_path`:
+        design_matrix_<eid>_<mouse>   (columns: Bin, avg_wheel_vel)
+        session_trials_<eid>_<mouse>
+
+    Parameters
+    ----------
+    session : str
+        Session eid.
+    one : ONE
+        An initialised ONE instance.
+    data_path : str
+        Directory to write the design matrix and trials files into.
+    mouse_name : str, optional
+        Subject nickname. If None, it is derived from the session path.
+
+    Returns
+    -------
+    str or None
+        The mouse_name on success, None if the session data was missing / failed.
+    """
+    # Lazy imports so the module doesn't hard-depend on brainbox
+    import gc
+    from brainbox.io.one import SessionLoader
+
+    file_path = one.eid2path(session)
+    if mouse_name is None:
+        parts = file_path.parts
+        # Robust to different path prefixes: subject folder follows 'Subjects'
+        if 'Subjects' in parts:
+            mouse_name = parts[parts.index('Subjects') + 1]
+        else:
+            mouse_name = file_path.parts[-3]
+
+    """ LOAD VARIABLES """
+    sl = SessionLoader(eid=session, one=one)
+    try:
+        sl.load_session_data(trials=True, wheel=True, motion_energy=False)
+
+        # Check if data is available
+        if np.sum(sl.data_info['is_loaded']) >= 1:
+
+            # Wheel
+            wheel = sl.wheel
+            wheel_t = np.asarray(wheel['times'], dtype=np.float64)
+            wheel_vel = wheel['velocity'].astype(np.float32)
+
+            # Common resampling window
+            onset = wheel_t.min()
+            offset = wheel_t.max()
+            fs = 30
+            ref_t = np.arange(onset, offset, 1 / fs, dtype=np.float64)
+
+            # Restrict to time window
+            mask = (wheel_t >= onset) & (wheel_t <= offset)
+            wheel_t, wheel_vel = wheel_t[mask], wheel_vel[mask]
+
+            # Resample
+            wh_down, rt = resample_common_time(ref_t, wheel_t, wheel_vel, kind='linear')
+
+            # Create design matrix
+            design_matrix = pd.DataFrame({'Bin': rt, 'avg_wheel_vel': wh_down})
+
+            # Trim to after the first go cue
+            session_trials = sl.trials
+            session_start = list(session_trials['goCueTrigger_times'])[0]
+            design_matrix = design_matrix.loc[(design_matrix['Bin'] > session_start)]
+
+            """ SAVE DATA """
+            filename = data_path + "design_matrix_" + str(session) + '_' + mouse_name
+            design_matrix.to_parquet(filename, compression='gzip')
+
+            filename = data_path + "session_trials_" + str(session) + '_' + mouse_name
+            session_trials.to_parquet(filename, compression='gzip')
+
+            del design_matrix, session_trials, sl
+            gc.collect()
+            return mouse_name
+        else:
+            print('Data missing for session ' + str(session))
+            return None
+    except Exception as e:
+        print(f"Failed to load session {session}. Error: {e}")
+        return None
