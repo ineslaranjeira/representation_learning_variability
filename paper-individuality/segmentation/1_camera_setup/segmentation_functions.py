@@ -284,9 +284,9 @@ def event_locked_signal(t, v, events, window=(-.5,1)):
 SCRIPT 2.1: DESIGN MATRIX INSPECTION
 """
 
-def plot_whisker_psth(mat, design_matrix, trial_df, event, save_path):
+def plot_whisker_psth(mat, design_matrix, trial_df, event, var, save_path):
 
-    X, tscale = event_locked_signal(np.array(design_matrix['Bin']), np.array(design_matrix['avg_whisker_me']), trial_df[event])
+    X, tscale = event_locked_signal(np.array(design_matrix['Bin']), np.array(design_matrix[var]), trial_df[event])
     m = np.nanmean(X, axis=0)
     s = np.nanstd(X, axis=0) / np.sqrt(np.sum(~np.isnan(X), axis=0))
     plt.plot(tscale, m)
