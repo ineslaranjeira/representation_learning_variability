@@ -151,7 +151,8 @@ def per_trial_table(df):
 
 def build_design_matrix(df, kernels=DEFAULT_KERNELS, mask_peritrial=True,
                         mask_pre=0.5, mask_post=2.0, motor_lags=True,
-                        motor_continuous=True):
+                        motor_continuous=True, continuous_features="speed",
+                        continuous_smooth=None):
     """Build the Musall-style design matrix for a single session.
 
     Parameters
@@ -240,15 +241,54 @@ def build_design_matrix(df, kernels=DEFAULT_KERNELS, mask_peritrial=True,
         y = df[ycol].values.astype(float)
         return np.hypot(np.diff(x, prepend=x[0]), np.diff(y, prepend=y[0]))
 
+    def _paw_velocity(col):
+        # signed per-axis velocity (px/bin). Roughly symmetric, so NOT log1p'd
+        # (log1p of negatives -> NaN); z-scoring downstream handles the scale.
+        v = df[col].values.astype(float)
+        return np.diff(v, prepend=v[0])
+
     if motor_continuous:
-        motor_base["motor_continuous"] = {
-            "l_paw_speed": np.log1p(_paw_speed("l_paw_x", "l_paw_y")),
-            "r_paw_speed": np.log1p(_paw_speed("r_paw_x", "r_paw_y")),
-            "whisker_me":  df["whisker_me"].values.astype(float),
-            "lick_count":  np.log1p(df["Lick count"].values.astype(float)),
-        }
+        if continuous_features == "velocity":
+            # per-axis signed paw velocities (l/r x/y) -- keeps movement DIRECTION,
+            # matching the syllables-notebook continuous set. More regressors and a
+            # bit more tracking-gap bin loss than 'speed'.
+            motor_base["motor_continuous"] = {
+                "l_paw_x_vel": _paw_velocity("l_paw_x"),
+                "l_paw_y_vel": _paw_velocity("l_paw_y"),
+                "r_paw_x_vel": _paw_velocity("r_paw_x"),
+                "r_paw_y_vel": _paw_velocity("r_paw_y"),
+                "whisker_me":  df["whisker_me"].values.astype(float),
+                "lick_count":  np.log1p(df["Lick count"].values.astype(float)),
+            }
+        else:  # "speed" (default, paper-faithful): speed magnitude per paw
+            motor_base["motor_continuous"] = {
+                "l_paw_speed": np.log1p(_paw_speed("l_paw_x", "l_paw_y")),
+                "r_paw_speed": np.log1p(_paw_speed("r_paw_x", "r_paw_y")),
+                "whisker_me":  df["whisker_me"].values.astype(float),
+                "lick_count":  np.log1p(df["Lick count"].values.astype(float)),
+            }
     # else: leave motor_continuous empty (states-only encoding; avoids collinearity
     # and the tracking-gap bin loss from paw signals).
+
+    # optional temporal SMOOTHING of the continuous signals (alternative to lags):
+    # a symmetric Gaussian (sigma = `continuous_smooth` seconds) spreads each analog
+    # signal over time so a single column can capture a neuron's temporally-extended
+    # response to movement -- without the multi-column lag basis, and WITHOUT touching
+    # the discrete states. NaN-aware so tracking gaps don't bleed into neighbours.
+    if motor_continuous and continuous_smooth:
+        from scipy.ndimage import gaussian_filter1d
+        sig_bins = continuous_smooth * FS
+        def _nan_smooth(s):
+            v = np.asarray(s, dtype=float)
+            m = np.isfinite(v).astype(float)
+            v0 = np.where(np.isfinite(v), v, 0.0)
+            num = gaussian_filter1d(v0, sig_bins, mode="nearest")
+            den = gaussian_filter1d(m, sig_bins, mode="nearest")
+            out = np.divide(num, den, out=np.full_like(num, np.nan), where=den > 0)
+            out[m == 0] = np.nan          # keep original gaps as NaN (dropped downstream)
+            return out
+        motor_base["motor_continuous"] = {
+            k: _nan_smooth(v) for k, v in motor_base["motor_continuous"].items()}
 
     # --- expand motor signals into the design matrix ---
     # `motor_lags` selects which motor group(s) get a temporal lag basis:
@@ -509,23 +549,47 @@ def shuffle_null(X, Y, groups, trial_ids, alpha, n_shuffles=100, n_splits=5):
 # ---------------------------------------------------------------------------
 # One-call per-session pipeline (for scaling across sessions)
 # ---------------------------------------------------------------------------
-def fit_session(df, motor_lags=True, motor_continuous=True, n_shuffles=50, n_splits=5):
+def fit_session(df, motor_lags=True, motor_continuous=True, continuous_features="speed",
+                continuous_smooth=None, unit="neuron", n_shuffles=50, n_splits=5):
     """Build design, fit + partition, and (optionally) run the shuffle null for a
-    single session. Returns a per-neuron results DataFrame (self-contained columns,
+    single session. Returns a per-UNIT results DataFrame (self-contained columns,
     safe to concatenate / write to parquet).
 
-    For the scaled encoding analysis use motor_continuous=False (task + motor states
-    only): avoids task/motor collinearity and the paw tracking-gap bin loss.
+    unit : "neuron"  -> one row per neuron (each `_spike_count` column is a target).
+           "region"  -> spike counts averaged across neurons within each Beryl area
+                        first, so one row per area. Region-averaging cancels
+                        independent per-neuron noise, so region cvR2 runs
+                        systematically higher and is NOT directly comparable to the
+                        per-neuron numbers -- use it to ask "does this region encode
+                        X", not "what fraction of neurons encode X".
+    continuous_features : "speed" (paper-faithful, per-paw speed magnitude) or
+                        "velocity" (per-axis signed l/r x/y velocities).
+
+    For the scaled STATES-ONLY encoding analysis use motor_continuous=False: avoids
+    task/motor collinearity and the paw tracking-gap bin loss.
     """
     X, groups, trial_ids, keep = build_design_matrix(
-        df, motor_lags=motor_lags, motor_continuous=motor_continuous)
+        df, motor_lags=motor_lags, motor_continuous=motor_continuous,
+        continuous_features=continuous_features, continuous_smooth=continuous_smooth)
     spike_cols = [c for c in df.columns if c.endswith("_spike_count")]
-    Y = df.loc[keep, spike_cols].values.astype(float)
+    Y_df = df.loc[keep, spike_cols].astype(float)
+
+    if unit == "region":
+        areas = [c.split("_neuron_")[0] for c in spike_cols]
+        # group columns (neurons) by area and average -> one target per area
+        Y_df = Y_df.T.groupby(areas).mean().T
+        unit_labels = list(Y_df.columns)
+        area_labels = list(Y_df.columns)
+    else:  # "neuron"
+        unit_labels = spike_cols
+        area_labels = [c.split("_neuron_")[0] for c in spike_cols]
+    Y = Y_df.values.astype(float)
 
     res = fit_and_partition(X, Y, groups, trial_ids, n_splits=n_splits)
     alpha = res.attrs["best_alpha"]
-    res.insert(0, "neuron", spike_cols)
-    res.insert(1, "area", [c.split("_neuron_")[0] for c in spike_cols])
+    res.insert(0, "neuron", unit_labels)
+    res.insert(1, "area", area_labels)
+    res.insert(2, "unit", unit)
 
     if n_shuffles:
         _, pvals, _ = shuffle_null(X, Y, groups, trial_ids, alpha,
