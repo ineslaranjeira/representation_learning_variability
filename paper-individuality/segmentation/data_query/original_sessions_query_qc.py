@@ -1,5 +1,5 @@
 """
-1. Query brainwide map behavioral sessions and filter based on qc - no need for neural QC or available insertions
+1. Query brainwide map sessions and filter based on qc
 @author: Ines
 """
 #%%
@@ -16,41 +16,43 @@ one = ONE(mode='remote')
 
 #%%
 # THIS CELL USES A QUERY VERY SIMILAR TO THE BWM PAPER BUT WITHOUT A DATE CUTOFF OR REQUIREMENT FOR PROBE ALIGNMENT QC
-# https://github.com/int-brain-lab/paper-brain-wide-map/blob/4b9d47f4444c5f4b91026588218e4d5869aff5a9/brainwidemap/bwm_loading.py#L21
-# Unlike the original BWM query, this queries the 'sessions' endpoint directly instead of 'insertions',
-# so sessions are kept even if they have no (fully QC'd) probe insertion.
+# https://github.com/int-brain-lab/paper-brain-wide-map/blob/4b9d47f4444c5f4b91026588218e4d5869aff5a9/brainwidemap/bwm_loading.py#L21 
 
 base_query = (
-    'projects__name__icontains,ibl_neuropixel_brainwide_01,'
-    '~json__IS_MOCK,True,'
-    'qc__lt,50,'
-    'extended_qc__behavior,1,'
+    'session__projects__name__icontains,ibl_neuropixel_brainwide_01,'
+    '~session__json__IS_MOCK,True,'
+    'session__qc__lt,50,'
+    'session__extended_qc__behavior,1,'
+    '~json__qc,CRITICAL,'  # Should clarify these
+    'json__extended_qc__alignment_count__gt,0,'  # No need for alignment resolved
 )
 qc_task = (
-    '~extended_qc___task_stimOn_goCue_delays__lt,0.9,'
-    '~extended_qc___task_response_feedback_delays__lt,0.9,'
-    '~extended_qc___task_wheel_move_before_feedback__lt,0.9,'
-    '~extended_qc___task_wheel_freeze_during_quiescence__lt,0.9,'
-    '~extended_qc___task_error_trial_event_sequence__lt,0.9,'
-    '~extended_qc___task_correct_trial_event_sequence__lt,0.9,'
-    '~extended_qc___task_reward_volumes__lt,0.9,'
-    '~extended_qc___task_reward_volume_set__lt,0.9,'
-    '~extended_qc___task_stimulus_move_before_goCue__lt,0.9,'
-    '~extended_qc___task_audio_pre_trial__lt,0.9')
+    '~session__extended_qc___task_stimOn_goCue_delays__lt,0.9,'
+    '~session__extended_qc___task_response_feedback_delays__lt,0.9,'
+    '~session__extended_qc___task_wheel_move_before_feedback__lt,0.9,'
+    '~session__extended_qc___task_wheel_freeze_during_quiescence__lt,0.9,'
+    '~session__extended_qc___task_error_trial_event_sequence__lt,0.9,'
+    '~session__extended_qc___task_correct_trial_event_sequence__lt,0.9,'
+    '~session__extended_qc___task_reward_volumes__lt,0.9,'
+    '~session__extended_qc___task_reward_volume_set__lt,0.9,'
+    '~session__extended_qc___task_stimulus_move_before_goCue__lt,0.9,'
+    '~session__extended_qc___task_audio_pre_trial__lt,0.9')
 
 marked_pass = (
-    'extended_qc___experimenter_task,PASS')  # This overwrides the previous Qc in case an experimented manually marked PASS
+    'session__extended_qc___experimenter_task,PASS')  # What is this?
 
-sessions = list(one.alyx.rest('sessions', 'list', django=base_query + qc_task))
-sessions.extend(list(one.alyx.rest('sessions', 'list', django=base_query + marked_pass)))
-print(len(sessions))
+insertions = list(one.alyx.rest('insertions', 'list', django=base_query + qc_task))
+insertions.extend(list(one.alyx.rest('insertions', 'list', django=base_query + marked_pass)))
+print(len(insertions))
 
 bwm_df = pd.DataFrame({
-    'eid': np.array([s['id'] for s in sessions]),
-    'session_number': np.array([s['number'] for s in sessions]),
-    'date': np.array([parser.parse(s['start_time']).date() for s in sessions]),
-    'subject': np.array([s['subject'] for s in sessions]),
-    'lab': np.array([s['lab'] for s in sessions]),
+    'pid': np.array([i['id'] for i in insertions]),
+    'eid': np.array([i['session'] for i in insertions]),
+    'probe_name': np.array([i['name'] for i in insertions]),
+    'session_number': np.array([i['session_info']['number'] for i in insertions]),
+    'date': np.array([parser.parse(i['session_info']['start_time']).date() for i in insertions]),
+    'subject': np.array([i['session_info']['subject'] for i in insertions]),
+    'lab': np.array([i['session_info']['lab'] for i in insertions]),
 }).sort_values(by=['lab', 'subject', 'date', 'eid'])
 bwm_df.drop_duplicates(inplace=True)
 bwm_df.reset_index(inplace=True, drop=True)
@@ -80,14 +82,11 @@ final_qc = ext_qc.loc[(ext_qc['_lightningPoseLeft_lick_detection'].isin(['PASS']
 # #%%
 # Save to google drive
 gdrive_path = "/Users/ineslaranjeira/Google Drive/O meu disco/CCU/PhD Project/paper-individuality/data/segmentation/"
-gdrive_path = "/home/ines/repositories/representation_learning_variability/paper-individuality/segmentation/data_query/"
 # Ensure the directory exists
 os.makedirs(gdrive_path, exist_ok=True)
 # Save your file
-filename = 'bwm_qc_new_'
+filename = 'bwm_qc_'
 now = datetime.now() # current date and time
 date_time = now.strftime("%m-%d-%Y")
 file_path = os.path.join(gdrive_path, filename + date_time)
 final_qc.to_pickle(file_path, compression='gzip')  
-
-# %%
