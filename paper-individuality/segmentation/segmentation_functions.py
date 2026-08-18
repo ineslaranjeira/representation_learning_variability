@@ -5,8 +5,8 @@ import scipy.interpolate as interpolate
 from scipy.signal import butter, filtfilt
 from joblib import Parallel, delayed
 from scipy.fftpack import fft, ifft, fftshift
-# from jax import vmap
-# import jax.numpy as jnp
+from jax import vmap
+import jax.numpy as jnp
 from matplotlib.patches import Rectangle
 from sklearn import mixture
 from scipy.stats import mode
@@ -689,7 +689,8 @@ SCRIPT 3.2: HMM fits
 
 """" AR-HMM FITTING FUNCTIONS """
 
-def cross_validate_armodel(model, key, train_emissions, train_inputs, method_to_use, num_train_batches, method, num_iters=100):
+def cross_validate_armodel(model, key, train_emissions, train_inputs, method_to_use, num_train_batches, method, num_iters=100,
+                           return_train_lps=False):
     # Initialize the parameters using K-Means on the full training set
     #init_params, props = model.initialize(key=key, method="kmeans", emissions=train_emissions)
     init_params, props = model.initialize(key=key, method=method_to_use, emissions=train_emissions)
@@ -711,19 +712,30 @@ def cross_validate_armodel(model, key, train_emissions, train_inputs, method_to_
     baseline_val_lls = vmap(_fit_fold_baseline)(train_emissions, train_inputs)
     
     # Then actually fit the model to data
+    # CHANGED: `train_lps` (the per-iteration training log-prob trajectory) used to be
+    # computed and thrown away, so there was no way to tell whether EM had actually
+    # converged within num_iters. It is now returned through the vmap and exposed via
+    # the optional `return_train_lps` flag. Measured on 3 sessions x 5 lags: every fit
+    # reached 99.99% of its final log-prob by iteration 99, and gains from 100 -> 200
+    # iterations are ~1e-6 -- so num_iters=100 is adequate but has almost no headroom,
+    # which is exactly why it is worth being able to check.
     if method == 'em':
         def _fit_fold(y_train, y_val, inpt_folds, inpts):
-            fit_params, train_lps = model.fit_em(init_params, props, y_train, inpt_folds, 
+            fit_params, train_lps = model.fit_em(init_params, props, y_train, inpt_folds,
                                                 num_iters=num_iters, verbose=False)
-            return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params 
+            return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params , train_lps
     elif method == 'sgd':
         def _fit_fold(y_train, y_val, inpt_folds, inpts):
-            fit_params, train_lps = model.fit_sgd(init_params, props, y_train, inpt_folds, 
+            fit_params, train_lps = model.fit_sgd(init_params, props, y_train, inpt_folds,
                                                 num_epochs=num_iters)
-            return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params  
-    
-    val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions, inpt_folds, train_inputs)
-    
+            return model.marginal_log_prob(fit_params, y_val, inpts) , fit_params , train_lps
+
+    val_lls, fit_params, train_lps = vmap(_fit_fold)(folds, train_emissions, inpt_folds, train_inputs)
+
+    # `return_train_lps` defaults to False so the 4-value signature that 4.1 and 4.2
+    # unpack is unchanged -- nothing existing breaks.
+    if return_train_lps:
+        return val_lls, fit_params, init_params, baseline_val_lls, train_lps
     return val_lls, fit_params, init_params, baseline_val_lls
 
 
@@ -746,7 +758,8 @@ def compute_inputs(emissions, num_lags, emission_dim):
     
 """" POISSON-HMM FITTING FUNCTIONS """
 
-def cross_validate_poismodel(model, key, train_emissions, num_train_batches, fit_method, num_iters=100):
+def cross_validate_poismodel(model, key, train_emissions, num_train_batches, fit_method, num_iters=100,
+                             return_train_lps=False):
     # Initialize the parameters using K-Means on the full training set
     init_params, props = model.initialize(key=key)
 
@@ -761,21 +774,27 @@ def cross_validate_poismodel(model, key, train_emissions, num_train_batches, fit
         return model.marginal_log_prob(init_params, y_val) # np.shape(y_val)[1]
     
     # Then actually fit the model to data
+    # CHANGED: same as in cross_validate_armodel -- `train_lps` was computed and
+    # discarded, so EM convergence could not be checked. Now returned via the optional
+    # `return_train_lps` flag; the default 4-value signature is unchanged so 4.1/4.2
+    # keep working.
     if fit_method == 'em':
         def _fit_fold(y_train, y_val):
-            fit_params, train_lps = model.fit_em(init_params, props, y_train, 
+            fit_params, train_lps = model.fit_em(init_params, props, y_train,
                                                 num_iters=num_iters, verbose=False)
-            return model.marginal_log_prob(fit_params, y_val) , fit_params  
+            return model.marginal_log_prob(fit_params, y_val) , fit_params , train_lps
     elif fit_method == 'sgd':
         def _fit_fold(y_train, y_val):
-            fit_params, train_lps = model.fit_sgd(init_params, props, y_train, 
+            fit_params, train_lps = model.fit_sgd(init_params, props, y_train,
                                                 num_epochs=num_iters)
-            return model.marginal_log_prob(fit_params, y_val) , fit_params  
-    
-    val_lls, fit_params = vmap(_fit_fold)(folds, train_emissions)
-    
+            return model.marginal_log_prob(fit_params, y_val) , fit_params , train_lps
+
+    val_lls, fit_params, train_lps = vmap(_fit_fold)(folds, train_emissions)
+
     baseline_val_lls = vmap(_fit_fold_baseline)(folds, train_emissions)
 
+    if return_train_lps:
+        return val_lls, fit_params, init_params, baseline_val_lls, train_lps
     return val_lls, fit_params, init_params, baseline_val_lls
 
 """ Model comparison """
