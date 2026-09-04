@@ -1,0 +1,71 @@
+== dataset ==
+332 sessions, 101 mice, 11 labs, median 74 min/session
+76 mice with >=2 sessions (307 sessions)
+
+== 0. camera-noise confound ==
+jitter (high-frequency tracking residual, common spatial units):
+  left  paw: 1.672   right paw: 3.163   ratio R/L = 1.95
+  LI[frame-difference speed (8 Hz low-passed)] mean=-0.0985  r with LI[jitter] = +0.519 (p=2.6e-24)
+  LI[0.5-8 Hz wavelet band power           ] mean=-0.0755  r with LI[jitter] = +0.900 (p=3.0e-121)
+  LI[32 Hz power (pure noise proxy)        ] mean=-0.4818  r with LI[jitter] = +0.922 (p=1.0e-137)
+
+== 1. population-level bias (mouse-averaged, so each animal counts once) ==
+  amplitude: 0.5-8 Hz band power                       mean=-0.0982 sd=0.2196 n=101  t=-4.49 p=1.89e-05  wilcoxon p=1.80e-06
+  amplitude: median speed                              mean=-0.1054 sd=0.1427 n=101  t=-7.42 p=3.87e-11  wilcoxon p=1.29e-11
+  scale-free: bout rate at matched duty cycle          mean=-0.0170 sd=0.0856 n=101  t=-1.99 p=4.92e-02  wilcoxon p=1.19e-02
+  scale-free: bout duration at matched duty cycle      mean=+0.0170 sd=0.0856 n=101  t=+1.99 p=4.92e-02  wilcoxon p=1.19e-02
+  temporal: cross-correlation lag (s, + = left leads)  mean=-0.0039 sd=0.0323 n=101  t=-1.21 p=2.27e-01  wilcoxon p=2.67e-01
+  bilateral coupling (peak xcorr)                      mean=+0.4915 sd=0.1037 n=101  t=+47.61 p=1.59e-70  wilcoxon p=2.67e-18
+  NB: a nonzero mean here is NOT evidence of biology -- see step 0.
+
+== 2. is paw bias a stable individual trait? ==
+split-half reliability within session (ceiling on any across-session correlation):
+  li_bandpow first vs second half: r=0.889 (p=8.1e-114, n=332)
+
+ICC(1): between-mouse variance / total, sessions nested in mice
+metric                 n_sess n_mice     ICC      F   p_perm  null95
+li_bandpow                307     76   0.815  18.67   0.0001   0.079
+li_spmed                  307     76   0.597   6.95   0.0001   0.087
+li_boutrate               307     76   0.512   5.23   0.0001   0.084
+li_boutdur                307     76   0.512   5.23   0.0001   0.085
+lag_s                     307     76   0.453   4.34   0.0001   0.086
+xcorr_peak                307     76   0.790  16.14   0.0001   0.077
+li_jitter                 307     76   0.824  19.82   0.0001   0.083
+
+sign consistency: mice whose every session falls on the same side of the population median
+  li_bandpow      55.2% of 58 mice (chance 13.0%)  p_perm=0.0001
+  li_boutrate     39.7% of 58 mice (chance 13.0%)  p_perm=0.0001
+  lag_s           55.2% of 58 mice (chance 24.5%)  p_perm=0.0001
+
+jitter-corrected amplitude bias (li_bandpow with li_jitter regressed out):
+  ICC=0.772  p_perm=0.0001  (n=307 sessions, 76 mice)
+
+== 3. lab as an alternative explanation ==
+  li_bandpow     by-session F=3.42 p=2.88e-04 (11 labs) | by-mouse F=0.73 p=6.94e-01
+  li_boutrate    by-session F=4.46 p=6.75e-06 (11 labs) | by-mouse F=1.57 p=1.28e-01
+  lag_s          by-session F=3.75 p=8.77e-05 (11 labs) | by-mouse F=0.92 p=5.18e-01
+  mouse-level ICC after centring each metric within its lab (removes any between-lab offset):
+    li_bandpow     ICC= 0.789  p_perm=0.0001  (307 sessions, 76 mice)
+    li_boutrate    ICC= 0.448  p_perm=0.0001  (307 sessions, 76 mice)
+    lag_s          ICC= 0.385  p_perm=0.0001  (307 sessions, 76 mice)
+
+== 4. which timescales carry the bias? (mouse means) ==
+  freq           LI power      LI spectral shape  ICC(shape)
+   0.5  -0.0428 p=4.9e-02    +0.0590 p=3.4e-07    0.669 p=0.0005
+   1.0  -0.0500 p=2.4e-02    +0.0518 p=6.1e-12    0.612 p=0.0005
+   2.0  -0.0609 p=7.6e-03    +0.0390 p=5.5e-19    0.691 p=0.0005
+   4.0  -0.0905 p=1.7e-04    +0.0064 p=1.2e-01    0.673 p=0.0005
+   8.0  -0.1865 p=2.6e-13    -0.0947 p=8.4e-24    0.662 p=0.0005
+
+== 5. does paw bias relate to the task? (mouse level) ==
+  li_bandpow       vs frac_right_choice  r=+0.226 rho=+0.306 p_perm=0.0244 (n=101 mice)
+  li_bandpow       vs frac_right_zero    r=+0.189 rho=+0.259 p_perm=0.0580 (n=101 mice)
+  li_bandpow       vs wheel_bias         r=+0.407 rho=+0.483 p_perm=0.0004 (n=101 mice)
+  li_bandpow       vs perf               r=+0.010 rho=+0.008 p_perm=0.9278 (n=101 mice)
+  li_boutrate      vs frac_right_zero    r=-0.020 rho=-0.053 p_perm=0.8460 (n=101 mice)
+  lag_s            vs frac_right_zero    r=-0.150 rho=-0.114 p_perm=0.1244 (n=101 mice)
+  xcorr_peak       vs perf               r=-0.035 rho=-0.039 p_perm=0.7221 (n=101 mice)
+  li_spmed_wheel   vs frac_right_zero    r=+0.083 rho=+0.148 p_perm=0.4187 (n=101 mice)
+  li_bandpow       vs li_jitter          r=+0.898 rho=+0.875 p_perm=0.0002 (n=101 mice)
+
+wrote per-mouse table: /tmp/claude-1000/-home-ines-repositories-representation-learning-variability/0f9ff46e-f7e2-4bff-86f8-cb2ca583be06/scratchpad/paw_bias_sessions_per_mouse.csv

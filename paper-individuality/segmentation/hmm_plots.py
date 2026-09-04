@@ -20,7 +20,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from hmm_functions import dwell_times, load_fit_variable, prepare_batches, MODELS
+from hmm_functions import (dwell_times, load_fit_variable, prepare_batches, MODELS,
+                           coarsen, BIN_AGG)
 
 SURFACE = '#fcfcfb'
 INK, INK_2, INK_MUTED = '#0b0b0b', '#52514e', '#87867f'
@@ -94,10 +95,20 @@ def load_result(save_path, var, mouse_name=None, session=None, eid=None):
 
 
 def load_signal(data_path, session, mouse_name, var, zsc, num_train_batches, model,
-                n_states=None):
-    """The signal exactly as the fit saw it, so it is aligned frame for frame."""
-    dm = load_fit_variable(data_path, session, mouse_name, [var], zsc,
-                           binarise=MODELS[model]['binarise'])
+                n_states=None, bin_frames=1):
+    """The signal exactly as the fit saw it, so it is aligned sample for sample.
+
+    `bin_frames` must match the fit: a fit run on 100 ms bins stores its states at BIN
+    resolution, so the signal has to be coarsened the same way or the two are neither
+    the same length nor the same time base. Read it from the fit's own config rather
+    than passing it by hand -- see plot_session.
+    """
+    # load_fit_variable returns (array_matrix, bins) -- it must be unpacked, or the
+    # whole tuple reaches prepare_batches and np.shape() raises an inhomogeneous-shape
+    # ValueError. run_session already unpacks it; this did not.
+    dm, bins = load_fit_variable(data_path, session, mouse_name, [var], zsc,
+                                 binarise=MODELS[model]['binarise'])
+    dm, _bins, _n = coarsen(dm, bins, bin_frames, how=BIN_AGG[model])
     sa, _, _ = prepare_batches(dm, num_train_batches)
     sig = np.asarray(sa)[:, 0]
     return sig if n_states is None else sig[:n_states]
@@ -216,13 +227,20 @@ def plot_session(save_path, data_path, var, mouse_name=None, session=None, eid=N
                                           mouse_name=mouse_name, session=session)
     d = load_result(save_path, var, mouse_name, session)
     states = np.asarray(d['most_likely_states'])
+    # bin width the fit actually used; older pickles predate the option, hence the default
+    bin_frames = int(d['config'].get('bin_frames', 1))
     signal = load_signal(data_path, session, mouse_name, var, d['config']['zsc'],
-                         num_train_batches, d['config']['model'], n_states=len(states))
+                         num_train_batches, d['config']['model'], n_states=len(states),
+                         bin_frames=bin_frames)
+    # the series being plotted advances one sample per BIN, so the time axis rate is
+    # fps / bin_frames -- otherwise every duration on the plot is wrong by that factor
+    fps_plot = fps / bin_frames
     fig, ax = plt.subplots(figsize=figsize)
     fig.patch.set_facecolor(SURFACE)
-    plot_states(d, signal, var, fps, win_s=win_s, ax=ax, start=start, start_s=start_s,
+    plot_states(d, signal, var, fps_plot, win_s=win_s, ax=ax, start=start, start_s=start_s,
                 compare_states=compare_states, labels=labels)
-    ax.set_title(f'{mouse_name}  {session[:8]}  ·  {var} ({d["config"]["model"]})  ·  '
+    binlab = '' if bin_frames == 1 else f'  ·  {bin_frames * 1000.0 / fps:.0f} ms bins'
+    ax.set_title(f'{mouse_name}  {session[:8]}  ·  {var} ({d["config"]["model"]}){binlab}  ·  '
                  + ax.get_title(), fontsize=9, color=ax.title.get_color(),
                  loc='left', pad=17)
     fig.subplots_adjust(top=0.76, bottom=0.19, left=0.075, right=0.99)

@@ -1,0 +1,18 @@
+
+== 68 sessions, 41 mice, 10 labs ==
+
+Laterality estimates (LI > 0 = LEFT paw moves more), 0.5-8 Hz band power:
+  cross-camera, both NEAR views  (what the pipeline uses)  mean=-0.0621 sd=0.253 p=4.67e-02  (24/68 positive)
+  cross-camera, both FAR views   (cameras swapped)         mean=+0.1157 sd=0.258 p=4.45e-04  (54/68 positive)
+  within LEFT camera only                                  mean=+0.1657 sd=0.256 p=1.22e-06  (58/68 positive)
+  within RIGHT camera only                                 mean=-0.1126 sd=0.242 p=2.81e-04  (10/68 positive)
+  mean of the two within-camera estimates  <-- cleanest    mean=+0.0266 sd=0.240 p=3.63e-01  (38/68 positive)
+  [near-vs-far foreshortening bias, for reference]         mean=+0.1391 sd=0.069 p=1.68e-25  (66/68 positive)
+
+Do the estimates agree per session? (correlation across sessions)
+  li_crosscam      vs li_within_mean       r=+0.931 p=1.53e-30 (n=68)
+  li_crosscam      vs li_leftcam           r=+0.900 p=1.60e-25 (n=68)
+  li_crosscam      vs li_rightcam          r=+0.889 p=4.40e-24 (n=68)
+  li_leftcam       vs li_rightcam          r=+0.848 p=6.71e-20 (n=68)
+  li_crosscam      vs li_crosscam_far      r=+0.742 p=4.27e-13 (n=68)
+  li_within_mean   vs li_noise_crosscam    r=+0.361 p=2.47e-03 (n=68)

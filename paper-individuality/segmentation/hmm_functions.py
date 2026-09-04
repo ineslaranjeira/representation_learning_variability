@@ -94,6 +94,33 @@ MODELS = {
     ),
 }
 
+# How to combine frames when coarsening the signal (see `bin_frames` in run_session).
+# Counts must be SUMMED -- that is the whole point, it turns a 0/1 trace into a count with
+# real dynamic range. A continuous level must be AVERAGED, or the emission scale changes
+# with the bin width and the z-scoring no longer means anything.
+BIN_AGG = {'gaussian': 'mean', 'poisson': 'sum', 'bernoulli': 'sum'}
+
+
+def coarsen(array_matrix, bins, bin_frames, how='sum'):
+    """Aggregate a frame-resolution signal into bins of `bin_frames` frames.
+
+    Returns (binned_signal, binned_bins, n_frames_used). The trailing partial bin is
+    dropped so every bin holds exactly `bin_frames` frames. `bins` is carried through by
+    taking each group's FIRST value -- it is a trial/bin index, so the first frame's label
+    is the right one for the aggregate.
+
+    Fitting on coarser bins is what breaks the degeneracy for sparse counts: at one frame
+    a lick bin holds 0 or 1, so both Poisson states converge on the same near-zero rate
+    and EM collapses. Two frames is already enough to separate them.
+    """
+    k = int(bin_frames)
+    if k <= 1:
+        return array_matrix, bins, len(array_matrix)
+    n = (len(array_matrix) // k) * k
+    a = np.asarray(array_matrix[:n], dtype=float).reshape(-1, k, array_matrix.shape[1])
+    out = a.sum(axis=1) if how == 'sum' else a.mean(axis=1)
+    return out, np.asarray(bins[:n]).reshape(-1, k)[:, 0], n
+
 
 def make_model(model, num_states, emission_dim, kappa=0.0):
     """Construct one HMM. Priors are left at their defaults: measured irrelevant."""
@@ -107,23 +134,61 @@ def make_model(model, num_states, emission_dim, kappa=0.0):
 # DATA PREPARATION
 # ============================================================================
 
-def load_fit_variable(data_path, session, mouse_name, var_interest, zsc, binarise=False):
-    """Read ONLY the fitted column(s) and drop NaN rows on those columns alone.
+def clean_ramping_artifact(design_matrix, var):
+    
+    s = design_matrix[var]
+    # Signs of changes: +1 for ramp up, -1 for ramp down, 0 for flat
+    diff_sign = np.sign(s.diff())
+    # Target direction of final ramp (-1 if ramping down, +1 if ramping up)
+    final_direction = np.sign(s.iloc[-1] - s.iloc[-10])
+    # Walk backward from the end as long as the signal keeps moving in that single direction
+    cut_idx = len(s) - 1
+    while cut_idx > 0 and diff_sign.iloc[cut_idx] == final_direction:
+        cut_idx -= 1
+    df = design_matrix.copy()
+    df[var].iloc[cut_idx:] = np.nan
+    return df
 
-    Reading just `var_interest` matters: a NaN in an unrelated column (an untracked right
-    paw, say) must not drop the bin, since the fit does not depend on it. Dropping after
-    selecting is what makes the row set correct.
-    """
-    filename = os.path.join(data_path, "design_matrix_" + str(session) + '_' + mouse_name)
-    original_design_matrix = pd.read_parquet(filename, columns=list(var_interest))
-    design_matrix = original_design_matrix[list(var_interest)].dropna()
+
+# NOTE: an earlier single-return load_fit_variable used to live here and was
+# SHADOWED by the (array_matrix, bins) version below, so callers silently got
+# whichever contract Python defined last. Removed to stop that recurring.
+
+def load_fit_variable(
+    data_path, session, mouse_name, var_interest, zsc, binarise=False
+):
+    """Read fitted column(s) plus 'Bin' and drop NaN rows on var_interest alone."""
+    filename = os.path.join(
+        data_path, "design_matrix_" + str(session) + "_" + mouse_name
+    )
+
+    # 1. Read var_interest AND 'Bin' (avoiding duplicates if 'Bin' is already in var_interest)
+    cols_to_read = list(dict.fromkeys(list(var_interest) + ["Bin"]))
+    original_design_matrix = pd.read_parquet(filename, columns=cols_to_read)
+
+    # 2. Remove data ramping up or down
+    for var in list(var_interest):
+        original_design_matrix = clean_ramping_artifact(
+            original_design_matrix, var
+        )
+
+    # 3. Drop NaNs based ONLY on var_interest (preserves aligned Bin values)
+    clean_df = original_design_matrix.dropna(subset=list(var_interest))
+
+    # 4. Extract aligned Bin array
+    bins = clean_df["Bin"].to_numpy()
+
+    # 5. Extract feature matrix
+    design_matrix = clean_df[list(var_interest)]
     array_matrix = np.array(design_matrix, dtype=float)
+
     if binarise:
-        # before z-scoring, and z-scoring a 0/1 variable would defeat the point
         array_matrix = (array_matrix > 0).astype(float)
     elif zsc:
-        array_matrix = zscore(array_matrix, axis=0, nan_policy='omit')
-    return array_matrix
+        array_matrix = zscore(array_matrix, axis=0, nan_policy="omit")
+
+    return array_matrix, bins  # <-- Return bins alongside array_matrix
+
 
 
 def prepare_batches(design_matrix, num_train_batches):
@@ -330,7 +395,7 @@ def result_path(save_path, var, mouse_name, session):
 
 def run_session(id, var_interest, model, zsc, num_states, num_train_batches, method,
                 fit_method, save_path, data_path, fps, num_iters=100, kappa=0.0,
-                min_dwell_ms=167., states_save_path=None):
+                min_dwell_ms=167., states_save_path=None, bin_frames=1):
     """Fit, decode and assess one session.
 
     Never raises: a failure is returned in the row's `error` field instead of being
@@ -343,12 +408,24 @@ def run_session(id, var_interest, model, zsc, num_states, num_train_batches, met
 
     row = dict(mouse=mouse_name, eid=session, var=var_interest[0], model=model, error='')
     try:
-        design_matrix = load_fit_variable(data_path, session, mouse_name, var_interest,
+        design_matrix, bins = load_fit_variable(data_path, session, mouse_name, var_interest,
                                           zsc, binarise=MODELS[model]['binarise'])
+        n_frames_raw = len(design_matrix)
+
+        # Coarsen BEFORE batching, so the folds are folds of bins.
+        bin_frames = max(1, int(bin_frames))
+        design_matrix, bins_binned, n_used = coarsen(
+            design_matrix, bins, bin_frames, how=BIN_AGG[model])
+        # every dwell/flicker screen is in real time, so the effective rate of the series
+        # being fitted is fps / bin_frames -- NOT fps
+        fps_fit = fps / bin_frames
+
         shortened_array, train_emissions, fold_len = prepare_batches(
             design_matrix, num_train_batches)
         emission_dim = np.shape(design_matrix)[1]
-        row.update(n_frames=int(len(shortened_array)))
+        row.update(n_frames=int(len(shortened_array) * bin_frames),
+                   n_bins=int(len(shortened_array)), bin_frames=int(bin_frames),
+                   bin_ms=float(bin_frames * 1000.0 / fps))
 
         raw_ll, base_ll, fit_params = fit_hmm(
             train_emissions, model, num_states, emission_dim, num_train_batches,
@@ -364,7 +441,7 @@ def run_session(id, var_interest, model, zsc, num_states, num_train_batches, met
             kappa=kappa)
         most_likely_states = orient_states(most_likely_states, shortened_array)
 
-        assessment = assess_fit(most_likely_states, raw_ll, base_ll, fps,
+        assessment = assess_fit(most_likely_states, raw_ll, base_ll, fps_fit,
                                 min_dwell_ms=min_dwell_ms)
         row.update(assessment)
         row.update(use_fold=int(use_fold))
@@ -382,11 +459,15 @@ def run_session(id, var_interest, model, zsc, num_states, num_train_batches, met
         to_save = dict(
             all_lls=raw_ll, all_baseline_lls=base_ll, fit_params=fit_params,
             most_likely_states=most_likely_states, use_fold=use_fold,
+            # bins at the resolution the fit ran at, so they pair with most_likely_states
+            bins=bins_binned[:len(shortened_array)],
             emission_levels=levels, assessment=assessment, fingerprint=fingerprint,
             config=dict(var_interest=var_interest, model=model, zsc=zsc,
                         num_states=num_states, num_train_batches=num_train_batches,
                         method=method, fit_method=fit_method, kappa=kappa,
-                        num_iters=num_iters, fps=fps, min_dwell_ms=min_dwell_ms),
+                        num_iters=num_iters, fps=fps, min_dwell_ms=min_dwell_ms,
+                        bin_frames=int(bin_frames), bin_ms=float(bin_frames*1000.0/fps),
+                        fps_fit=float(fps_fit)),
         )
         atomic_dump(to_save, filename)
 
@@ -394,7 +475,13 @@ def run_session(id, var_interest, model, zsc, num_states, num_train_batches, met
         #     most_likely_states, _, _ = pickle.load(open(states_filename, "rb"))
         if states_save_path is not None:
             os.makedirs(states_save_path, exist_ok=True)
-            atomic_dump((most_likely_states, use_fold, (num_states, np.nan, kappa)),
+            # Saved states are ALWAYS at frame resolution, whatever bin width was fitted,
+            # so every downstream consumer is unchanged. Upsampling quantises a state
+            # onset to the bin edge: 100 ms bins cost ~29 ms RMS, 200 ms ~58 ms.
+            states_frames = np.repeat(np.asarray(most_likely_states), bin_frames)
+            bins_frames = np.asarray(bins)[:len(states_frames)]
+            states_frames = states_frames[:len(bins_frames)]
+            atomic_dump((states_frames, bins_frames, use_fold, (num_states, np.nan, kappa)),
                         os.path.join(states_save_path, var_interest[0] + '_' + fit_id))
 
         del to_save

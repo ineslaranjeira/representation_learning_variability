@@ -1,0 +1,47 @@
+== 213 sessions, 58 mice (58 with >=3) ==
+
+estimated positional noise sd (right-cam px): left 0.322, right 0.865; noise added to left paw by MATCH: 0.257
+
+C1  LI[32 Hz power] -> 0   (0 = noise floors equalised)
+    RAW (current pipeline)             mean=-0.4027  median=-0.4471  |mean| fail
+    QUANT (snap to right-cam grid)     mean=-0.1254  median=-0.1498  |mean| fail
+    MATCH (noise floors equalised)     mean=+0.0145  median=+0.0065  |mean| PASS
+    WHITEN (divide by own 32 Hz)       mean=+0.0000  median=+0.0000  |mean| PASS
+
+C2  r(LI[band power], LI[32 Hz of the RAW data]) -> 0
+    RAW (current pipeline)             r=+0.771  p=3.2e-43
+    QUANT (snap to right-cam grid)     r=+0.771  p=3.1e-43
+    MATCH (noise floors equalised)     r=+0.767  p=1.7e-42
+    WHITEN (divide by own 32 Hz)       r=-0.125  p=6.8e-02
+
+**  how much does each fix actually MOVE the metric it is meant to fix? **
+    metric             RAW mean      QUANT      MATCH  r(raw,quant)  r(raw,match)
+    li_bandpow          -0.0780    -0.0724    -0.0704        0.9999        0.9999
+    li_spmed            -0.1067    +0.0738    +0.0484        0.8579        0.7915
+    (r ~ 1.000 means the fix left the metric essentially untouched)
+
+C3  per-frequency LI (mean over sessions) -- a monotonic slide with frequency is the noise-floor signature
+    variant                                0.5Hz     1.0Hz     2.0Hz     4.0Hz     8.0Hz    slope
+    RAW (current pipeline)               -0.0263   -0.0297   -0.0407   -0.0708   -0.1573  -0.0303/oct
+    QUANT (snap to right-cam grid)       -0.0260   -0.0289   -0.0388   -0.0660   -0.1425  -0.0270/oct
+    MATCH (noise floors equalised)       -0.0262   -0.0294   -0.0396   -0.0661   -0.1342  -0.0253/oct
+
+C4  between-mouse ICC(1) survives the fix
+    RAW (current pipeline)             ICC=0.829  p_perm=0.0005  (213 sess, 58 mice)
+    QUANT (snap to right-cam grid)     ICC=0.829  p_perm=0.0005  (213 sess, 58 mice)
+    MATCH (noise floors equalised)     ICC=0.827  p_perm=0.0005  (213 sess, 58 mice)
+    WHITEN (divide by own 32 Hz)       ICC=0.791  p_perm=0.0005  (213 sess, 58 mice)
+    RAW  li_spmed                      ICC=0.637  p_perm=0.0005
+    MATCH li_spmed                     ICC=0.570  p_perm=0.0005
+
+C5  mouse-level correlation with the task survives the fix
+    wheel_bias         RAW (current pipeline)             r=+0.432 rho=+0.417 p_perm=0.0007 (n=58)
+    wheel_bias         QUANT (snap to right-cam grid)     r=+0.434 rho=+0.418 p_perm=0.0003 (n=58)
+    wheel_bias         MATCH (noise floors equalised)     r=+0.432 rho=+0.413 p_perm=0.0003 (n=58)
+    wheel_bias         WHITEN (divide by own 32 Hz)       r=+0.148 rho=+0.242 p_perm=0.2629 (n=58)
+
+    frac_right_choice  RAW (current pipeline)             r=+0.190 rho=+0.224 p_perm=0.1500 (n=58)
+    frac_right_choice  QUANT (snap to right-cam grid)     r=+0.191 rho=+0.229 p_perm=0.1563 (n=58)
+    frac_right_choice  MATCH (noise floors equalised)     r=+0.190 rho=+0.222 p_perm=0.1606 (n=58)
+    frac_right_choice  WHITEN (divide by own 32 Hz)       r=+0.115 rho=+0.176 p_perm=0.3802 (n=58)
+

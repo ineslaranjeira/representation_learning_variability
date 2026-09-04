@@ -1,0 +1,15 @@
+== 68 sessions:  61 standard (left 60 / right 150), 5 reversed ==
+
+lightningPose smoother transfer function, measured at each camera's native rate
+(value < 1 = the smoother removes real movement at that frequency)
+
+    freq   60 Hz cam  150 Hz cam  ratio 60/150  OBSERVED L/R  explained
+     0.5       0.993       0.984         1.009         0.929       -13%
+     1.0       0.986       0.983         1.003         0.926        -4%
+     2.0       0.961       0.979         0.982         0.906        19%
+     4.0       0.889       0.973         0.914         0.841        54%
+     8.0       0.718       0.956         0.750         0.681        78%
+
+  in the 5 REVERSED rigs the roles swap, as they must if this is the cause:
+     0.5 Hz: left(150 Hz)=1.000  right(60 Hz)=1.001  ratio left/right=0.999
+     8.0 Hz: left(150 Hz)=0.928  right(60 Hz)=0.906  ratio left/right=1.025
