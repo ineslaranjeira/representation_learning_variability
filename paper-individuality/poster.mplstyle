@@ -1,0 +1,25 @@
+# POSTER mode: read from two metres away. Same colours and same spine treatment as
+# paper mode -- only the type, strokes and panel sizes grow, so a figure drafted for
+# the poster becomes the paper figure by switching modes, with no other edits.
+font.size:          16
+axes.titlesize:     18
+axes.labelsize:     17
+xtick.labelsize:    14
+ytick.labelsize:    14
+legend.fontsize:    14
+figure.titlesize:   19
+
+axes.linewidth:     1.6
+xtick.major.size:   5.0
+ytick.major.size:   5.0
+xtick.major.width:  1.6
+ytick.major.width:  1.6
+xtick.major.pad:    4.0
+ytick.major.pad:    4.0
+
+lines.linewidth:    3.0
+lines.markersize:   9.0
+errorbar.capsize:   3.5
+
+figure.dpi:         100
+savefig.dpi:        300

@@ -1,0 +1,39 @@
+# Shared by every output mode. Things here are decisions about STYLE, not size:
+# what a panel looks like, how it exports. Sizes live in paper.mplstyle /
+# poster.mplstyle, which are applied on top of this one by paper_style.use().
+
+font.family:        sans-serif
+font.sans-serif:    Arial, Helvetica, DejaVu Sans
+
+# TEXT STAYS TEXT in exported vectors. Without these, Illustrator/Inkscape receive
+# outlines instead of editable labels and late edits become impossible.
+svg.fonttype:       none
+pdf.fonttype:       42
+ps.fonttype:        42
+
+# no box: only the left and bottom rules survive (use()'s `spines` argument can
+# remove those too)
+axes.spines.top:    False
+axes.spines.right:  False
+axes.grid:          False
+axes.axisbelow:     True
+axes.labelpad:      2.5
+axes.titlepad:      3.5
+
+xtick.direction:    out
+ytick.direction:    out
+
+legend.frameon:     False
+legend.handlelength: 1.4
+legend.handletextpad: 0.5
+legend.columnspacing: 1.0
+legend.borderaxespad: 0.3
+
+lines.solid_capstyle: round
+scatter.edgecolors: none
+
+figure.facecolor:   white
+savefig.bbox:       tight
+savefig.pad_inches: 0.02
+savefig.facecolor:  white
+savefig.transparent: False

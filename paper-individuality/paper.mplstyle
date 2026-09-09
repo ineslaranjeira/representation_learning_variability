@@ -1,0 +1,23 @@
+# PAPER mode: journal column widths, small type. Applied on top of paper_base.
+font.size:          7
+axes.titlesize:     8
+axes.labelsize:     7
+xtick.labelsize:    6
+ytick.labelsize:    6
+legend.fontsize:    6
+figure.titlesize:   8
+
+axes.linewidth:     0.6
+xtick.major.size:   2.5
+ytick.major.size:   2.5
+xtick.major.width:  0.6
+ytick.major.width:  0.6
+xtick.major.pad:    1.5
+ytick.major.pad:    1.5
+
+lines.linewidth:    1.2
+lines.markersize:   3.5
+errorbar.capsize:   1.5
+
+figure.dpi:         120
+savefig.dpi:        400
