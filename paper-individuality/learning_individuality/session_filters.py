@@ -5,7 +5,7 @@ Single source of truth for "which sessions do we drop", replacing the hardcoded
 `prob_sessions` / `session_1` / `last_training` lists that used to be copied between
 scripts.
 
-The sheet is `individuality-paper_data_3sep26.csv`. Two things about it matter:
+The sheet is `individuality-paper_data_4Sep26.csv` (CSV_NAME below). Two things about it matter:
   * it has a TWO-ROW header (merged spreadsheet cells), so it must be read with
     header=1 or every column comes back as 'Unnamed: N';
   * `source_file` identifies which dataset a session belongs to, and
@@ -39,9 +39,33 @@ EXCLUDE_LEVELS = {
 }
 
 
+def find_csv(name=None):
+    """Locate the QC sheet wherever it currently lives.
+
+    It has moved between folders (it sat next to this module, it now sits in
+    paper-individuality/data/), and every notebook that hardcoded one of those paths
+    broke when it did. Searching a short list of plausible homes means the sheet can
+    move again without touching any analysis code. Any explicit csv_path still wins.
+    """
+    name = name or CSV_NAME
+    here = Path(__file__).resolve().parent
+    root = here.parent                      # paper-individuality/
+    candidates = [here / name,
+                  root / 'data' / name,
+                  root / '4_mice' / name,
+                  root / name,
+                  *sorted(root.glob(f'*/{name}')),
+                  *sorted(root.glob(f'*/*/{name}'))]
+    for c in candidates:
+        if c.exists():
+            return c
+    raise FileNotFoundError(
+        f"{name} not found. Looked in:\n  " + "\n  ".join(str(c) for c in candidates[:5]))
+
+
 def load_session_table(csv_path=None):
     """The QC sheet as a tidy frame with an added `timepoint` column."""
-    path = Path(csv_path) if csv_path else Path(__file__).with_name(CSV_NAME)
+    path = Path(csv_path) if csv_path else find_csv()
     df = pd.read_csv(path, header=1, dtype=str)
     df.columns = [c.strip() for c in df.columns]
     for col in ('eid', 'source_file', 'Used in paper'):
