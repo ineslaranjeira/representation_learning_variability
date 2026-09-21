@@ -22,6 +22,12 @@ THREE VIEWS OF THE SAME BEHAVIOUR, deliberately at different removes from the LD
                        gain-invariant measures (bout rate at matched duty cycle,
                        spectral shape, lead-lag) that a camera-gain error cannot
                        touch.
+  trial_features()     the trial table -- choice, block and signed contrast -- for the
+                       psychometric curves in section 8. Not a laterality measure: it
+                       is the behaviour the motor asymmetry either does or does not
+                       reach. Its signed contrast is RE-DERIVED, never read off the
+                       file, because the repo's trial tables disagree about the sign;
+                       see the function's docstring.
 
 CONVENTIONS, taken from segmentation/paw_bias (which established them)
 ----------------------------------------------------------------------
@@ -154,12 +160,22 @@ def paw_features(sessions=None, cache=True, verbose=True):
                 print(f'cached: {CACHE.name} ({len(got)} sessions)')
             return got if want is None else got.loc[sorted(want)]
 
-    files = {f[17:53]: WV_DIR / f for f in os.listdir(WV_DIR)
-             if f.startswith('paw_vel_wavelets_')}
+    # rglob, not os.listdir: the wavelet files are not always flat in data/paw_wavelets/.
+    # On some machines they sit in per-batch subfolders (1_camera_setup/, extra_bwm/,
+    # kcenia/), and a flat listing then finds NOTHING while hundreds of files are one
+    # level down -- which looks exactly like "the data is missing" and is not.
+    files = {f.name[17:53]: f for f in sorted(WV_DIR.rglob('paw_vel_wavelets_*'))}
     todo = sorted(files) if want is None else sorted(want & set(files))
     if verbose:
         missing = 0 if want is None else len(want - set(files))
-        print(f'{len(todo)} sessions to extract' + (f' ({missing} have no wavelet file)' if missing else ''))
+        print(f'{len(files)} wavelet files under {WV_DIR}; {len(todo)} sessions to extract'
+              + (f' ({missing} of the requested sessions have no wavelet file)' if missing else ''))
+    if not files:
+        raise FileNotFoundError(
+            f'no paw_vel_wavelets_* files under {WV_DIR} (searched recursively). Either copy '
+            f'them there, or -- much cheaper -- copy the cache {CACHE.name} next to this '
+            f'module: it holds the finished per-session features and makes the wavelets '
+            f'unnecessary.')
 
     rows = []
     for i, eid in enumerate(todo, 1):
@@ -172,6 +188,8 @@ def paw_features(sessions=None, cache=True, verbose=True):
         rows.append(r)
         if verbose and i % 50 == 0:
             print(f'  ... {i}/{len(todo)}')
+    if not rows:            # nothing matched: return an empty frame, not a KeyError
+        return pd.DataFrame(columns=['session']).set_index('session')
     got = pd.DataFrame(rows).set_index('session')
     if cache:
         got.to_csv(CACHE)
@@ -250,6 +268,152 @@ def paw_bias_metrics(sessions=None):
     pb = pb.rename(columns={'eid': 'session'}).set_index('session')
     pb = pb.add_suffix('_pb')
     return pb if sessions is None else pb.reindex(sorted(set(sessions) & set(pb.index)))
+
+
+# --------------------------------------------------------------- trial behaviour
+TRIAL_FILES = ['data/session_trial_meta_19-08-2026',
+               'data/session_trial_meta_10-07-2026',
+               '4_mice/all_trials_04-05-2026']
+MIN_TRIALS = 100              # below this a session cannot support a psychometric curve
+
+
+def _first_existing(paths):
+    for p in paths:
+        q = pathlib.Path(p)
+        q = q if q.is_absolute() else ROOT / q
+        if q.exists():
+            return q
+    return None
+
+
+def trial_features(sessions=None, path=None, min_trials=MIN_TRIALS, verbose=True):
+    """Per-trial choice, block and signed contrast -- the psychometric curves' input.
+
+    THE SIGN TRAP, which is the whole reason this function exists rather than three
+    lines in the notebook. The `choice` strings in this repo's trial tables are
+    MIRRORED with respect to the screen. `1_segmentation/functions.py` writes
+    'right' for ALF `trials.choice == +1`, but +1 is the counter-clockwise wheel turn,
+    which is the report of a stimulus on the LEFT. The data says so twice over, with
+    no appeal to any convention:
+
+      * on correct trials, `choice == 'right'` pairs with `contrastRight - contrastLeft
+        < 0` in 100% of trials (`prepro()` in the same file defines that column);
+      * in the p(left) = 0.2 block, 80% of the stimuli land on the side the strings
+        call 'right'.
+
+    So a curve drawn straight off the `choice` strings is a mirror image of itself,
+    and looks perfectly reasonable while it is. It is exactly backwards for a
+    laterality question, where the sign is the entire result.
+
+    What this function does instead: the stimulus side is recovered from
+    choice x feedback (the stimulus was on the side the mouse chose <=> the trial was
+    rewarded), which pairs choice and stimulus correctly whatever the labels mean, and
+    the left/right ORIENTATION of that pair is then fixed by `block`, which is
+    `probabilityLeft` straight out of ALF (`segmentation_functions.py`) and is not
+    mirrored. The check is printed, so a file that breaks the assumption is loud.
+
+    The convention on the way out, which everything downstream assumes:
+
+        signed_contrast > 0   stimulus on the RIGHT of the screen, in % contrast
+        choice_right == 1     the mouse reported RIGHT
+        block                 p(left), so 0.2 is the block where right stimuli are
+                              common and P(right) is highest
+
+    A curve of choice_right against signed_contrast therefore RISES, the 0.2 block sits
+    ABOVE the 0.8 block, and a mouse biased towards the right has a curve shifted UP
+    and to the LEFT.
+
+    Trials with no choice (`no_go`) carry no recoverable stimulus side and are dropped.
+    Zero-contrast trials keep signed_contrast == 0 whichever side the invisible
+    stimulus was on. Sessions with fewer than `min_trials` usable trials are dropped --
+    a psychometric curve fit on 40 trials is noise.
+
+    Returns one row per trial: session, mouse_name, block, contrast, signed_contrast,
+    choice_right, correct, and reaction / elongation where the source file has them.
+    """
+    src = _first_existing([path] if path else TRIAL_FILES)
+    if src is None:
+        looked = ', '.join([path] if path else TRIAL_FILES)
+        raise FileNotFoundError(f'no trial table found under {ROOT}; looked for: {looked}')
+    t = pd.read_parquet(src)
+    t = t.rename(columns={'eid': 'session', 'subject': 'mouse_name'})
+    if verbose:
+        print(f'trials from {src.name}: {len(t)} rows, {t.session.nunique()} sessions')
+
+    # choice -> 0/1 in the FILE's labelling, which the orientation step below may flip
+    if t['choice'].dtype == object:
+        labelled_right = t['choice'].map({'left': 0.0, 'right': 1.0})    # 'no_go' -> NaN
+    else:
+        c = pd.to_numeric(t['choice'], errors='coerce')
+        labelled_right = c.where(c.isin([0, 1]))
+    correct = t['correct'] if 'correct' in t else (t['feedback'] == 'correct')
+    correct = pd.to_numeric(correct, errors='coerce').astype(float)
+
+    out = pd.DataFrame({
+        'session': t['session'].astype(str),
+        'mouse_name': t['mouse_name'] if 'mouse_name' in t else np.nan,
+        'block': pd.to_numeric(t['block'], errors='coerce'),
+        'contrast': pd.to_numeric(t['contrast'], errors='coerce').abs(),
+        'labelled_right': labelled_right,
+        'correct': correct,
+    })
+    for extra in ('trial_id', 'reaction', 'response', 'elongation'):
+        if extra in t:
+            out[extra] = pd.to_numeric(t[extra], errors='coerce')
+
+    n_all = len(out)
+    out = out.dropna(subset=['block', 'contrast', 'labelled_right', 'correct'])
+    # rewarded -> the stimulus was on the side the mouse reported; unrewarded -> the
+    # other side. Still in the file's own labelling at this point.
+    stim_labelled_right = np.where(out['correct'] > 0,
+                                   out['labelled_right'], 1 - out['labelled_right'])
+
+    # ORIENTATION. block = p(left), so in the 0.2 block 80% of the stimuli are on the
+    # RIGHT. Whichever way the labels run, that fraction says which is which.
+    seen = out.loc[out['contrast'] > 0, 'block']
+    frac = {b: float(stim_labelled_right[(out['contrast'] > 0).to_numpy()][(seen == b).to_numpy()].mean())
+            for b in (0.2, 0.8) if (seen == b).any()}
+    if len(frac) < 2:
+        raise ValueError(f'need both biased blocks to orient left/right; found {sorted(frac)}')
+    if abs(frac[0.2] - frac[0.8]) < 0.3:
+        raise ValueError(f'blocks do not separate the stimulus side ({frac}); `block` is '
+                         'not p(left) in this file and the orientation cannot be trusted')
+    mirrored = frac[0.2] < 0.5
+    ori = -1.0 if mirrored else 1.0
+    if verbose:
+        print(f"  orientation: {frac[0.2]:.3f} of p(left)=0.2 stimuli are on the side this "
+              f"file's `choice` strings call 'right' (0.8 block: {frac[0.8]:.3f})")
+        print('  -> the labels are ' + ('MIRRORED and have been flipped; '
+              "this file's 'right' is the screen's LEFT" if mirrored else
+              'consistent with the screen and are used as they are'))
+
+    out['choice_right'] = out['labelled_right'] if ori > 0 else 1 - out['labelled_right']
+    # + 0.0 so a zero contrast comes out as 0.0 rather than -0.0, which would otherwise
+    # split the 0% point of the curve into two groupby keys
+    out['signed_contrast'] = (ori * 100.0 * out['contrast']
+                              * np.where(stim_labelled_right > 0, 1.0, -1.0)) + 0.0
+    out = out.drop(columns=['labelled_right'])
+
+    if sessions is not None:
+        out = out[out.session.isin(set(sessions))]
+    n_short = 0
+    if min_trials:
+        big = out.groupby('session').size()
+        n_short = int((big < min_trials).sum())
+        out = out[out.session.isin(big.index[big >= min_trials])]
+    out = out.reset_index(drop=True)
+
+    if verbose:
+        print(f'  kept {len(out)} trials ({n_all - len(out)} dropped: no-go, missing '
+              f'fields, sessions outside the cohort, {n_short} sessions under '
+              f'{min_trials} trials)')
+        print(f'  {out.session.nunique()} sessions, block counts '
+              f'{out.block.value_counts().sort_index().to_dict()}')
+        z = out[out.contrast == 0].groupby('block').choice_right.mean()
+        print('  sanity, P(choice = right) at 0% contrast per block: '
+              + ', '.join(f'{b} -> {v:.3f}' for b, v in z.items())
+              + '   (must FALL as p(left) rises)')
+    return out
 
 
 if __name__ == '__main__':

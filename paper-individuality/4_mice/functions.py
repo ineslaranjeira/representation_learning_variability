@@ -1374,3 +1374,130 @@ def remove_lab_variance(features, labs, mode='center', mouse_names=None,
               + (f', left alone: {", ".join(skipped)}' if skipped else '')
               + (f', {unknown} sessions with unknown lab left alone' if unknown else ''))
     return pd.DataFrame(X, index=features.index, columns=features.columns) if is_df else X
+
+
+def rank_inverse_normal(features, groups=None, offset='blom', min_per_group=8,
+                        verbose=True):
+    """Rank-based inverse-normal ('probit') transform of a sessions x features matrix.
+
+    Each FEATURE is replaced by the normal scores of its ranks, so its marginal becomes
+    standard normal by construction. Ties get the same value. This is what Forkosh et al.
+    2019 call quantile normalisation:
+
+        "We quantile-normalized the data to have a normal distribution by computing the
+         quantile of each sample and then computing the inverse of the normal cumulative
+         distribution function (also known as the 'probit' function). If two or more
+         samples were identical prior to the normalization they were all assigned the
+         same value."
+
+    WHY IT IS NOT JUST ANOTHER z-SCORE, AND WHY THAT MATTERS HERE. The LDA objective is
+    invariant under any invertible AFFINE map of the features, so `StandardScaler` -- on the
+    raw features or on the PCA scores -- cannot change the discriminants, the eigenvalues or
+    the LOO score by anything beyond numerical conditioning. This transform is monotone but
+    NONLINEAR, so it does change them. It is the only feature-level normalisation in this
+    file that the LDA can actually see (the other one being remove_lab_variance, which is
+    affine per lab rather than globally).
+
+    WHAT IT BUYS. The features are session means of binary indicators, i.e. proportions in
+    [0, 1]. A syllable that is rare at a given timebin sits near 0 in most sessions with a
+    handful well above, so its marginal is strongly skewed, and because the PCA runs on raw
+    variance (see dim_red) one aberrant session can plant a component that the LDA then
+    rides. Replacing values by normal scores bounds how far any single session can sit from
+    its neighbours, and makes the marginals match the Gaussian that LDA is optimal under.
+
+    WHAT IT COSTS. Two things, both real:
+
+      1. It forces EVERY feature to unit variance, which reverses dim_red's deliberate
+         choice not to standardise before PCA. For a proportion, Var ~ p(1-p)/n, so the
+         un-normalised PCA is implicitly downweighting rare syllables; afterwards a rare
+         syllable's ordering counts as much as a common one's. Re-read the scree plot and
+         `min_components` after turning this on -- the spectrum WILL move.
+      2. Only the ordering survives. Two sessions three units apart and two sessions a
+         thousand units apart become equally far apart if no other session lies between
+         them. If a feature's absolute scale is part of what distinguishes mice, it is gone.
+
+    Parameters
+    ----------
+    features : DataFrame or array, (n_sessions, n_features)
+    groups : array-like of length n_sessions, or None
+        None (default) = one global ranking per feature. Pass `lab_of_session` to rank
+        WITHIN LAB instead, which is Forkosh's per-batch-per-day version and removes the
+        lab's location, scale AND distribution shape at once -- strictly more than
+        remove_lab_variance(mode='zscore'), which only removes the first two.
+
+        READ remove_lab_variance's docstring BEFORE USING THIS. Lab is nested inside mouse,
+        so ranking within lab pays exactly the same price: the mouse-identity signal loses
+        one dimension per lab (10 of the 57 here). Forkosh's batches are nested the same way
+        and the paper does not mention it.
+    offset : 'blom' | 'vdw'
+        The plotting position that turns a rank r of n into a quantile.
+        'blom' (default) uses (r - 3/8) / (n + 1/4); 'vdw' (van der Waerden) uses
+        r / (n + 1). Both keep the extreme ranks finite -- a plain r/n would send the
+        largest value to Phi^-1(1) = inf.
+    min_per_group : int
+        Groups smaller than this are transformed anyway but NAMED in the printout. A rank
+        map estimated from 12 sessions is coarse and noisy, and the noise differs per group.
+        Note this is the opposite of remove_lab_variance's rule, which SKIPS small labs:
+        there, skipping leaves them on the same raw scale as everyone else, which is
+        harmless; here, skipping would leave them on a different scale from the transformed
+        groups, which is worse than a noisy map.
+
+    Returns
+    -------
+    Same type as `features`, same shape, same index/columns. NaNs are left in place and are
+    excluded from the ranking of their own column.
+    """
+    from scipy.stats import rankdata, norm
+
+    if offset not in ('blom', 'vdw'):
+        raise ValueError(f"offset must be 'blom' or 'vdw', got {offset!r}")
+
+    is_df = isinstance(features, pd.DataFrame)
+    X = np.asarray(features, dtype=float).copy()
+
+    def _score_block(block):
+        """Normal scores of one (rows x features) block, column by column, NaN-aware."""
+        out = np.full_like(block, np.nan)
+        for j in range(block.shape[1]):
+            col = block[:, j]
+            ok = ~np.isnan(col)
+            n = int(ok.sum())
+            if n == 0:
+                continue
+            if n == 1:
+                out[ok, j] = 0.0        # a single value has no ordering; put it at the median
+                continue
+            # 'average' so that tied values all receive the same score, as Forkosh specify
+            r = rankdata(col[ok], method='average')
+            q = (r - 0.375) / (n + 0.25) if offset == 'blom' else r / (n + 1.0)
+            out[ok, j] = norm.ppf(q)
+        return out
+
+    if groups is None:
+        X = _score_block(X)
+        if verbose:
+            print(f'  rank-inverse-normal ({offset}): global, {X.shape[1]} features '
+                  f'over {X.shape[0]} sessions')
+    else:
+        g = pd.Series(list(groups)).to_numpy(dtype=object)
+        if len(g) != X.shape[0]:
+            raise ValueError(f'groups has length {len(g)}, features has {X.shape[0]} rows')
+        small, n_groups = [], 0
+        for lab in pd.unique(g[pd.notna(g)]):
+            rows = np.where(g == lab)[0]
+            n_groups += 1
+            if len(rows) < min_per_group:
+                small.append(f'{lab} ({len(rows)} sessions)')
+            X[rows] = _score_block(X[rows])
+        unknown = int(pd.isna(g).sum())
+        if unknown:
+            # ranked together rather than left raw: a raw block among transformed ones
+            # would be the only part of the matrix still on the original scale
+            X[pd.isna(g)] = _score_block(X[pd.isna(g)])
+        if verbose:
+            print(f'  rank-inverse-normal ({offset}): within group, {n_groups} groups'
+                  + (f', {unknown} sessions with no group ranked together' if unknown else '')
+                  + (f'; SMALL (coarse, noisy map): {", ".join(small)}' if small else ''))
+
+    return (pd.DataFrame(X, index=features.index, columns=features.columns)
+            if is_df else X)
