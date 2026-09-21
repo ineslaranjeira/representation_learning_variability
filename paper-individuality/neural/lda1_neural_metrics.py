@@ -93,6 +93,8 @@ KEEP_48 = ['CA1', 'DG', 'MRN', 'CP', 'LP', 'CA3', 'ZI', 'PO', 'MOs', 'MOp',
            'LD', 'RSPv', 'SI', 'SUB', 'RT', 'PRM', 'RSPd', 'Eth', 'ANcr2', 'ACB', 'CENT3',
            'IC', 'IP', 'SSp-bfd', 'PB', 'LGd', 'VPL', 'VISam', 'NOT', 'NTS', 'ACAd', 'VM',
            'SPVI', 'RSPagl', 'CA2', 'LH', 'GPe', 'GRN', 'PARN', 'SCs', 'PoT']
+KEEP_48 = ['CA1', 'DG', 'MRN', 'CP', 'LP', 'CA3', 'ZI', 'PO', 'MOs', 'MOp',
+           'APN', 'SCm', 'IRN', 'VPM', 'PAG', 'VISa', 'LSr', 'CUL4', 'MD', 'VISp'] # 20
 
 
 def default_config():
@@ -102,7 +104,8 @@ def default_config():
         # and the trial meta have both moved and been re-cut, and a stale hardcoded path
         # is how these notebooks break. The pinned entry is the one the published numbers
         # came from; later entries are only fallbacks.
-        LDA_FILES=[PAPER / 'clustering/data_files/mouse_LDA_5_bins_25_18-09-2026',
+        LDA_FILES=[PAPER / 'clustering/data_files/mouse_LDA_5_bins_raw_25_20-09-2026',
+                   PAPER / 'clustering/data_files/mouse_LDA_5_bins_labzscore_25_20-09-2026',
                    PAPER / 'clustering/data_files/mouse_LDA_5_bins_cut25_16-09-2026',
                    PAPER / 'clustering/data_files/mouse_LDA_5_bins_lab_26_17-09-2026',
                    PAPER / 'clustering/data_files/mouse_LDA_5_bins_cut25_weighted_17-09-2026',
