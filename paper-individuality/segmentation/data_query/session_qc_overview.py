@@ -35,6 +35,9 @@ INPUT_FILES = [
     'biased_before_ephys_1_eids.csv',   # last biased before ephys (closest)
     'biased_before_ephys_2_eids.csv',   # second-to-last
     'biased_before_ephys_3_eids.csv',   # third-to-last
+    # habituation is NOT listed here: this script takes every eid in an input file,
+    # which would pull in the 8 sessions with no mp4. Those rows come from
+    # 6_habituation_qc_sheet_rows.py, which filters on has_raw_leftCam first.
 ]
 out_csv = data_query_path + 'session_qc_overview.csv'   # output + incremental cache
 
@@ -62,6 +65,8 @@ def protocol_word(proto):
         return 'ephys'
     if 'biased' in p:
         return 'biased'
+    if 'habituation' in p:
+        return 'habituation'
     if 'training' in p:
         return 'training'
     return 'other'

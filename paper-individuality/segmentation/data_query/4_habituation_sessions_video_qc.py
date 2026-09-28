@@ -55,10 +55,11 @@ REFRESH = False
 CACHE_FILE = 'habituation_alyx_cache.pkl'
 
 # ---- VIDEO QC GROUPING ------------------------------------------------------------
-# Split the same way `bwm_habituation_sessions_video.csv` splits it: whether the video is
-# usable as PIXELS, and whether it is usable as a TIME SERIES aligned to the task. The
-# second is the one that matters for trial-epoch binning, and it is the one that is most
-# often missing.
+# Two questions, kept apart: whether the video is usable as PIXELS, and whether it is
+# usable as a TIME SERIES aligned to the task. The second is the one that matters for
+# trial-epoch binning, and it is the one that is most often missing.
+# (This split was inherited from an earlier BWM-wide pass over the same question, whose
+# CSVs were deleted once this script narrowed it to the LDA cohort.)
 QUALITY_CHECKS = ['_videoLeft_focus', '_videoLeft_position', '_videoLeft_brightness',
                   '_videoLeft_resolution', '_videoLeft_file_headers']
 TIMING_CHECKS = ['_videoLeft_camera_times', '_videoLeft_timestamps', '_videoLeft_pin_state',

@@ -29,6 +29,7 @@ SOURCE_TO_TIMEPOINT = {
     'biased_before_ephys_2_eids.csv': 'Pre-rec',
     'biased_before_ephys_3_eids.csv': 'Pre-rec',
     'bwm_qc_new_08-03-2026':          'Proficient',
+    'habituation_sessions.csv':       'Habituation',
 }
 
 # The filter parameter. 'filtered_out' takes `Used in paper` literally;
