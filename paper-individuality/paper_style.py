@@ -21,10 +21,12 @@ Then refer to things by MEANING, never by literal value:
     ax.plot(x, y, color=ps.TIMEPOINT['Early'])          # not '#ECA307'
     ax.imshow(R, cmap=ps.CORR_CMAP, norm=ps.corr_norm())
     ps.epoch_lines(ax, n_bins=40)
+    ps.saving(True)                                          # writing is OPT-IN
     ps.savefig(fig, 'fig3_syllable_correlations')            # PNG, dated
     ps.savefig(fig, 'fig3_syllable_correlations', svg=True)   # PNG + vector master
 
-Figures land in figures/ as <name>[_poster]_<DD-MM-YYYY>.<ext>.
+Figures land in figures/ as <name>[_poster]_<DD-MM-YYYY>.<ext>, but ONLY after
+ps.saving(True) -- by default savefig prints the name it would write and writes nothing.
 
 NOTHING HERE RESCALES OR TRANSFORMS DATA. The module holds colours, sizes and
 rcParams; every plotting call still receives your numbers untouched. The one
@@ -36,11 +38,20 @@ from pathlib import Path
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm, to_rgb
+from matplotlib.colors import (LinearSegmentedColormap, ListedColormap, TwoSlopeNorm,
+                               to_rgb)
 
 ROOT = Path(__file__).resolve().parent
 FIGDIR = ROOT / 'figures'
 DATE_FMT = '%d-%m-%Y'      # same convention as the repo's data files, e.g. 08-09-2026
+
+# FIGURE WRITING IS OFF BY DEFAULT -- savefig() reports the name it would write and
+# returns []. Notebooks here get re-run constantly while a knob is being tuned, and every
+# run used to leave another dated PNG/SVG pair in figures/, so the directory filled with
+# near-identical files and the one that belongs in the paper was whichever ran last.
+# Call ps.saving(True) for the run that counts. A reload resets this to False, which is
+# the safe direction.
+SAVE_FIGURES = False
 
 # Two output modes over one set of decisions. paper_base.mplstyle holds everything
 # that must NOT differ between them (colours come from this module, spine treatment,
@@ -72,8 +83,8 @@ MODE = 'paper'
 # from the previous palette, where Early was orange.
 #
 # The magenta-purple family is free: LD1 is blue-red (LD1_CMAP), correlations
-# brown-teal (CORR_CMAP), syllables Set3 pastels with a grey whisk and a near-black
-# lick -- so nothing else in the paper reads as a timepoint.
+# brown-teal (CORR_CMAP), paw syllables blue-orange by laterality with a grey whisk and a
+# near-black lick (PAW_STATE_COLORS) -- so nothing else in the paper reads as a timepoint.
 #
 # Used by syllable_correlations, lda_sweep_timepoints, lda_trajectories,
 # lda_all_timepoints, lda_pred, relational_structure.
@@ -136,13 +147,381 @@ def timepoint_colorbar(ax, label='Training stage', named_ticks=True, **kw):
         cb.set_ticklabels([TIMEPOINT_LABEL[n] for n in TIMEPOINT_ORDER])
     return cb
 
-# Behavioural syllables: 8 paw states (Set3, as in lda_trajectories) + whisk + lick.
+# Behavioural syllables: 8 paw states + whisk + lick.
 N_PAW_STATES = 8
 SYLLABLE_NAMES = [f'Paw {i}' for i in range(N_PAW_STATES)] + ['Whisk', 'Lick']
-SYLLABLE_COLORS = ([mpl.colors.to_hex(c) for c in plt.get_cmap('Set3').colors[:N_PAW_STATES]]
-                   + ['#b8b8b8', '#484949'])
-SYLLABLE = dict(zip(SYLLABLE_NAMES, SYLLABLE_COLORS))
 MODALITY = {'Paw': list(range(N_PAW_STATES)), 'Whisk': [8], 'Lick': [9]}
+
+# ---------------------------------------------------------------------------
+# PAW STATES COLOURED BY WHAT THEY ARE, not by an arbitrary categorical order
+# ---------------------------------------------------------------------------
+# HUE says which forepaw leads -- VIOLET LEFT, AMBER RIGHT -- and LIGHTNESS says how
+# vigorous the state is. Both come
+# from segmentation/paw_bias/state_profiles_19Ago2026.csv, reduced the way
+# 4_mice/laterality/laterality_features.state_laterality() reduces it:
+#   vigor = mean session-z-scored wavelet power over all 20 paw channels
+#   LI    = (left - right) / (|left| + |right|),  so POSITIVE = LEFT paw
+# The eight states sit on that plane already -- 3 and 4 mirror each other at moderate
+# vigor, 5 and 6 mirror each other higher up, and 0/1/2/7 are a symmetric spine from
+# still to very fast -- so this palette shows the structure rather than hiding it.
+#
+# CHROMA IS THE SIZE OF THE LEFT-RIGHT GAP, |left - right|, NOT the laterality index.
+# LI is a RATIO, (L-R)/(|L|+|R|), and its denominator collapses for the quiet states, so it
+# manufactures bias out of nothing: state 1's paws differ by 0.045 -- no movement either
+# side -- but over a denominator of 0.349 that reads as LI +0.13 and came out visibly
+# tinted. State 4 is the same trick inverted, a 0.386 gap over 0.472 giving LI -0.82.
+# The two rankings disagree almost everywhere:
+#     by |LI|            4 > 3 > 6 > 5 > 1 > 2 > 7 > 0
+#     by |left - right|  5 > 6 > 3 > 7 > 4 > 2 > 1 > 0
+# The gap is the honest one. It also fixes, for free, what two earlier attempts could not:
+# states 5 and 6 are the FAST lateralised pair the LD3 result rests on and they hold the two
+# largest real asymmetries (0.956, 0.952), so they finally come out the boldest marks on the
+# panel instead of the palest. A compressive transform (sqrt|LI|) was tried and goes the
+# WRONG way -- it lifts the small values, doubling state 1's chroma.
+#
+# WHAT IT COSTS: state 4 falls from C 0.20 to 0.10. Its LI is the most extreme in the set but
+# its actual gap is modest, because both its paws barely move; it is also the single strongest
+# correlate of LD3 (r = +0.61), so the state doing most of the work on that axis is no longer
+# the most saturated. Measured: normal 12.6 / CVD 12.4, against |LI|'s 14.6 / 13.4.
+# VIOLET LEFT (310), AMBER RIGHT (90) -- chosen to stay off LD1_CMAP, which runs blue (271)
+# to red (22) and so owns both ends of the obvious diverging pair. Blue/orange separated
+# better (CVD 12.4 against 9.6) because blue-yellow is the one chromatic axis dichromats
+# keep, but it put the paw palette in the same hues as the individuality axis the paper is
+# about. 9.6 still clears the 8 the validator asks for.
+#
+# 310 rather than the CVD-optimal 295: the sweep's best violet is only 24 deg off LD1's blue
+# pole, i.e. it still reads blue-purple and does not solve the problem it exists for. 310 is
+# 39 deg clear and genuinely purple. Past 320 the CVD floor goes.
+#     violet  295 -> CVD 11.4, LD1 gap 24     310 -> CVD 9.6, gap 39     325 -> CVD 7.5, gap 54
+# The amber hue is free: CVD is flat across 80-100, so it was picked on appearance.
+PAW_LEFT, PAW_RIGHT = '#7B09AE', '#985800'
+#                                                     gap    vigor   frames   C
+PAW_STATE_COLORS = ['#EDE8D8',   # 0  still, neutral   -0.018  -0.61   35.7%  0.022
+                    '#BFB5C7',   # 1  slow, neutral    +0.045  -0.17   27.3%  0.027
+                    '#857691',   # 2  moderate, faint  +0.123  +0.70    7.8%  0.044
+                    '#A96BD3',   # 3  moderate, LEFT   +0.670  +0.53    7.9%  0.161
+                    '#B79C50',   # 4  moderate, right  -0.386  +0.24   11.5%  0.101
+                    '#7B09AE',   # 5  fast, LEFT       +0.956  +1.54    3.5%  0.223
+                    '#985800',   # 6  fast, RIGHT      -0.952  +1.16    5.7%  0.119
+                    '#462600']   # 7  very fast, right -0.507  +3.19    0.7%  0.069
+
+# THE HMM's STATE NUMBERS ARE ARBITRARY, so index order is not vigor order -- state 2 is more
+# vigorous than 3 and 4 and is therefore darker, which reads as a mistake in a legend laid out
+# 0..7. This is the order to DISPLAY them in: stacks and legends built on it run monotonically
+# from pale-still to dark-vigorous, which is what lightness already encodes.
+#     lightness along PAW_VIGOR_ORDER   0.93 0.79 0.70 0.64 0.59 0.52 0.47 0.30   monotone
+#     lightness in index order          0.93 0.79 0.59 0.64 0.70 0.47 0.52 0.30   not
+# The COLOUR keying is untouched: PAW_STATE_COLORS[k] is still state k.
+PAW_VIGOR_ORDER = [0, 1, 4, 3, 2, 6, 5, 7]
+
+PAW_LATERAL = {'left': [3, 5], 'right': [4, 6], 'symmetric': [0, 1, 2, 7]}
+PAW = dict(zip([f'Paw {i}' for i in range(N_PAW_STATES)], PAW_STATE_COLORS))
+
+PAW_SIDE = {s: side for side, states in PAW_LATERAL.items() for s in states}
+
+
+def paw_label(state, with_side=True):
+    """'Paw 3  (left)' -- so a legend states the encoding instead of asking the reader to
+    remember it. Symmetric states get no tag, because they have no side to name."""
+    side = PAW_SIDE.get(state, 'symmetric')
+    return f'Paw {state}' + ('' if side == 'symmetric' or not with_side else f'  ({side})')
+
+
+# ---------------------------------------------------------------------------
+# THE SYLLABLE RASTER -- trials x bins, one convention for every figure using it
+# ---------------------------------------------------------------------------
+# A syllable is (paw state, whisking on/off, licking on/off), packed as
+#     code = paw + n_paw*whisk + 2*n_paw*lick          paw is the FAST index
+# which is 32 values for 8 paw states. Drawn as ONE image, that needs 32 distinguishable
+# colours, and the old figure got them as 8 hues x 4 lightness steps.
+#
+# WHY THAT NO LONGER WORKS. PAW_STATE_COLORS spends BOTH hue and lightness on the paw
+# dimension -- hue is which forepaw leads, lightness is vigor -- so there is no free
+# visual channel left inside one image. Any lightness step for whisk/lick now collides
+# with vigor, and at one pixel per bin a 4-way lightness step was not resolvable anyway:
+# it read as texture rather than as data.
+#
+# SO THE RASTER SPLITS. Whisking and licking are BINARY -- one bit each -- and a slim
+# band carries one bit better than a shade does. Three aligned images: the paw raster,
+# then whisk, then lick, sharing the x axis and the trial ordering. Nothing is lost, the
+# collision is gone, and it matches how the structural-coefficient panel already splits
+# paw from whisk/lick, so the two figures stop disagreeing about what colour means.
+#
+# MISSING BINS ARE HATCHED, NOT WHITE. Paw state 0 is '#EFE6E1' -- nearly white, and 36%
+# of all frames -- so a NaN drawn as white would be indistinguishable from the commonest
+# state, in figures whose whole point is sometimes that a session is badly tracked. The
+# axes carry a hatched patch underneath and NaNs are left transparent, so a gap reads as
+# a gap.
+NODATA_HATCH = '////'
+NODATA_EDGE = '#C8C8C8'
+
+
+def decode_syllables(codes, n_paw_states=N_PAW_STATES):
+    """Unpack `code = paw + n*whisk + 2n*lick` into (paw, whisk, lick).
+
+    NaN in, NaN out -- a missing bin stays missing in all three, rather than decoding to
+    paw 0 (which is a real and very common state, so the mistake would be invisible).
+    """
+    c = np.asarray(codes, dtype=float)
+    bad = np.isnan(c)
+    ci = np.where(bad, 0, c).astype(int)
+    paw = np.where(bad, np.nan, ci % n_paw_states)
+    whisk = np.where(bad, np.nan, (ci // n_paw_states) % 2)
+    lick = np.where(bad, np.nan, ci // (2 * n_paw_states))
+    return paw, whisk, lick
+
+
+def _binary_cmap(color):
+    return ListedColormap(['#FFFFFF', color])
+
+
+def syllable_raster(codes, fig=None, subplot_spec=None, sort='paw',
+                    n_paw_states=N_PAW_STATES, band=0.09, epochs=True, labels=True):
+    """Draw one session as three aligned bands: paw state, whisking, licking.
+
+    `codes` is (trials, bins) of PACKED syllable codes -- the raw `binned_sequence`
+    values, not a renumbering. Unpacking happens here so that every figure agrees about
+    which index is which.
+
+    sort : 'paw'  order trials by mean paw state, which is what makes the block
+                  structure legible; 'none' keeps the true trial order (a raster);
+                  or pass an explicit index array.
+    subplot_spec : a SubplotSpec to draw into, for embedding beside other panels.
+                   Without one the current or a new figure is used.
+
+    Returns {'paw': ax, 'whisk': ax, 'lick': ax}.
+    """
+    from matplotlib.gridspec import GridSpecFromSubplotSpec
+    from matplotlib.patches import Rectangle
+
+    codes = np.asarray(codes, dtype=float)
+    paw, whisk, lick = decode_syllables(codes, n_paw_states)
+
+    if isinstance(sort, str):
+        if sort == 'paw':
+            order = np.argsort(np.nanmean(np.where(np.isnan(paw), np.nan, paw), axis=1))
+        elif sort == 'none':
+            order = np.arange(len(codes))
+        else:
+            raise ValueError("sort must be 'paw', 'none', or an index array")
+    else:
+        order = np.asarray(sort)
+    paw, whisk, lick = paw[order], whisk[order], lick[order]
+
+    fig = fig or plt.gcf()
+    heights = [1 - 2 * band, band, band]
+    if subplot_spec is None:
+        gs = fig.add_gridspec(3, 1, height_ratios=heights, hspace=0.06)
+    else:
+        gs = GridSpecFromSubplotSpec(3, 1, subplot_spec=subplot_spec,
+                                     height_ratios=heights, hspace=0.06)
+    axes = {}
+    for row, (key, data, cmap) in enumerate((
+            ('paw', paw, ListedColormap(PAW_STATE_COLORS)),
+            ('whisk', whisk, _binary_cmap(SYLLABLE['Whisk'])),
+            ('lick', lick, _binary_cmap(SYLLABLE['Lick'])))):
+        ax = fig.add_subplot(gs[row])
+        # the hatch sits UNDER the image; NaNs are transparent, so a missing bin shows it
+        ax.add_patch(Rectangle((0, 0), 1, 1, transform=ax.transAxes, zorder=0,
+                               facecolor='white', edgecolor=NODATA_EDGE,
+                               hatch=NODATA_HATCH, linewidth=0))
+        cm = cmap.copy()
+        cm.set_bad(alpha=0.0)
+        vmax = n_paw_states - 1 if key == 'paw' else 1
+        ax.imshow(np.ma.masked_invalid(data), aspect='auto', cmap=cm,
+                  interpolation='none', vmin=0, vmax=vmax, zorder=1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        if epochs:
+            epoch_lines(ax, codes.shape[1])
+        if labels and key != 'paw':
+            ax.set_ylabel(key, rotation=0, ha='right', va='center',
+                          fontsize=plt.rcParams['font.size'] * 0.7)
+        axes[key] = ax
+    if labels:
+        axes['paw'].set_ylabel('Trials')
+    return axes
+
+
+# Whisk and lick are one BIT each, so when a mark has room they can ride on top of the
+# paw colour as texture instead of taking a colour channel. Compositional on purpose:
+# "both" is the two marks together, so there is nothing extra to learn for it. Line vs dot
+# rather than '/' vs '\\', which are mirror images and the hardest pair in the hatch
+# vocabulary to tell apart; the sparse punctate mark goes to licking, which is on in ~11%
+# of bins against whisking's ~48%.
+PAW_HATCH = {(0, 0): '', (1, 0): '//', (0, 1): '..', (1, 1): '//..'}
+
+# ONE BLACK INK by default. Note what it costs: the palette spans OKLCH L 0.93 to 0.30, and
+# on the three darkest states -- 5, 6 and 7, which are the vigorous ones and so the likeliest
+# to be whisking -- black hatch on a dark fill has little contrast and largely disappears.
+# hatch_ink() below switches to white ink there and syllable_histogram(edge='auto') uses it,
+# which is more legible but puts two inks in one panel. The split is in relative luminance
+# rather than OKLCH so it needs no colour-space maths; 0.17 sits between state 2 (0.200) and
+# state 6 (0.137), which is where OKLCH L 0.55 falls for this palette.
+HATCH_INK_DARK = '#000000CC'
+HATCH_INK_LIGHT = '#FFFFFFDD'
+HATCH_INK_SPLIT = 0.17
+
+
+def hatch_ink(fill):
+    """The hatch colour to use over `fill` -- dark ink on pale fills, light on dark."""
+    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+               for c in to_rgb(fill))
+    lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return HATCH_INK_LIGHT if lum < HATCH_INK_SPLIT else HATCH_INK_DARK
+HATCH_MIN_PT = 12.0     # a hatch needs roughly this much cell width to read; measured by
+                        # stepping one patch down from 40pt to 3pt -- below ~10 the four
+                        # textures stop separating, and below ~6 they vanish entirely
+
+
+def syllable_histogram(codes, ax=None, texture=False, n_paw_states=N_PAW_STATES,
+                       lowest_on_top=True, edge=None, warn=True):
+    """Trial-aligned syllable histogram: one stacked column per time bin.
+
+    Each column is the composition of syllables ACROSS TRIALS at that bin -- trial identity
+    is deliberately gone, which is what separates this from syllable_raster. Equivalent to
+    fig 2A's `imshow(np.sort(seq, axis=0))`, with two differences:
+
+      * the sort key is the decoded (paw, whisk, lick), so the stack is ordered by paw
+        state directly. fig 2A had to renumber the raw codes to control that order.
+      * the y axis is a FRACTION of trials. fig 2A labelled it "Syllable count", but every
+        column holds the same number of trials, so the height carried no information.
+
+    texture : lay ps.PAW_HATCH over each block, so one panel carries paw side, paw vigor,
+        whisking and licking together. Only worth it when bins are wide -- the blocks are
+        drawn as patches so that a hatch is possible at all, and `warn` reports the bin
+        width when it falls under HATCH_MIN_PT. It also costs something: whisking splits
+        most paw blocks in two, so the panel gains edges that are not paw transitions,
+        and the laterality contrast gets quieter. Prefer it when whisk/lick ARE the
+        question, and colour alone when paw side is.
+
+    lowest_on_top : keep fig 2A's orientation, where paw state 0 sits at the top of the
+        stack. That is what imshow's default origin='upper' produced there, so matching it
+        keeps old and new panels comparable. False stacks upward from state 0 instead.
+
+    edge : the hatch colour. None means HATCH_INK_DARK -- one black ink everywhere. Pass
+        'auto' for hatch_ink(), which switches to white ink on the dark fills; that reads
+        better on states 5, 6 and 7, at the cost of two inks in one panel.
+
+    Missing bins shrink the stack rather than being filled in, so a poorly tracked bin is
+    a short column, not a fabricated one.
+    """
+    from matplotlib.patches import Rectangle
+    ax = ax or plt.gca()
+    codes = np.asarray(codes, dtype=float)
+    paw, whisk, lick = decode_syllables(codes, n_paw_states)
+    # RANK, not the raw state number. The HMM's numbering is arbitrary, so stacking on it
+    # puts state 2 (vigor +0.70) above states 3 and 4 (+0.53, +0.24) and the stack's
+    # lightness jumps about. Stacking on PAW_VIGOR_ORDER makes the column run
+    # pale-still -> dark-vigorous, which is what lightness already means.
+    rank = np.empty(n_paw_states, dtype=float)
+    rank[np.asarray(PAW_VIGOR_ORDER)] = np.arange(n_paw_states)
+    paw_rank = np.where(np.isnan(paw), np.nan, rank[np.where(np.isnan(paw), 0, paw).astype(int)])
+    key = paw_rank * 4 + whisk + 2 * lick      # vigor sets block order, whisk/lick divide it
+    unrank = np.asarray(PAW_VIGOR_ORDER)       # rank -> state, to get the colour back
+    n_bins = codes.shape[1]
+
+    if texture and warn:
+        w_pt = ax.get_window_extent().width / max(n_bins, 1) * 72 / ax.figure.dpi
+        if w_pt < HATCH_MIN_PT - 0.5:      # tolerance: sizing FOR the threshold lands on
+                                           # 11.99 and a warning there is just noise
+            print(f'  syllable_histogram: ~{w_pt:.0f} pt per bin, under the {HATCH_MIN_PT:.0f} '
+                  f'a hatch needs -- widen the panel, show fewer bins, or use texture=False')
+
+    for b in range(n_bins):
+        col = key[:, b]
+        col = np.sort(col[~np.isnan(col)])
+        n = len(col)
+        if not n:
+            continue
+        cuts = np.flatnonzero(np.diff(col)) + 1
+        for lo, hi in zip(np.r_[0, cuts], np.r_[cuts, n]):
+            k = int(col[lo])
+            p, wl = unrank[k // 4], k % 4      # back from vigor rank to the state index
+            w, l = wl % 2, wl // 2
+            y0, y1 = lo / n, hi / n
+            if lowest_on_top:
+                y0, y1 = 1 - y1, 1 - y0
+            fill = PAW_STATE_COLORS[p]
+            ink = (hatch_ink(fill) if edge == 'auto'
+                   else (HATCH_INK_DARK if edge is None else edge)) if texture else 'none'
+            ax.add_patch(Rectangle((b, y0), 1, y1 - y0, facecolor=fill,
+                                   hatch=PAW_HATCH[(w, l)] if texture else '',
+                                   edgecolor=ink, linewidth=0))
+    ax.set_xlim(0, n_bins)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel('Fraction of trials')
+    return ax
+
+
+def whisk_lick_panel(codes, ax=None, n_paw_states=N_PAW_STATES):
+    """P(whisking) as a filled band and P(licking) as a line, per time bin.
+
+    The companion to syllable_histogram(texture=False): the two binary channels as the
+    proportions they are, rather than squeezed into the stack. Licking largely rides on
+    whisking, which this shows directly -- the lick curve sits inside the whisk envelope.
+    """
+    ax = ax or plt.gca()
+    _, whisk, lick = decode_syllables(np.asarray(codes, dtype=float), n_paw_states)
+    t = np.arange(whisk.shape[1])
+    ax.fill_between(t, np.nanmean(whisk, axis=0), color=SYLLABLE['Whisk'], lw=0,
+                    label='whisk')
+    ax.plot(t, np.nanmean(lick, axis=0), color=SYLLABLE['Lick'], lw=2, label='lick')
+    ax.set_xlim(0, whisk.shape[1] - 1)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel('P(on)')
+    return ax
+
+
+def paw_legend(target=None, ncol=4, title='Paw state', missing=True,
+               hatch=False, **kw):
+    """Legend for the paw raster, labelled with the side each state leads with.
+
+    `target` is a Figure or an Axes. A FIGURE is usually what you want for a row of
+    rasters -- one legend under the whole row rather than one hanging off a panel --
+    and it defaults to the current figure. With `missing`, the hatch used for absent
+    bins gets a key too, because an unexplained hatch reads as a rendering artifact.
+    With `hatch`, the whisk/lick/both marks are keyed as well, on a neutral fill so the
+    mark is what reads rather than the colour under it -- pass it whenever the panel was
+    drawn with texture=True.
+    """
+    from matplotlib.patches import Patch
+    # listed in PAW_VIGOR_ORDER, so the swatches form a smooth pale-to-dark ramp instead of
+    # jumping around with the HMM's arbitrary numbering
+    handles = [Patch(facecolor=PAW_STATE_COLORS[s], label=paw_label(s))
+               for s in PAW_VIGOR_ORDER]
+    if missing:
+        handles.append(Patch(facecolor='white', edgecolor=NODATA_EDGE,
+                             hatch=NODATA_HATCH, label='no data'))
+    if hatch:
+        # keyed on a neutral fill so the mark itself is what reads, not the colour under it
+        # keyed on a neutral fill, so the mark reads rather than the colour under it; the
+        # ink matches what hatch_ink() would choose for that fill
+        handles += [Patch(facecolor='white', edgecolor=hatch_ink('white'),
+                          hatch=PAW_HATCH[k], label=lab)
+                    for k, lab in (((1, 0), 'whisk'), ((0, 1), 'lick'), ((1, 1), 'both'))]
+    target = target if target is not None else plt.gcf()
+    kw.setdefault('loc', 'upper center')
+    kw.setdefault('bbox_to_anchor', (0.5, 0.02))
+    if hasattr(target, 'add_subplot'):          # a Figure
+        return target.legend(handles=handles, title=title, ncol=ncol,
+                             frameon=False, **kw)
+    return target.legend(handles=handles, title=title, ncol=ncol, frameon=False, **kw)
+
+
+# SYLLABLE IS DERIVED FROM PAW_STATE_COLORS, never listed separately. It used to be its own
+# Set3 slice, and leaving it that way while PAW_STATE_COLORS existed would have meant
+# ps.SYLLABLE['Paw 3'] and ps.PAW_STATE_COLORS[3] returning DIFFERENT colours for the same
+# state -- two figures in the same paper drawing state 3 in two colours, with nothing
+# saying which was current. Whisk and lick keep their greys: they have no side and no vigor.
+SYLLABLE_COLORS = PAW_STATE_COLORS + ['#b8b8b8', '#484949']
+SYLLABLE = dict(zip(SYLLABLE_NAMES, SYLLABLE_COLORS))
+
+# One neutral null band, not one per state. A permutation null's width depends on the
+# sample size and the feature's own variance, which across these eight states differ by
+# 4.6% -- so eight near-identical bands in eight colours stack into a dark block that
+# carries no information and swallows the traces crossing it.
+NULL_BAND = '#9AA0A6'
 
 # Trial structure. The epochs are equal blocks of the binned trial, so the edges
 # follow from however many bins the file has.
@@ -453,6 +832,19 @@ def use(mode='paper', spines='lb', dpi=None, save_dpi=None, scale=None):
           'box': (True, True, True, True)}[spines]
     for side, flag in zip(('left', 'bottom', 'top', 'right'), on):
         plt.rcParams[f'axes.spines.{side}'] = flag
+    # RETINA PREVIEW. The inline backend rasterises at figure.dpi and the notebook then
+    # displays that PNG at 1 logical pixel per rendered pixel, so on a Retina screen every
+    # figure is upscaled 2x and looks soft. 'retina' renders at 2x and tags the image as 2x,
+    # which the browser displays at the right physical size and full sharpness. It changes
+    # only the preview -- savefig is unaffected, and SVG has no pixels to begin with.
+    try:
+        from IPython import get_ipython
+        _ip = get_ipython()
+        if _ip is not None:
+            _ip.run_line_magic('config', "InlineBackend.figure_format = 'retina'")
+    except Exception:
+        pass        # not in IPython, or the magic is unavailable -- the dpi bump still helps
+
     print(f"paper_style: {mode} mode, spines={spines}, "
           f"font {plt.rcParams['font.size']:.0f} pt, "
           f"panels {SIZES[mode]['single'][0]:.1f}x{SIZES[mode]['single'][1]:.1f} in, "
@@ -633,7 +1025,7 @@ def corr_panel(ax, x, y, color=None, method='pearson', log_y=False, xlabel=None,
 
 
 def savefig(fig, name, svg=False, formats=None, subdir=None, dated=True,
-            tag_mode=True, **kw):
+            tag_mode=True, save=None, **kw):
     """Write a figure to figures/ under the paper's naming convention.
 
         <name>[_<mode>]_<DD-MM-YYYY>.png
@@ -645,7 +1037,22 @@ def savefig(fig, name, svg=False, formats=None, subdir=None, dated=True,
     The date is the RUN date, so re-running never silently overwrites yesterday's
     figure: you get a new file and the old one stays for comparison. Pass dated=False
     for a stable filename when a manuscript references one.
+
+    WRITING IS OPT-IN. By default this only reports the filename it WOULD write and
+    returns []. Every exploratory re-run of a notebook otherwise drops another dated
+    pair into figures/, so the directory fills with near-identical files and the one
+    that belongs in the paper is whichever happened to run last. Turn it on for the
+    run that matters, either globally or for one call:
+
+        ps.saving(True)                 # this session writes figures
+        ps.savefig(fig, 'name')         # ...as usual
+        ps.savefig(fig, 'name', save=True)   # or just this one, whatever the default
+
+    `save` overrides the module default in both directions, so a notebook that must
+    always write can pass save=True and ignore the switch.
     """
+    if save is None:
+        save = SAVE_FIGURES
     if formats is None:
         formats = ('png', 'svg') if svg else ('png',)
     stem = name
@@ -655,6 +1062,13 @@ def savefig(fig, name, svg=False, formats=None, subdir=None, dated=True,
     if dated:
         stem = f'{stem}_{_date.today().strftime(DATE_FMT)}'
     out = FIGDIR if subdir is None else FIGDIR / subdir
+    if not save:
+        # Say what WOULD be written, and how to write it. A silent no-op is worse than
+        # the old always-write: you go looking in figures/ for something that is not there.
+        rel = ', '.join(str((out / f'{stem}.{f}').relative_to(ROOT)) for f in formats)
+        print(f'not saved (ps.SAVE_FIGURES is False): {rel}'
+              '   -- ps.saving(True) to write, or pass save=True')
+        return []
     out.mkdir(parents=True, exist_ok=True)
     paths = []
     for f in formats:
@@ -663,3 +1077,12 @@ def savefig(fig, name, svg=False, formats=None, subdir=None, dated=True,
         paths.append(p)
     print('wrote ' + ', '.join(str(p.relative_to(ROOT)) for p in paths))
     return paths
+
+
+def saving(on=True):
+    """Turn figure writing on or off for this session. Returns the new state, so
+    `ps.saving(True)` reads as a statement in a notebook."""
+    global SAVE_FIGURES
+    SAVE_FIGURES = bool(on)
+    print(f'figure writing {"ON -- figures/ will be updated" if SAVE_FIGURES else "OFF"}')
+    return SAVE_FIGURES

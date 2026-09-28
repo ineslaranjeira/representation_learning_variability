@@ -21,5 +21,6 @@ lines.linewidth:    3.0
 lines.markersize:   9.0
 errorbar.capsize:   3.5
 
-figure.dpi:         100
+# on-screen only; see paper.mplstyle
+figure.dpi:         150
 savefig.dpi:        300

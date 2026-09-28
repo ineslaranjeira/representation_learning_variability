@@ -1,13 +1,17 @@
 # PAPER mode: journal column widths, small type. Applied on top of paper_base.
-font.size:          7
-axes.titlesize:     8
-axes.labelsize:     7
-xtick.labelsize:    6
-ytick.labelsize:    6
-legend.fontsize:    6
-figure.titlesize:   8
+# Type is 8/7 pt rather than 7/6. Both are inside what journals accept (Nature's floor is
+# 5 pt at final size), but 6 pt tick labels on an 86 mm column were at the very bottom of
+# the range and unreadable while working. One point up costs nothing in the layout and is
+# still comfortably journal-legal. Revert by subtracting 1 from every size here.
+font.size:          8
+axes.titlesize:     9
+axes.labelsize:     8
+xtick.labelsize:    7
+ytick.labelsize:    7
+legend.fontsize:    7
+figure.titlesize:   9
 
-axes.linewidth:     0.6
+axes.linewidth:     0.7
 xtick.major.size:   2.5
 ytick.major.size:   2.5
 xtick.major.width:  0.6
@@ -19,5 +23,9 @@ lines.linewidth:    1.2
 lines.markersize:   3.5
 errorbar.capsize:   1.5
 
-figure.dpi:         120
+# ON-SCREEN ONLY. 120 rendered a 3.4 in panel as 408 px, which a Retina display then
+# upscales -- the pixelation. 200 makes the preview sharp and, since it scales the whole
+# frame uniformly, also makes 7 pt type legible while you work WITHOUT changing the
+# type-to-panel ratio the journal will see. savefig.dpi below is untouched.
+figure.dpi:         200
 savefig.dpi:        400
