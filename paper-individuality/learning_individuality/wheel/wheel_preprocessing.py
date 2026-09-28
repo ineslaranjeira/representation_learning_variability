@@ -76,6 +76,16 @@ SEGMENTATION_CANDIDATES = [
 ]
 
 
+def _cache_path(name):
+    """Resolve a cache filename next to THIS module, not next to the caller's cwd.
+
+    Without this, `contrast_history()` called from another notebook's directory would
+    miss the existing cache and rebuild it from Google Drive into a stray copy.
+    """
+    return name if name is None or os.path.isabs(name) else \
+        str(pathlib.Path(__file__).resolve().parent / name)
+
+
 def _pick(cands, what):
     hit = next((c for c in cands if os.path.isdir(c)), None)
     assert hit is not None, f'no {what} directory found; tried:\n  ' + '\n  '.join(cands)
@@ -142,6 +152,7 @@ def training_history(cache='training_history.parquet', refresh=False):
     `columns=` skips the rest on disk rather than after loading. The result is then
     cached locally, because even the cheap version is not worth repeating.
     """
+    cache = _cache_path(cache)
     if cache and os.path.exists(cache) and not refresh:
         return pd.read_parquet(cache)
     rows = []
@@ -162,6 +173,84 @@ def training_history(cache='training_history.parquet', refresh=False):
     if cache:
         out.to_parquet(cache)
     return out
+
+
+def contrast_history(cache='contrast_history.parquet', refresh=False):
+    """(mouse, session, session_date, ordinal, n_trials, n_levels, levels) per session.
+
+    `n_levels` is how many distinct absolute stimulus contrasts the session used. It
+    is what turns the IBL training protocol into a clock: a mouse starts on two
+    contrasts (1.0 and 0.5), and 0.25 is added only once it meets the stage criterion,
+    so the ordinal of the first three-contrast session is a graduation date.
+
+    Why not read `task_protocol` or the trainingStatus field instead: every session in
+    these tables is some spelling of trainingChoiceWorld (12 spellings across 102
+    mice), so the protocol string does not mark the stage. The contrast set does.
+
+    Same read strategy as `training_history` -- five columns of a 30k-row table, then
+    cached, because these files stream from Google Drive on the mac.
+    """
+    cache = _cache_path(cache)
+    if cache and os.path.exists(cache) and not refresh:
+        return pd.read_parquet(cache)
+    rows = []
+    for f in sorted(os.listdir(LEARNING_TABLE_DIR)):
+        if f.startswith('.'):
+            continue
+        mouse = f.replace('training_data_trials_', '')
+        try:
+            t = pd.read_parquet(os.path.join(LEARNING_TABLE_DIR, f),
+                                columns=['session', 'session_date',
+                                         'contrastLeft', 'contrastRight'])
+        except Exception:
+            continue
+        # exactly one of the two columns is set per trial; the side is irrelevant here
+        t['contrast'] = np.abs(np.where(t['contrastLeft'].notna(),
+                                        t['contrastLeft'], t['contrastRight']))
+        g = (t.groupby(['session_date', 'session'], sort=True)
+               .agg(n_trials=('contrast', 'size'),
+                    levels=('contrast', lambda s: tuple(sorted(s.dropna().unique()))))
+               .reset_index().sort_values('session_date').reset_index(drop=True))
+        g['mouse_name'] = mouse
+        g['ordinal'] = np.arange(1, len(g) + 1)
+        g['n_levels'] = g['levels'].apply(len)
+        rows.append(g)
+    out = pd.concat(rows, ignore_index=True)
+    out['levels'] = out['levels'].astype(str)          # tuples are not parquet-safe
+    if cache:
+        out.to_parquet(cache)
+    return out
+
+
+def sessions_to_n_levels(n=3, persist=1, hist=None):
+    """Ordinal of the first session using >= `n` distinct contrasts -- a learning-speed
+    measure that is scored in the first weeks rather than at graduation.
+
+    `persist` requires the next `persist` sessions (inclusive) to also be at >= n, which
+    protects against the protocol's reverse step: 4 of 102 mice drop back to two
+    contrasts after first crossing. It moves exactly one mouse at persist=3, so the
+    choice is not load-bearing; it is exposed because "a criterion that a mouse then
+    fails" is a real thing and the reader should be able to see it does not matter.
+
+    Returns a Series indexed by mouse_name; NaN for a mouse that never crosses.
+
+    LEFT CENSORING. A mouse whose ordinal-1 session is already at >= n did not start
+    being recorded at the start of its training, so its value is a lower bound, not a
+    measurement. Those mice are returned, and the caller should drop them; the notebook
+    does, and names them.
+    """
+    h = contrast_history() if hist is None else hist
+    out = {}
+    for m, g in h.groupby('mouse_name'):
+        g = g.sort_values('ordinal')
+        nl, od = g['n_levels'].values, g['ordinal'].values
+        hit = np.nan
+        for i in range(len(nl)):
+            if nl[i] >= n and (nl[i:i + persist] >= n).all():
+                hit = od[i]
+                break
+        out[m] = hit
+    return pd.Series(out, name=f'sessions_to_{n}lv').sort_index()
 
 
 def first_session_table(min_proficient=1):
