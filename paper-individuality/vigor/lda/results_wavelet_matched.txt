@@ -1,0 +1,48 @@
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_raw_shrink0.5_360_28-09-2026: 260 sessions, 56 mice, 10 labs
+merged: 260 sessions, 56 mice
+sessions with wavelet files: 260/260
+
+==============================================================================
+1. IS THE hypot() METRIC THE SAME THING AS THE PIPELINE FEATURES?
+==============================================================================
+  r(paw_mean_speed          , wav_all ) = +0.975
+  r(paw_band_0.5_8          , wav_all ) = +0.922
+  r(paw_mean_speed_moving   , wav_all ) = +0.780
+  r(l_paw_mean_speed        , wav_l   ) = +0.973
+  r(r_paw_mean_speed        , wav_r   ) = +0.915
+
+==============================================================================
+2. THE 20 CLUSTERING FEATURES vs LD1  (pre-z-score session means)
+==============================================================================
+feature                rho         p |  rho|lab         p
+wav_all             +0.009    0.9466 |   +0.022    0.8717
+wav_l               -0.062    0.6488 |   -0.037    0.7875
+wav_r               +0.001    0.9916 |   +0.058    0.6721
+wav_f0.5            -0.066    0.6273 |   -0.062    0.6488
+wav_f1.0            -0.020    0.8815 |   +0.011    0.9358
+wav_f2.0            +0.065    0.6362 |   +0.079     0.562
+wav_f4.0            +0.062    0.6499 |   +0.079    0.5613
+wav_f8.0            -0.042    0.7584 |   -0.005    0.9729
+wav_8_over_0.5      -0.021      0.88 |   -0.021    0.8784
+wav_cv              -0.068     0.616 |   -0.034    0.8045
+  per-feature, all 20:
+   max |rho| = 0.124 (l_paw_x8.0); 0/20 reach p < 0.05 uncorrected
+
+==============================================================================
+3. IS SESSION-LEVEL AMPLITUDE RECOVERABLE FROM THE 360 SYLLABLE FEATURES?
+==============================================================================
+   Ridge, grouped 5-fold by MOUSE, so a fold never shares a mouse. If the
+   per-session z-score really removes amplitude, R2 should sit at or below 0.
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+   paw amplitude (wav_all)          n=260  cross-validated R2 = +0.231   r = +0.519
+   paw amplitude, left (wav_l)      n=260  cross-validated R2 = +0.069   r = +0.408
+   wheel speed while moving         n=260  cross-validated R2 = +0.032   r = +0.417
+   wheel speed, pre-quiescence      n=260  cross-validated R2 = +0.248   r = +0.531
+   LD1 itself (positive control)    n=260  cross-validated R2 = +1.000   r = +1.000

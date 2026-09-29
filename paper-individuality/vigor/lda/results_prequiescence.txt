@@ -1,0 +1,28 @@
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_raw_shrink0.5_360_28-09-2026: 260 sessions, 56 mice, 10 labs
+merged: 260 sessions, 56 mice
+##############################################################################
+A. EPOCH LENGTH (mean seconds of each epoch per trial)
+##############################################################################
+  dur_Pre-quiescence     mean=  0.74s  vs LD1: rho=+0.026 p=0.8509
+  dur_Quiescence         mean=  0.52s  vs LD1: rho=+0.048 p=0.7270
+  dur_Choice             mean=  1.62s  vs LD1: rho=+0.134 p=0.3252
+  dur_ITI                mean=  1.57s  vs LD1: rho=+0.160 p=0.2388
+  wheel_speed_Pre-quiescence vs LD1 controlling its epoch length: +0.435 (p=0.0008)   [raw +0.424]
+  r(speed, length) = +0.274
+
+##############################################################################
+B. REACTION TIME AND TRIAL TIMING
+##############################################################################
+  median_reaction      vs LD1 rho=+0.396 (p=0.0025) | r(with pre-q speed)=+0.325 | pre-q speed vs LD1 controlling it: +0.340 (p=0.0104)
+  median_response      vs LD1 rho=+0.122 (p=0.3723) | r(with pre-q speed)=+0.161 | pre-q speed vs LD1 controlling it: +0.399 (p=0.0023)
+  median_elongation    vs LD1 rho=-0.013 (p=0.9247) | r(with pre-q speed)=+0.162 | pre-q speed vs LD1 controlling it: +0.428 (p=0.0010)
+  n_trials             vs LD1 rho=+0.131 (p=0.3363) | r(with pre-q speed)=+0.236 | pre-q speed vs LD1 controlling it: +0.390 (p=0.0029)
+
+##############################################################################
+C. THE GATING CONTRAST: pre-quiescence minus quiescence
+##############################################################################
+  wheel log(pre-q / quiescence)  rho=+0.441 (p=0.0007)   lab-centred +0.285 (p=0.0334)
+  paw   log(pre-q / quiescence)  rho=+0.484 (p=0.0002)   lab-centred +0.373 (p=0.0047)
+  reliability 0.929 (n=37) -> ceiling 0.952, rho/ceiling = +0.463
+  permutation p (10k): 0.0009

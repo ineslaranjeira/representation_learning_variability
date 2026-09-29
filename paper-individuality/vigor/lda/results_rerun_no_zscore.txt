@@ -1,0 +1,37 @@
+332 subsampled sessions
+  [zscored] supersession (664000, 20), PCA -> 14 comps, KMeans k=8
+  [raw] supersession (664000, 20), PCA -> 14 comps, KMeans k=8
+  25/332
+  50/332
+  75/332
+  100/332
+  125/332
+  150/332
+  175/332
+  200/332
+  225/332
+  250/332
+  275/332
+  300/332
+  325/332
+  [zscored] ARI vs the states on disk: 0.974 (n=332)
+  [raw] ARI vs the states on disk: 0.594 (n=332)
+cached /home/ines/repositories/representation_learning_variability/paper-individuality/vigor/lda/rerun_features.npz
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+
+cohort: 260 sessions, 56 mice
+  1 session(s) had no rig in the sheet; lab taken from the mouse
+  labs: 10 for 260 sessions
+
+================================================================================================
+PAW-ONLY STATES: WITH vs WITHOUT THE PER-SESSION Z-SCORE
+================================================================================================
+variant                               dims   mouse  mouse|lab  lab eta2  lab acc    ICC  r(LD1,amp)
+ZSCORED  (current pipeline)            280   0.756      0.692     0.138    0.312  0.499      -0.098
+RAW      (no per-session z)            280   0.744      0.704     0.121    0.338  0.568      +0.277

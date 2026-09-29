@@ -1,0 +1,115 @@
+##############################################################################
+1. DOES IT DEPEND ON THE EMBEDDING?
+##############################################################################
+embedding                                        n  wheel_mean_speed_m   wheel_frac_moving  wheel_speed_Pre-qu
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins: 194 sessions, 46 mice, 10 labs
+merged: 190 sessions, 46 mice  (4 embedding sessions had no states file)
+mouse_LDA_5_bins                                46   -0.401* (p=0.006)   +0.067  (p=0.659)   -0.426* (p=0.003)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_15_18-09-2026: 263 sessions, 57 mice, 10 labs
+merged: 263 sessions, 57 mice
+mouse_LDA_5_bins_15_18-09-2026                  57   +0.310* (p=0.019)   -0.177  (p=0.188)   +0.314* (p=0.017)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_25_18-09-2026: 269 sessions, 58 mice, 10 labs
+merged: 269 sessions, 58 mice
+mouse_LDA_5_bins_25_18-09-2026                  58   +0.333* (p=0.011)   -0.198  (p=0.136)   +0.364* (p=0.005)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_cut: 249 sessions, 56 mice, 11 labs
+merged: 247 sessions, 56 mice  (2 embedding sessions had no states file)
+mouse_LDA_5_bins_cut                            56   -0.431* (p=0.001)   +0.061  (p=0.654)   -0.496* (p=0.000)
+mouse_LDA_5_bins_cut05-08-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut06-07-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut18-06-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut19-06-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut19-08-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut20-07-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut25_16-09-2026               -- skipped (KeyError)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_cut25_18-09-2026: 269 sessions, 58 mice, 10 labs
+merged: 269 sessions, 58 mice
+mouse_LDA_5_bins_cut25_18-09-2026               58   +0.333* (p=0.011)   -0.198  (p=0.136)   +0.364* (p=0.005)
+mouse_LDA_5_bins_cut25_weighted_17-09-2026      -- skipped (KeyError)
+mouse_LDA_5_bins_cut28-08-2026                  -- skipped (KeyError)
+mouse_LDA_5_bins_cut30_09-09-2026               -- skipped (KeyError)
+mouse_LDA_5_bins_cut30_16-09-2026               -- skipped (KeyError)
+mouse_LDA_5_bins_cut30_weighted_17-09-2026      -- skipped (KeyError)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_paw_15_18-09-2026: 269 sessions, 58 mice, 10 labs
+merged: 269 sessions, 58 mice
+mouse_LDA_5_bins_paw_15_18-09-2026              58   +0.336* (p=0.010)   -0.080  (p=0.549)   +0.375* (p=0.004)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_paw_25_18-09-2026: 263 sessions, 57 mice, 10 labs
+merged: 263 sessions, 57 mice
+mouse_LDA_5_bins_paw_25_18-09-2026              57   -0.415* (p=0.001)   +0.238  (p=0.074)   -0.386* (p=0.003)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_paw_55_18-09-2026: 269 sessions, 58 mice, 10 labs
+merged: 269 sessions, 58 mice
+mouse_LDA_5_bins_paw_55_18-09-2026              58   +0.228  (p=0.085)   -0.046  (p=0.733)   +0.254  (p=0.054)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_raw_25_21-09-2026: 269 sessions, 58 mice, 10 labs
+merged: 269 sessions, 58 mice
+mouse_LDA_5_bins_raw_25_21-09-2026              58   +0.333* (p=0.011)   -0.198  (p=0.136)   +0.364* (p=0.005)
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_raw_shrink0.5_360_28-09-2026: 260 sessions, 56 mice, 10 labs
+merged: 260 sessions, 56 mice
+mouse_LDA_5_bins_raw_shrink0.5_360_28-09-2026   56   +0.387* (p=0.003)   -0.183  (p=0.177)   +0.424* (p=0.001)
+  SIGN IS ARBITRARY per file -- an eigenvector is defined up to sign, so
+  compare |rho| across rows, and signs only within a row.
+vigor: 332 sessions, 101 mice
+embedding mouse_LDA_5_bins_raw_shrink0.5_360_28-09-2026: 260 sessions, 56 mice, 10 labs
+merged: 260 sessions, 56 mice
+
+##############################################################################
+2. RELIABILITY OF THE PER-EPOCH METRICS
+##############################################################################
+wheel_speed_Pre-quiescence   rel= 0.927  ceiling=0.951  rho=+0.424  rho/ceil=+0.446
+wheel_speed_Quiescence       rel= 0.908  ceiling=0.941  rho=-0.279  rho/ceil=-0.297
+wheel_speed_Choice           rel= 0.627  ceiling=0.782  rho=-0.098  rho/ceil=-0.126
+wheel_speed_ITI              rel= 0.806  ceiling=0.887  rho=+0.100  rho/ceil=+0.112
+paw_speed_Pre-quiescence     rel= 0.925  ceiling=0.950  rho=+0.255  rho/ceil=+0.268
+paw_speed_Quiescence         rel= 0.843  ceiling=0.907  rho=-0.338  rho/ceil=-0.373
+paw_speed_Choice             rel= 0.623  ceiling=0.780  rho=-0.092  rho/ceil=-0.118
+paw_speed_ITI                rel= 0.890  ceiling=0.931  rho=-0.117  rho/ceil=-0.126
+
+##############################################################################
+3. WHEEL vs PAW, HEAD TO HEAD
+##############################################################################
+r(wheel_mean_speed_moving, paw_mean_speed_moving) = +0.480
+wheel_mean_speed_moving    vs LD1: raw +0.387 -> controlling paw_mean_speed_moving: +0.294 (p=0.0279)
+paw_mean_speed_moving      vs LD1: raw +0.267 -> controlling wheel_mean_speed_moving: +0.050 (p=0.7146)
+
+##############################################################################
+4. IS PRE-QUIESCENCE WHEEL SPEED A SEPARATE FACT?
+##############################################################################
+  controlling wheel_mean_speed_moving   : +0.325  p=0.0145  [r(tgt,ctrl)=+0.728]
+  controlling wheel_mean_speed          : +0.456  p=0.0004  [r(tgt,ctrl)=+0.587]
+  controlling wheel_frac_moving         : +0.443  p=0.0006  [r(tgt,ctrl)=+0.029]
+  controlling wheel_speed_ITI           : +0.433  p=0.0009  [r(tgt,ctrl)=+0.316]
+  controlling wheel_speed_Choice        : +0.428  p=0.0010  [r(tgt,ctrl)=-0.015]
+  controlling paw_speed_Pre-quiescence  : +0.308  p=0.0208  [r(tgt,ctrl)=+0.680]
+  lab-centred: +0.424
+  per-lab rho (labs with >=5 mice), to check it is not one lab:
+    angelakilab            n= 8  rho=-0.214  p=0.610
+    churchlandlab          n= 7  rho=+0.214  p=0.645
+    churchlandlab_ucla     n= 5  rho=+0.700  p=0.188
+    danlab                 n= 7  rho=+0.393  p=0.383
+    hausserlab             n= 6  rho=+0.771  p=0.072
+    mainenlab              n= 7  rho=+0.857  p=0.014
+    mrsicflogel            n= 7  rho=+0.357  p=0.432
+
+##############################################################################
+5. n_sessions AND DURATION
+##############################################################################
+  LD1 vs n_sessions    : rho=+0.203 p=0.134
+    wheel_mean_speed_moving      r(metric,n_se)=+0.412   rho|n_se=+0.308 (p=0.0209)
+    wheel_frac_moving            r(metric,n_se)=+0.133   rho|n_se=-0.210 (p=0.1204)
+    wheel_speed_Pre-quiescence   r(metric,n_se)=+0.249   rho|n_se=+0.379 (p=0.0040)
+    paw_mean_speed_moving        r(metric,n_se)=+0.164   rho|n_se=+0.228 (p=0.0911)
+    paw_speed_Quiescence         r(metric,n_se)=-0.055   rho|n_se=-0.329 (p=0.0134)
+  LD1 vs duration_min  : rho=+0.150 p=0.270
+    wheel_mean_speed_moving      r(metric,dura)=+0.027   rho|dura=+0.374 (p=0.0046)
+    wheel_frac_moving            r(metric,dura)=-0.078   rho|dura=-0.190 (p=0.1602)
+    wheel_speed_Pre-quiescence   r(metric,dura)=+0.309   rho|dura=+0.378 (p=0.0041)
+    paw_mean_speed_moving        r(metric,dura)=+0.146   rho|dura=+0.228 (p=0.0917)
+    paw_speed_Quiescence         r(metric,dura)=-0.113   rho|dura=-0.344 (p=0.0095)

@@ -1,0 +1,18 @@
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+  1 session(s) had no rig in the sheet; lab taken from the mouse
+  labs: 10 for 260 sessions
+rig covariates present: log_tube 213/260, log_fr 217/260, log_noise 260/260
+
+block                                      dims  mouse   |lab   |rig  labID    ICC
+SCALE  = log mean + log sd  (DISCARDED)      40  0.690  0.625  0.688  0.315  0.675
+  log MEAN only                              20  0.598  0.510  0.560  0.285  0.653
+  log SD only                                20  0.573  0.508  0.558  0.288  0.681
+SHAPE  = skew + kurtosis    (KEPT)           40  0.313  0.454  0.340  0.200  0.863
+CORR   = 190 correlations   (KEPT)          190  0.779  0.698  0.758  0.354  0.426
+chance                                           0.018  0.018  0.018  0.100

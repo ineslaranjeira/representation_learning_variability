@@ -1,0 +1,14 @@
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+  1 session(s) had no rig in the sheet; lab taken from the mouse
+  labs: 10 for 260 sessions
+wheel scale coverage: 260/260 sessions, 10 features
+
+feature set                   dims   mouse  mouse|lab  lab eta2  lab ID     ICC
+SYLLABLES (current)            360   0.877      0.758     0.177   0.377   0.752
+SYLLABLES + WHEEL scale        370   0.869      0.781     0.180   0.381   0.718

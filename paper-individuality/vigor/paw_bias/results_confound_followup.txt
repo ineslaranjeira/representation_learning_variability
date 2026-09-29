@@ -1,0 +1,45 @@
+== how contaminated is each metric? (session level, r with the 32 Hz noise LI) ==
+  li_bandpow     r=+0.801 p=1.97e-75   mean=-0.0755
+  li_spmed       r=+0.478 p=2.17e-20   mean=-0.0985
+  li_jitter      r=+0.922 p=1.02e-137   mean=-0.3031
+  li_boutrate    r=-0.226 p=3.18e-05   mean=-0.0163
+  lag_s          r=-0.206 p=1.55e-04   mean=-0.0027
+  xcorr_peak     r=-0.186 p=6.58e-04   mean=+0.4927
+  li_snr         r=-0.142 p=9.55e-03   mean=+0.4310
+
+  32 Hz noise LI itself: mean=-0.4818  (strongly right-shifted = right camera noisier)
+  per-paw SNR: left median=132.6  right median=51.1
+
+== population-level bias on the gain-invariant SNR metric (mouse means) ==
+  LI[SNR] mean=+0.4333 sd=0.1153 n=101 mice  t=+37.76 p=5.46e-61  wilcoxon p=2.83e-18
+  mice with left-biased SNR: 100/101
+
+== is the SNR bias an individual trait? ==
+  ICC=0.845 p_perm=0.0001 (307 sessions, 76 mice, null95=0.088)
+  sign consistency: 55.2% of 58 mice (chance 12.9%) p_perm=0.0001
+  (within-session split-half of li_bandpow, reliability ceiling: r=0.889)
+
+== task relations, contamination-controlled (mouse level, n=101) ==
+  li_snr       vs wheel_bias         r=+0.315 rho=+0.415 p_perm=0.0016
+  li_snr       vs frac_right_choice  r=+0.235 rho=+0.261 p_perm=0.0184
+  li_snr       vs frac_right_zero    r=+0.207 rho=+0.238 p_perm=0.0380
+  li_snr       vs perf               r=+0.024 rho=+0.065 p_perm=0.8032
+  li_bandpow   vs wheel_bias         r=+0.407 rho=+0.483 p_perm=0.0002 | partial on noise: r=+0.379 p=0.000
+  li_bandpow   vs frac_right_choice  r=+0.226 rho=+0.306 p_perm=0.0236 | partial on noise: r=+0.254 p=0.010
+  li_bandpow   vs frac_right_zero    r=+0.189 rho=+0.259 p_perm=0.0576 | partial on noise: r=+0.217 p=0.029
+  li_bandpow   vs perf               r=+0.010 rho=+0.008 p_perm=0.9206 | partial on noise: r=+0.011 p=0.910
+  lag_s        vs wheel_bias         r=-0.184 rho=-0.276 p_perm=0.0598 | partial on noise: r=-0.129 p=0.199
+  lag_s        vs frac_right_choice  r=-0.059 rho=-0.093 p_perm=0.5635 | partial on noise: r=-0.035 p=0.728
+  lag_s        vs frac_right_zero    r=-0.150 rho=-0.114 p_perm=0.1414 | partial on noise: r=-0.136 p=0.176
+  lag_s        vs perf               r=+0.111 rho=+0.022 p_perm=0.2663 | partial on noise: r=+0.116 p=0.246
+  xcorr_peak   vs wheel_bias         r=+0.034 rho=+0.021 p_perm=0.7461 | partial on noise: r=+0.047 p=0.642
+  xcorr_peak   vs frac_right_choice  r=+0.046 rho=+0.022 p_perm=0.6487 | partial on noise: r=+0.051 p=0.611
+  xcorr_peak   vs frac_right_zero    r=+0.022 rho=-0.018 p_perm=0.8236 | partial on noise: r=+0.026 p=0.798
+  xcorr_peak   vs perf               r=-0.035 rho=-0.039 p_perm=0.7223 | partial on noise: r=-0.035 p=0.726
+
+== is the noise LI itself related to the task? (it should not be, if the task relations are real) ==
+  li_noisepow  vs wheel_bias         r=+0.231 p_perm=0.0214
+  li_noisepow  vs frac_right_choice  r=+0.091 p_perm=0.3609
+  li_noisepow  vs perf               r=+0.003 p_perm=0.9698
+
+wrote /tmp/claude-1000/-home-ines-repositories-representation-learning-variability/0f9ff46e-f7e2-4bff-86f8-cb2ca583be06/scratchpad/paw_bias_sessions_snr.csv

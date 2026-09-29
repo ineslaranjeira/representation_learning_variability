@@ -1,0 +1,21 @@
+332 sessions resolved to paths
+wrote /home/ines/repositories/representation_learning_variability/paper-individuality/vigor/lda/rig_covariates_sessions.csv: (332, 24)
+
+coverage:
+  l_tube      276/332
+  r_tube      187/332
+  l_fr        277/332
+  r_fr        129/332
+  left ruler source: {'dlc': 227, 'none': 56, 'lp': 49}
+
+DLC vs lightningPose on the same sessions (n=23): rho=+0.818, median ratio 1.030
+  -> the tube is static, so the two trackers should agree; this checks it.
+
+Does ONE camera's ruler stand in for the rig? (n=177 two-camera sessions)
+  rho(l_tube, r_tube) = +0.675; median l/r = 1.927
+  A high rho means the left-camera ruler carries the rig-level geometry
+  and can be used for both paws; a low one means it cannot.
+
+how much does the ruler vary? (it is the thing the correction removes)
+  log l_tube: sd=0.159 across 276 sessions (median 48.6 px)
+  left camera frame rate: {60.0: 245, 61.0: 27, 149.0: 5}
