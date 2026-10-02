@@ -216,7 +216,7 @@ def paw_features(sessions=None, cache=True, verbose=True):
 
 
 # ------------------------------------------------------------- syllable occupancy
-def state_laterality():
+def state_laterality(profiles=None):
     """Per-HMM-state laterality, recomputed from the state wavelet profiles rather
     than hardcoded, so a refit of the clustering changes it here automatically.
 
@@ -224,7 +224,9 @@ def state_laterality():
     every (paw, axis, frequency) in each state. `LI` below averages the 10 left
     columns against the 10 right ones -- the same summary describe_states.py prints.
     """
-    m = pd.read_csv(STATE_PROFILES).set_index('state')
+    # `profiles`: a state x channel table to use instead, e.g. paper_style.paw_profiles()
+    # for another state set; the default is the production states'
+    m = pd.read_csv(STATE_PROFILES).set_index('state') if profiles is None else profiles
     left = m[[c for c in m.columns if c.startswith('l_paw')]].mean(axis=1)
     right = m[[c for c in m.columns if c.startswith('r_paw')]].mean(axis=1)
     return pd.DataFrame({'left': left, 'right': right,

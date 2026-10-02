@@ -1,178 +1,58 @@
 #%%
-""" 
-IMPORTS
+"""
+LDA SCORE SWEEP -- mouse discriminability vs number of dimensions
+=================================================================
+How well the LDA tells mice apart, as a function of how many PCA dimensions it is given,
+for several behavioural encodings (syllables at different k, raw binned signals, trial
+summaries).
+
+SHARED CODE WITH THE NOTEBOOK. The encoding, filtering and LDA all live in
+4_mice/functions.py and are imported below, so this script and
+4_mice/LDA_analyses_pipeline_ALLSESSIONS.ipynb cannot drift apart again. They previously
+disagreed in four places -- session exclusions, the balanced-subsampling guard, the trial
+feature branch and the chance level. Two consequences worth knowing:
+
+  * SESSION EXCLUSIONS come from the curated QC sheet (individuality-paper_data_4Sep26.csv,
+    via learning_individuality/session_filters), not the hardcoded list this script used
+    to carry. Editing the sheet now changes this sweep too.
+  * THE SUBSAMPLING CAP is a maximum contribution, not a minimum requirement, so no mouse
+    is ever tested against a classifier that never saw it. See run_lda's docstring for the
+    measured effect -- it is invisible at n_per_mouse=3 and large above it.
+
+The notebook's operating point is 30 PCA dimensions, which is in the sweep grid below, so
+x = 30 is the directly comparable value.
 """
 import os
+import pathlib
+import sys
+
 import numpy as np
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-
-# --Machine learning and statistics
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from scipy.stats import zscore
+
+# the shared pipeline lives in paper-individuality/4_mice/functions.py
+_root = pathlib.Path(__file__).resolve().parent.parent      # paper-individuality/
+sys.path.insert(0, str(_root / '4_mice'))
+sys.path.insert(0, str(_root))
+from functions import build_design_matrix, dim_red, qc_exclusions, run_lda
+
+# paper_style holds every cross-figure decision -- panel sizes, colours, where figures are
+# written. 'poster' is big type for a poster; ps.use('paper') gives the journal version of
+# the same figures with no other edits.
+import paper_style as ps
+ps.use('poster')
 
 #%%
-
 """ IMPORTANT PATHS """
-base_path = '/Users/ineslaranjeira/Google Drive/O meu disco/CCU/PhD Project/paper-individuality/data/newly_generated/segmentation/'
-base_path = '/home/ines/repositories/representation_learning_variability/paper-individuality/data/'
+base_path = str(_root / 'data') + '/'
 
+# One QC read for the whole sweep, so every dataset is filtered identically and the sheet
+# is not re-parsed per dataset.
+PROB_SESSIONS = qc_exclusions(timepoint='Proficient', strictness='filtered_out')
 
-def binarize(n_features_per_step, use_sequences, n_paw_states=8):
-    """
-    Binarizes behavioral sequence data dynamically based on the number of paw states.
-    
-    Parameters:
-    -----------
-    n_features_per_step : int
-        Total features per step *before* dropping the reference column (e.g., 10).
-    use_sequences : np.ndarray
-        Array of shape (n_trials, timesteps) containing encoded integer states or NaNs.
-    n_paw_states : int
-        The number of possible paw states (defaults to 8).
-    """
-    n_trials = use_sequences.shape[0]
-    timesteps = use_sequences.shape[1]
-
-    binarized = np.zeros((n_trials, timesteps * n_features_per_step))
-    
-    for t in range(timesteps):
-        current_vals = use_sequences[:, t]
-        nan_mask = np.isnan(current_vals)
-        valid_mask = ~nan_mask
-        labels_0idx = current_vals[valid_mask].astype(int)
-        start_col = t * n_features_per_step
-        
-        if len(labels_0idx) > 0:  
-            valid_row_idx = np.arange(n_trials)[valid_mask]
-            
-            # 1. Fill Paw States (Cols 0 to n_paw_states-1)
-            paw_indices = labels_0idx % n_paw_states
-            binarized[valid_row_idx, start_col + paw_indices] = 1
-            
-            # 2. Fill Whisking (Col equal to n_paw_states)
-            whisking_col = start_col + n_paw_states
-            binarized[valid_mask, whisking_col] = ((labels_0idx // n_paw_states) % 2).astype(int)
-            
-            # 3. Fill Licking (Col equal to n_paw_states + 1)
-            licking_col = start_col + n_paw_states + 1
-            binarized[valid_mask, licking_col] = (labels_0idx // (n_paw_states * 2)).astype(int)
-        
-        # Set all features for this timestep to NaN where original data was NaN
-        if np.any(nan_mask):
-            feature_cols = slice(start_col, start_col + n_features_per_step)
-            binarized[nan_mask, feature_cols] = np.nan
-
-    # Dynamically eliminate Paw State 2 (index 1) for every timestep
-    # Using 'n_features_per_step' ensures this steps accurately across the array
-    cols_to_delete = [t * n_features_per_step + 1 for t in range(timesteps)]
-    binarized_reduced = np.delete(binarized, cols_to_delete, axis=1)
-    
-    return binarized_reduced
-
-def encode_data(filename, all_sequences, n_paw_states):
-    
-    if 'syllables' in filename or 'sequences' in filename:     
-        # all_sequences['session'] = all_sequences['sample'].str[:36]  
-        design_df = all_sequences.pivot(index=['mouse_name', 'session', 'sample', 'trial_type'], columns=['broader_label'], values='binned_sequence').reset_index().dropna()
-        # Remove any spurious 'index' column created by reset_index
-        if 'index' in design_df.columns:
-            design_df = design_df.drop(columns=['index'])
-        design_df = design_df.sort_values(by='session')
-        
-        # Validate
-        assert len(design_df) > 0, "ERROR: design_df is empty after filtering!"
-        # print(f"✓ design_df created: {len(design_df)} rows, {design_df['mouse_name'].nunique()} mice, {design_df['session'].nunique()} sessions")
-        
-        epoch_to_analyse = ['Pre-quiescence', 'Quiescence', 'Choice', 'ITI']
-        use_sequences = np.vstack(design_df[epoch_to_analyse].apply(lambda row: np.hstack(row), axis=1))  # Transpose to get the right shape
-        
-        # Validate alignment
-        assert len(use_sequences) == len(design_df), f"ERROR: use_sequences length ({len(use_sequences)}) != design_df length ({len(design_df)})"
-        
-        # --- PARAMETERS ---
-        n_features_per_step = n_paw_states + 2  # 8 Paw + 1 Whisk + 1 Lick
-        binarized_9d_ref2 = binarize(n_features_per_step, use_sequences, n_paw_states)
-        use_format = binarized_9d_ref2.copy()
-        
-    elif 'raw' in filename:
-        all_sequences['session'] = all_sequences['sample'].str[:36]
-        binned_vars = ['Lick count_binned_sequence', 'whisker_me_binned_sequence', 
-                    'l_paw_x_vel_binned_sequence', 'l_paw_y_vel_binned_sequence', 
-                    'r_paw_x_vel_binned_sequence', 'r_paw_y_vel_binned_sequence']
-        design_df = all_sequences.pivot(index=['mouse_name', 'session', 'sample', 'trial_type'], columns=['broader_label'], values=binned_vars).reset_index().dropna()
-        if 'index' in design_df.columns:
-            design_df = design_df.drop(columns=['index'])
-        design_df = design_df.sort_values(by='session')
-        # var_names = design_df.keys()[-4:]
-        epoch_to_analyse = design_df.keys()[4:]
-        use_sequences = np.vstack(design_df[epoch_to_analyse].apply(lambda row: np.hstack(row), axis=1))  # Transpose to get the right shape
-        
-        assert len(use_sequences) == len(design_df), f"ERROR: use_sequences length != design_df length"
-        
-        # Normalize
-        use_format = zscore(use_sequences, axis=0, nan_policy='omit')
-
-    elif 'trial' in filename:
-        design_df = all_sequences.dropna().copy()
-        design_df['choice'] = design_df['choice'].map({'left': 0, 'right': 1}).astype(float)
-        # Some files store trial outcome as a string 'feedback' column, others as a numeric
-        # 'correct' column -- normalize to a single numeric 'feedback'.
-        if 'feedback' in design_df.columns:
-            design_df['feedback'] = design_df['feedback'].map({'incorrect': 0, 'correct': 1}).astype(float)
-        else:
-            design_df['feedback'] = design_df['correct'].astype(float)
-        bias_df = (design_df[design_df['contrast'] == 0]
-                .groupby(['session', 'block'])['choice'].mean()
-                .unstack(level='block'))
-        bias_df['bias'] = bias_df[0.8] - bias_df[0.2]
-
-        agg = {'trial_id': 'count', 'reaction': 'median',
-               'elongation': 'median', 'feedback': 'mean',
-               'choice': 'mean'}
-        # p_state1 is only present in some trial files (e.g. session_trial_meta_*)
-        if 'p_state1' in design_df.columns:
-            agg['p_state1'] = 'mean'
-        merged = (design_df.groupby(['session', 'mouse_name'])
-                .agg(agg)
-                .merge(bias_df['bias'], on='session', how='left'))
-
-        merged['log_reaction'], merged['log_elongation'] = np.log(merged['reaction']), np.log(merged['elongation'])
-        features = ['trial_id', 'feedback', 'choice',
-                    'log_reaction', 'log_elongation', 'bias']
-        if 'p_state1' in merged.columns:
-            features.insert(3, 'p_state1')
-        # use_format = merged[features].to_numpy()
-        # use_format = zscore(use_format, axis=0, nan_policy='omit')
-        clean_df = merged[features].dropna()
-        use_format = clean_df.to_numpy()
-        use_format = zscore(use_format, axis=0)
-
-        design_df = clean_df.reset_index().merge(design_df[['mouse_name', 'session']].drop_duplicates(),
-                                                 on='session').drop_duplicates()
-
-    return use_format, design_df
-
-# Bad sessions, excluded from every dataset
-prob_sessions = [
-    '30af8629-7b96-45b7-8778-374720ddbc5e',
-    '90e524a2-aa63-47ce-b5b8-1b1941a1223a',
-    'a8a8af78-16de-4841-ab07-fde4b5281a03',
-    '49368f16-de69-4647-9a7a-761e94517821',
-    'a71175be-d1fd-47a3-aa93-b830ea3634a1',
-    '0deb75fb-9088-42d9-b744-012fb8fc4afb',
-    '02fbb6da-3034-47d6-a61b-7d06c796a830',
-    '7f6b86f9-879a-4ea2-8531-294a221af5d0',
-    '8c33abef-3d3e-4d42-9f27-445e9def08f9',
-    'ebe2efe3-e8a1-451a-8947-76ef42427cc9',
-    '510b1a50-825d-44ce-86f6-9678f5396e02',
-    '91bac580-76ed-41ab-ac07-89051f8d7f6e',
-    '8a1cf4ef-06e3-4c72-9bc7-e1baa189841b',
-    '64977c74-9c04-437a-9ea1-50386c4996db'
-]
+N_PER_MOUSE = 3
+N_REPEATS = 10
 
 
 def uses_dim_red(filename):
@@ -181,196 +61,75 @@ def uses_dim_red(filename):
     return not ('trial' in filename and 'syllables' not in filename and 'raw' not in filename)
 
 
-def load_and_prepare(dataset, n_paw_states):
-    """Load one dataset file, apply the session/mouse filters, encode it and average per
-    session. Returns (session_syllables, design_df) -- the input to PCA / LDA."""
-    filename = base_path + dataset
-    all_sequences = pd.read_parquet(filename)
-    if 'syllables' in filename or 'sequences' in filename or 'raw' in filename:
-        all_sequences['session'] = all_sequences['sample'].str[:36]
-
-    """ FILTER DATA """
-    # Filter out bad sessions
-    # FIX: Use drop=True to avoid creating 'index' column
-    all_sequences = all_sequences.loc[~all_sequences['session'].isin(prob_sessions)].reset_index(drop=True)
-    # Filter out mice without enough sessions
-    session_count = all_sequences[['mouse_name', 'session']].drop_duplicates().groupby(['mouse_name'])['session'].count().reset_index()
-    multi_sess_mice = session_count.loc[session_count['session']>2, 'mouse_name']
-    # FIX: Use drop=True here too
-    all_sequences = all_sequences.loc[all_sequences['mouse_name'].isin(multi_sess_mice)].reset_index(drop=True)
-
-    # Validation
-    assert 'index' not in all_sequences.columns, "ERROR: 'index' column created by reset_index!"
-
-    """ ENCODE DATA """
-    use_format, design_df = encode_data(filename, all_sequences, n_paw_states)
-
-    """ SESSION AVERAGE """
-    # Create session-to-mouse mapping BEFORE aggregation (critical fix!)
-    session_mouse_mapping = design_df[['session', 'mouse_name']].drop_duplicates()
-    session_mouse_mapping = session_mouse_mapping.set_index('session')['mouse_name'].to_dict()
-
-    # Validate: each session maps to exactly one mouse
-    assert len(session_mouse_mapping) == len(design_df[['session', 'mouse_name']].drop_duplicates()),     "ERROR: A session maps to multiple mice!"
-
-    # Now aggregate data
-    session_syllables = pd.DataFrame(use_format)
-    session_syllables['session'] = design_df['session'].values
-    session_syllables = session_syllables.groupby('session', sort=False)[np.arange(0, np.shape(use_format)[1], 1)].mean()
-
-    return session_syllables, design_df
+def load_and_prepare(dataset, n_paw_states, verbose=False):
+    """Load one dataset file, filter, encode and average per session."""
+    return build_design_matrix(base_path + dataset, n_paw_states=n_paw_states,
+                               prob_sessions=PROB_SESSIONS, verbose=verbose)
 
 
-def score_dataset(dataset, n_paw_states, n_dim):
+def score_dataset(dataset, n_paw_states, n_dim, verbose=True):
     """LDA score of one dataset at `n_dim` PCA dimensions (or on its raw features, if the
-    dataset gets no dimensionality reduction). Returns (true_scores, shuffle_scores, n_used)."""
-    session_syllables, design_df = load_and_prepare(dataset, n_paw_states)
+    dataset gets no dimensionality reduction).
+
+    Returns (true_scores, shuffle_scores, n_used, n_mice)."""
+    session_syllables, design_df = load_and_prepare(dataset, n_paw_states, verbose)
 
     if uses_dim_red(base_path + dataset):
         mat = np.array(dim_red(session_syllables)[:, :n_dim])
     else:
-        mat = np.array(session_syllables)  # no dimensionality reduction
+        mat = np.array(session_syllables)      # no dimensionality reduction
     n_used = mat.shape[1]
 
     norm_pop = StandardScaler().fit_transform(mat.copy())
-    true_scores, shuffle_scores = run_lda(design_df, session_syllables, n_used, norm_pop)
-
+    true_scores, shuffle_scores = run_lda(design_df, session_syllables, n_used, norm_pop,
+                                          n_per_mouse=N_PER_MOUSE, n_repeats=N_REPEATS,
+                                          verbose=verbose)
     return true_scores, shuffle_scores, n_used, design_df['mouse_name'].nunique()
-
-
-def dim_red(all_features):
-    
-    # PCA
-    n_components = np.min([np.shape(np.array(all_features))[0], np.shape(np.array(all_features))[1]])
-    # Step 1: Reduce dimensions with PCA
-    pca = PCA(n_components)  # Reduce to 50 dimensions
-    scaler = StandardScaler()
-    # standardized_X = scaler.fit_transform(np.array(all_features))
-    # X_pca = pca.fit_transform(standardized_X)
-    X_pca = pca.fit_transform(np.array(all_features))
-
-    # # Explained variance ratio
-    # explained_variance_ratio = pca.explained_variance_ratio_
-    # cumulative_variance = np.cumsum(explained_variance_ratio)
-    # threshold = 0.95
-    # min_components = np.where(cumulative_variance>0.95)[0][0]
-    # # min_components = 28
-    # print(str(min_components) + ' components explain ' + str(threshold) +' of total variance')
-
-    # # Plot explained variance
-    # plt.figure(figsize=(8, 5))
-    # plt.plot(range(1, n_components+1), explained_variance_ratio, marker='o', label='Individual')
-    # plt.plot(range(1, n_components+1), cumulative_variance, marker='s', label='Cumulative', linestyle='--')
-    # plt.hlines(threshold, 0, 250, 'black', 'dashed')
-    # plt.vlines(min_components, 0, 1, 'black', 'dashed')
-    # plt.xlabel("Number of Principal Components")
-    # plt.ylabel("Variance Explained")
-    # plt.title("Explained Variance by PCA")
-    # plt.show()
-    
-    return X_pca
-
-def run_lda(design_df, session_syllables, n_component, norm_pop):
-    mapping = pd.DataFrame(np.array(design_df[['mouse_name', 'session']].drop_duplicates()), columns=['mouse_name', 'session'])
-    df_with_sessions = session_syllables.reset_index()
-    mouse_names = df_with_sessions.merge(mapping, on=['session'])['mouse_name']
-    df = df_with_sessions.merge(mapping, on=['session'])
-
-    n_per_mouse = 3
-    lda_components = 30
-    lda_components = np.min([n_component, len(mouse_names.unique())-1])
-    # lda_components = 30
-    n_repeats = 10
-
-    final_matrix = np.array(norm_pop)
-
-    X = final_matrix.copy()
-    y = pd.factorize(mouse_names)[0]
-    n_samples = X.shape[0]
-    rng = np.random.default_rng(0)
-
-    # Store repeat results
-    true_scores_all = []
-    shuffle_scores_all = []
-
-    for repeat in range(n_repeats):
-        scores_true = []
-        scores_shuff = []
-
-        # Subsample balanced sessions for training in each fold
-        for test_idx in range(n_samples):
-            X_test = X[test_idx:test_idx+1]
-            y_test = y[test_idx:test_idx+1]
-            train_idx = np.setdiff1d(np.arange(n_samples), test_idx)
-            X_train_full = X[train_idx]
-            y_train_full = y[train_idx]
-
-            # --- balanced subsampling for training ---
-            balanced_idx = []
-            for m in np.unique(y_train_full):
-                m_idx = np.where(y_train_full == m)[0]
-                if len(m_idx) >= n_per_mouse-1:
-                    balanced_idx.extend(rng.choice(m_idx, n_per_mouse-1, replace=False))
-                # else:
-                    # print(m)
-            balanced_idx = np.array(balanced_idx)
-            X_train = X_train_full[balanced_idx]
-            y_train = y_train_full[balanced_idx]
-
-            # --- true labels run ---
-            lda = LinearDiscriminantAnalysis(
-                priors=np.ones(len(np.unique(y_train))) / len(np.unique(y_train)),
-                n_components=lda_components)
-            lda.fit(X_train, y_train)
-            scores_true.append(lda.score(X_test, y_test))
-
-            # --- shuffled labels run ---
-            y_train_shuff = y_train.copy()
-            rng.shuffle(y_train_shuff)
-            lda_shuff = LinearDiscriminantAnalysis(
-                priors=np.ones(len(np.unique(y_train_shuff))) / len(np.unique(y_train_shuff)),
-                n_components=lda_components)
-            lda_shuff.fit(X_train, y_train_shuff)
-            scores_shuff.append(lda_shuff.score(X_test, y_test))
-            
-        # store average score for this repeat
-        true_scores_all.append(np.mean(scores_true))
-        shuffle_scores_all.append(np.mean(scores_shuff))
-
-    print("True labels mean ± std:", np.mean(true_scores_all), np.std(true_scores_all))
-    print("Shuffled labels mean ± std:", np.mean(shuffle_scores_all), np.std(shuffle_scores_all))
-
-    # Convert to arrays for convenience
-    true_scores = np.array(true_scores_all)
-    shuffle_scores = np.array(shuffle_scores_all)
-
-    return true_scores, shuffle_scores
 
 #%%
 #### LOOP ###
 
-datasets = ['10_bin_raw_16-06-2026', '10_k_10_bin_syllables_17-06-2026',
-            '9_k_10_bin_syllables_18-06-2026',
-            '8_k_10_bin_syllables_17-06-2026', '6_k_10_bin_syllables_17-06-2026',
-            'all_trials_06-07-2026']  # Might have to update?  '8_k_10_bin_syllables_06-07-2026'
-paw_states = [np.nan,  10, 9, 8, 6, np.nan]
-n_components = np.arange(5, 30, 5)
-n_components = [1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 35]
+# ONE ENTRY PER DATASET -- a dict, not four parallel lists.
+# The parallel lists silently desynced the last time this was edited: `datasets` was cut to
+# three entries while `paw_states`, `labels` and `colors` kept six, so each dataset was
+# handed another dataset's k -- and the first got NaN, which made n_features_per_step NaN
+# and crashed binarize. Keyed by filename, that failure mode is gone.
+# n_paw is np.nan for encodings with no paw states (raw signals, trial summaries).
+DATASETS = {
+    '10_k_10_bin_syllables_10-09-2026': dict(n_paw=10, label='12-state syllables',
+                                             color='#990000'),
+    '8_k_10_bin_syllables_19-08-2026':  dict(n_paw=8,  label='10-state syllables',
+                                             color='#E46D6F'),
+    '6_k_10_bin_syllables_21-08-2026':  dict(n_paw=6,  label='8-state syllables',
+                                             color='#F28F8F'),
+    # a syllable label counts k paw states + whisk + lick, hence k + 2
+    '10_bin_raw_10-09-2026':  dict(n_paw=np.nan, label='Raw data',   color='#1A1A1A'),
+    'all_trials_10-09-2026':  dict(n_paw=np.nan, label='Trial data', color='#3B6EA5')
+}
 
-# Trial-level data gets no dimensionality reduction, and therefore no dimensionality sweep --
-# its score is a single number, plotted as one dot at x = number of trial features.
-scores = np.zeros((len(datasets), len(n_components))) * np.nan
-score_std = np.zeros((len(datasets), len(n_components))) * np.nan
-# dataset index -> number of features used, for the datasets with no dimensionality reduction
-feature_dims = {}
+n_components = [1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 50, 100, 200]
 
-for d, dataset in enumerate(datasets):
+# All results keyed by dataset name, so nothing depends on positional alignment.
+# Trial-level data gets no dimensionality reduction and therefore no sweep -- its score is
+# a single number, plotted as one dot at x = number of trial features.
+scores, score_std = {}, {}
+# 95% CI from resampling MICE -- the band that goes on the figure. `score_std` is the
+# spread across training subsamples, which is a robustness diagnostic and NOT uncertainty:
+# it shrinks as n_per_mouse rises simply because a mouse with exactly n_per_mouse sessions
+# has no draw left to make. Kept in the printout, off the plot.
+score_ci_low, score_ci_high = {}, {}
+feature_dims = {}     # dataset -> n features used, for the datasets with no PCA
+mouse_counts = {}     # dataset -> n mice, because chance is 1/n_mice and it differs per dataset
+
+for dataset, meta in DATASETS.items():
     filename = base_path + dataset
     if not os.path.exists(filename):
         print(f'!! skipping missing dataset: {dataset}')
         continue
+    print(f'\n=== {dataset}  (k = {meta["n_paw"]}) ===')
 
-    session_syllables, design_df = load_and_prepare(dataset, paw_states[d])
+    session_syllables, design_df = load_and_prepare(dataset, meta['n_paw'], verbose=True)
+    mouse_counts[dataset] = design_df['mouse_name'].nunique()
     scaler = StandardScaler()
 
     if not uses_dim_red(filename):
@@ -379,62 +138,89 @@ for d, dataset in enumerate(datasets):
         norm_pop = scaler.fit_transform(np.array(session_syllables))
         print(f'{dataset}: {n_feat} trial features, no dimensionality reduction')
 
-        true_scores, shuffle_scores = run_lda(design_df, session_syllables, n_feat, norm_pop)
-        # One single score -- stored in the first column and plotted as a dot at x = n_feat
-        scores[d, 0] = np.mean(true_scores)
-        score_std[d, 0] = np.std(true_scores)
-        feature_dims[d] = n_feat
+        true_scores, shuffle_scores, lo, hi = run_lda(
+            design_df, session_syllables, n_feat, norm_pop, n_per_mouse=N_PER_MOUSE,
+            n_repeats=N_REPEATS, return_ci=True)
+        for _d in (scores, score_std, score_ci_low, score_ci_high):
+            _d[dataset] = np.full(len(n_components), np.nan)
+        scores[dataset][0] = np.mean(true_scores)
+        score_std[dataset][0] = np.std(true_scores)
+        score_ci_low[dataset][0], score_ci_high[dataset][0] = lo, hi
+        feature_dims[dataset] = n_feat
         continue
 
     """ DIMENSIONALITY REDUCTION """
     X_pca = dim_red(session_syllables)
+    for _d in (scores, score_std, score_ci_low, score_ci_high):
+        _d[dataset] = np.full(len(n_components), np.nan)
 
     for b, n_component in enumerate(n_components):
-        print(n_component, dataset)
+        print(f'  {dataset}  {n_component}D')
         mat = np.array(X_pca[:, :n_component])
         norm_pop = scaler.fit_transform(mat.copy())
 
         """ RUN LDA """
-        true_scores, shuffle_scores = run_lda(design_df, session_syllables, n_component, norm_pop)
-        scores[d, b] = np.mean(true_scores)
-        score_std[d, b] = np.std(true_scores)
+        true_scores, shuffle_scores, lo, hi = run_lda(
+            design_df, session_syllables, n_component, norm_pop, n_per_mouse=N_PER_MOUSE,
+            n_repeats=N_REPEATS, return_ci=True, verbose=False)
+        scores[dataset][b] = np.mean(true_scores)
+        score_std[dataset][b] = np.std(true_scores)
+        score_ci_low[dataset][b], score_ci_high[dataset][b] = lo, hi
+        print(f'    true {scores[dataset][b]:.3f}  [95% CI over mice {lo:.3f}, {hi:.3f}]'
+              f'  (subsample spread +/-{score_std[dataset][b]:.3f})')
 
 # %%
 
-# --- Your original plotting code ---
-labels = ['Raw data', '12-state syllables', '11-state syllables',
-          '10-state syllables', '8-state syllables', 'Trial data']
+fig, ax = ps.figure('square', scale=.6)
 
-colors = ['#1A1A1A', '#990000', '#D9383A',  "#E46D6F", '#F28F8F', '#3B6EA5']
-
-for d, dataset in enumerate(datasets):
-    if np.all(np.isnan(scores[d, :])):
+for dataset, meta in DATASETS.items():
+    if dataset not in scores or np.all(np.isnan(scores[dataset])):
         continue
 
     # Trial data has no dimensionality sweep -> single dot at x = number of trial features
-    if d in feature_dims:
-        plt.errorbar(feature_dims[d], scores[d, 0], yerr=score_std[d, 0],
-                     fmt='o', color=colors[d], capsize=3, label=labels[d])
+    if dataset in feature_dims:
+        ax.errorbar(feature_dims[dataset], scores[dataset][0],
+                    yerr=[[scores[dataset][0] - score_ci_low[dataset][0]],
+                          [score_ci_high[dataset][0] - scores[dataset][0]]],
+                    fmt='o', color=meta['color'], capsize=3, label=meta['label'])
         continue
 
-    linestyle = '-' #if uses_dim_red(base_path + dataset) else '--'
-    plt.plot(n_components, scores[d, :], color=colors[d], label=labels[d], linestyle=linestyle)
+    ax.plot(n_components, scores[dataset], color=meta['color'], label=meta['label'])
+    # band = 95% CI over MICE (asymmetric), not +/- the across-subsample spread
+    ax.fill_between(n_components, score_ci_low[dataset], score_ci_high[dataset],
+                    color=meta['color'], alpha=0.15, lw=0)
 
-    plt.fill_between(n_components,
-                    scores[d, :] - score_std[d, :],
-                    scores[d, :] + score_std[d, :],
-                    color=colors[d], alpha=0.15)
-plt.xticks(np.array(n_components).astype(int))
-plt.ylim([0, 1])
-plt.xlabel('Number of dimensions')
-plt.ylabel('Mouse discriminability score')
-plt.hlines(1/56, np.min(n_components), np.max(n_components), 'grey', 'dashed')
-plt.legend()
+ax.set_xticks(np.array(n_components).astype(int))
+ax.set_xticks([1, 10, 20, 30, 50, 100])
+ax.set_ylim([0, 1])
+ax.set_xlim([0, 100])
+# ax.set_xticks(n_components)
+ax.set_xlabel('# PCA dimensions')
+# the score depends on the balance cap as much as on the encoding (0.76 at n_per_mouse=3
+# vs 0.85 at 4), so the setting travels with the figure rather than living only in the code
+ax.set_ylabel(f'LDA score')
+
+# Chance is 1/n_mice, and the mouse count depends on which sessions survive QC for each
+# dataset -- so it is read from the data rather than hardcoded. One line per distinct value,
+# but a SINGLE label: 1/55 and 1/58 are visually identical and two texts overprint.
+chance_counts = sorted(set(mouse_counts.values()))
+for n_mice in chance_counts:
+    ax.axhline(1 / n_mice, color=ps.NEUTRAL, ls='--', lw=1.0)
+chance_label = ('chance (1/%d)' % chance_counts[0] if len(chance_counts) == 1
+                else 'chance (1/%d to 1/%d)' % (chance_counts[-1], chance_counts[0]))
+chance_label = ('chance ')
+ax.text(np.min(n_components), np.mean([1 / n for n in chance_counts]), chance_label,
+        ha='left', va='bottom', color=ps.NEUTRAL,
+        fontsize=plt.rcParams['font.size'] * 0.8)
+
+ax.legend(frameon=False)
+fig.tight_layout()
+ps.savefig(fig, 'lda_score_sweep', svg=True)
 plt.show()
 
 # %%
 #### BAR PLOT AT A FIXED NUMBER OF DIMENSIONS ####
-# Standalone: only needs the function definitions above, not the sweep loop.
+# Standalone: only needs the imports and helpers above, not the sweep loop.
 
 n_dim = 6
 
@@ -463,7 +249,7 @@ plot_labels = list(bar_results.keys())
 x = np.arange(len(plot_labels))
 width = 0.38
 
-fig, ax = plt.subplots(figsize=(1.6 * len(plot_labels) + 1.5, 4))
+fig, ax = ps.figure('single' if len(plot_labels) <= 3 else 'wide')
 
 for i, label in enumerate(plot_labels):
     r = bar_results[label]
@@ -473,19 +259,16 @@ for i, label in enumerate(plot_labels):
            label='True labels' if i == 0 else None)
     # Shuffled labels: neutral grey + hatch, so the control never reads as a dataset
     ax.bar(x[i] + width/2, np.mean(r['shuffle']), width, yerr=np.std(r['shuffle']),
-           color='#C9C9C9', edgecolor='#8A8A8A', hatch='///', capsize=3,
+           color='white', edgecolor=ps.NEUTRAL, hatch='///', capsize=3,
            label='Shuffled labels' if i == 0 else None)
-    # Theoretical chance for this dataset (mouse count differs slightly between datasets)
-    # ax.hlines(1/r['n_mice'], x[i] - 0.5, x[i] + 0.5, colors='grey', linestyles='dashed',
-    #           linewidth=1, label='Chance (1/n mice)' if i == 0 else None)
 
 ax.set_xticks(x)
 ax.set_xticklabels([f"{lab}\n({bar_results[lab]['n_used']}D)" for lab in plot_labels])
-ax.set_ylabel('Mouse discriminability score')
+ax.set_ylabel(f'Mouse discriminability score\n(n_per_mouse = {N_PER_MOUSE})')
+# band is the CI over mice -- say so, since the previous version's band was a different thing
 ax.set_ylim([0, 1])
-ax.spines[['top', 'right']].set_visible(False)
-ax.legend(frameon=False)
-plt.tight_layout()
-# plt.savefig(base_path + f'lda_score_bars_{n_dim}D.svg', format='svg', bbox_inches='tight')
+ax.legend(frameon=False)      # spine treatment comes from paper_style, not set per figure
+fig.tight_layout()
+ps.savefig(fig, f'lda_score_bars_{n_dim}D', svg=True)
 plt.show()
 # %%

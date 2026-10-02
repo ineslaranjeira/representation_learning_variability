@@ -1,0 +1,70 @@
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:114: RuntimeWarning: divide by zero encountered in log
+  wm = np.log(S['whisker_me'].to_numpy(float))
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:116: RuntimeWarning: invalid value encountered in subtract
+  S['whisk_z'] = (wm - np.nanmean(wm)) / np.nanstd(wm)
+/home/ines/miniconda3/envs/iblenv/lib/python3.10/site-packages/numpy/lib/_nanfunctions_impl.py:1867: RuntimeWarning: invalid value encountered in subtract
+  np.subtract(arr, avg, out=arr, casting='unsafe', where=where)
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:114: RuntimeWarning: divide by zero encountered in log
+  wm = np.log(S['whisker_me'].to_numpy(float))
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:116: RuntimeWarning: invalid value encountered in subtract
+  S['whisk_z'] = (wm - np.nanmean(wm)) / np.nanstd(wm)
+/home/ines/miniconda3/envs/iblenv/lib/python3.10/site-packages/numpy/lib/_nanfunctions_impl.py:1867: RuntimeWarning: invalid value encountered in subtract
+  np.subtract(arr, avg, out=arr, casting='unsafe', where=where)
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:114: RuntimeWarning: divide by zero encountered in log
+  wm = np.log(S['whisker_me'].to_numpy(float))
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:116: RuntimeWarning: invalid value encountered in subtract
+  S['whisk_z'] = (wm - np.nanmean(wm)) / np.nanstd(wm)
+/home/ines/miniconda3/envs/iblenv/lib/python3.10/site-packages/numpy/lib/_nanfunctions_impl.py:1867: RuntimeWarning: invalid value encountered in subtract
+  np.subtract(arr, avg, out=arr, casting='unsafe', where=where)
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:114: RuntimeWarning: divide by zero encountered in log
+  wm = np.log(S['whisker_me'].to_numpy(float))
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:116: RuntimeWarning: invalid value encountered in subtract
+  S['whisk_z'] = (wm - np.nanmean(wm)) / np.nanstd(wm)
+/home/ines/miniconda3/envs/iblenv/lib/python3.10/site-packages/numpy/lib/_nanfunctions_impl.py:1867: RuntimeWarning: invalid value encountered in subtract
+  np.subtract(arr, avg, out=arr, casting='unsafe', where=where)
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:114: RuntimeWarning: divide by zero encountered in log
+  wm = np.log(S['whisker_me'].to_numpy(float))
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:116: RuntimeWarning: invalid value encountered in subtract
+  S['whisk_z'] = (wm - np.nanmean(wm)) / np.nanstd(wm)
+/home/ines/miniconda3/envs/iblenv/lib/python3.10/site-packages/numpy/lib/_nanfunctions_impl.py:1867: RuntimeWarning: invalid value encountered in subtract
+  np.subtract(arr, avg, out=arr, casting='unsafe', where=where)
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:114: RuntimeWarning: divide by zero encountered in log
+  wm = np.log(S['whisker_me'].to_numpy(float))
+/home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables.py:116: RuntimeWarning: invalid value encountered in subtract
+  S['whisk_z'] = (wm - np.nanmean(wm)) / np.nanstd(wm)
+/home/ines/miniconda3/envs/iblenv/lib/python3.10/site-packages/numpy/lib/_nanfunctions_impl.py:1867: RuntimeWarning: invalid value encountered in subtract
+  np.subtract(arr, avg, out=arr, casting='unsafe', where=where)
+cached /home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_vs_syllables_features.npz
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+  1 session(s) had no rig in the sheet; lab taken from the mouse
+  labs: 10 for 260 sessions
+
+cohort: 260 sessions, 56 mice, 10 labs
+
+========================================================================================================
+MOUSE vs LAB, SEGMENTED vs RAW   (LOSO, 260 sessions; chance: mouse 0.018, lab ~0.100)
+========================================================================================================
+block                                                 dims  mouse mouse|lab lab eta2 lab LOSO lab LOMO    ICC
+SYLLABLES
+  paw + whisk + lick (the 360 the LDA uses)            360  0.867     0.767    0.177    0.377    0.350  0.752
+  paw only: production states                          280  0.760     0.705    0.131    0.331    0.242  0.440
+  paw only: uniform, log, session z                    280  0.627     0.531    0.139    0.338    0.373  0.432
+  paw only: uniform, log, global z                     280  0.704     0.691    0.152    0.308    0.312  0.785
+  whisk + lick only                                     80  0.699     0.642    0.337    0.435    0.427  0.781
+RAW, TIME-RESOLVED (same 4 x 10 bins, no clustering)
+  paw + whisk + lick, global                           880  0.949     0.869    0.189    0.588    0.642  0.776
+  paw + whisk + lick, session z                        880  0.922     0.851    0.190    0.550    0.581  0.462
+  paw only, global                                     800  0.900     0.832    0.166    0.500    0.565  0.775
+  paw only, session z                                  800  0.872     0.806    0.179    0.454    0.550  0.459
+  whisk + lick only, global                             80  0.751     0.610    0.464    0.581    0.612  0.814
+  whisk + lick only, session z                          80  0.778     0.664    0.304    0.535    0.542  0.656
+RAW, WHOLE-SESSION STATISTICS (paw amplitudes)
+  scale: log mean + log SD                              40  0.696     0.609    0.137    0.323    0.146  0.675
+  shape: skew + kurtosis                                40  0.394     0.463    0.130    0.212    0.138  0.863
+  between-feature correlations                         190  0.803     0.727    0.137    0.362    0.346  0.426

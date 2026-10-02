@@ -517,6 +517,115 @@ def paw_legend(target=None, ncol=4, title='Paw state', missing=True,
 SYLLABLE_COLORS = PAW_STATE_COLORS + ['#b8b8b8', '#484949']
 SYLLABLE = dict(zip(SYLLABLE_NAMES, SYLLABLE_COLORS))
 
+
+# ---------------------------------------------------------------------------
+# TWO PAW-STATE SETS, ONE SWITCH
+# ---------------------------------------------------------------------------
+# 'production' is everything above: the states in data/states_files and the
+# 8_k_10_bin_syllables_19-08-2026 syllables.
+#
+# 'uniform' is segmentation/3.3_wavelet_clusters_uniform.ipynb with LOG = False and
+# NORM = 'session' (data/paw_states_uniform_raw_sessionz/): a uniform per-session subsample,
+# one per-session z-score shared by training and labelling, and k-means with n_init = 10.
+# ITS STATES ARE NUMBERED BY VIGOR -- 0 stillest, 7 most vigorous -- so PAW_VIGOR_ORDER is the
+# identity and index order is already display order. The structure matches production (81% of
+# frames on the matched pairs), only under different numbers:
+#     uniform state    0  1  2  3  4  5  6  7
+#     production match 0  1  3  4  2  5  6  7
+# Differences in character: 7 is symmetric here (gap +0.06, production -0.38); the RIGHT state
+# of the moderate pair is the more lateralised one (-0.67 vs +0.47; production had the left one
+# stronger); and 6 (fast right) is more vigorous than 5 (fast left). So the colours are
+# re-derived, not copied, by the rule the production palette follows:
+#   OKLCH L    production's lightness ramp, assigned by vigor rank (so here, by index)
+#   hue        310 violet if gap > +0.1, amber if gap < -0.1, else the production match's own
+#   chroma     0.02 + 0.22 |gap|, clipped to sRGB  (reproduces production's C to +-0.006
+#              wherever production is not itself gamut-limited)
+# Measured in vigor/zscore/ over every frame of all 332 sessions (session-z wavelets):
+#                                                   gap    vigor   frames   C     prod
+_UNIFORM_COLORS = ['#EDE8D8',   # 0  still, neutral   -0.011  -0.55   43.1%  0.022   0
+                   '#BFB5C7',   # 1  slow, neutral    -0.031  -0.11   26.3%  0.027   1
+                   '#B688D8',   # 2  moderate, LEFT   +0.467  +0.37    9.2%  0.123   3
+                   '#A98605',   # 3  moderate, RIGHT  -0.672  +0.71    6.3%  0.129   4
+                   '#84778F',   # 4  moderate, faint  -0.085  +0.75    7.1%  0.039   2
+                   '#9420CF',   # 5  fast, LEFT       +1.018  +1.33    4.5%  0.244   5
+                   '#7C4702',   # 6  fast, RIGHT      -1.028  +1.77    2.8%  0.101   6
+                   '#3B2B1C']   # 7  very fast, faint +0.064  +3.43    0.7%  0.034   7
+
+PAW_STATE_SETS = {
+    'production': dict(colors=list(PAW_STATE_COLORS), vigor_order=list(PAW_VIGOR_ORDER),
+                       lateral={k: list(v) for k, v in PAW_LATERAL.items()},
+                       states_dir='data/states_files (identifiable_states // 100)',
+                       profiles='vigor/paw_bias/state_profiles_19Ago2026.csv',
+                       # the syllables already use this numbering
+                       syllable_paw_map=list(range(N_PAW_STATES))),
+    'uniform': dict(colors=_UNIFORM_COLORS, vigor_order=list(range(N_PAW_STATES)),
+                    lateral={'left': [2, 5], 'right': [3, 6], 'symmetric': [0, 1, 4, 7]},
+                    states_dir='data/paw_states_uniform_raw_sessionz',
+                    profiles='vigor/paw_bias/state_profiles_uniform.csv',
+                    # THE SYLLABLES ARE NUMBERED DIFFERENTLY FROM THE STATES. Syllables and
+                    # states_files built from these states by 5_syllable_generation (from
+                    # 8_k_10_bin_syllables_02-10-2026 on) went through its 19Ago2026
+                    # paw_fix_mapping {0:0, 1:2, 2:1, 3:6, 4:7, 5:5, 6:4, 7:3}, written for the
+                    # OLD fit. That is a pure relabelling -- the data are right -- so it is
+                    # undone on load by paw_codes(): syllable paw digit d is state map[d].
+                    # Verified on the data: digit 1 is the slow state, 2 moderate-left, 3 very
+                    # fast, 4 fast-right, 6 moderate-right, 7 moderate-symmetric.
+                    # If 5_syllable_generation is changed to the identity for this folder, set
+                    # this to list(range(8)).
+                    syllable_paw_map=[0, 2, 1, 7, 6, 5, 3, 4]),
+}
+PAW_STATES = 'production'
+
+
+def paw_codes(codes, n_paw_states=N_PAW_STATES):
+    """Packed syllable codes AS STORED in a syllable file or states_files (`binned_sequence`,
+    `most_likely_states`) -> the same codes in the ACTIVE state set's paw numbering.
+
+    Only the paw part (code % n) is relabelled; whisk and lick are untouched; NaN stays NaN.
+    The identity for 'production'. Apply it once, where the codes are loaded.
+    """
+    c = np.asarray(codes, dtype=float)
+    m = np.asarray(PAW_STATE_SETS[PAW_STATES]['syllable_paw_map'])
+    if (m == np.arange(len(m))).all():
+        return c
+    bad = np.isnan(c)
+    ci = np.where(bad, 0, c).astype(int)
+    paw = ci % n_paw_states
+    return np.where(bad, np.nan, ci - paw + m[paw]).astype(float)
+
+
+def paw_profiles(root=None):
+    """The active set's per-state wavelet profile table (mean session-z power per channel),
+    indexed by state in the set's numbering. `root` is the paper-individuality folder."""
+    import pathlib
+    import pandas as pd
+    root = pathlib.Path(root) if root else pathlib.Path(__file__).resolve().parent
+    return pd.read_csv(root / PAW_STATE_SETS[PAW_STATES]['profiles']).set_index('state')
+
+
+def use_paw_states(name):
+    """Switch every paw-state constant to one state set: 'production' or 'uniform'.
+
+    Rebinds PAW_STATE_COLORS, PAW_VIGOR_ORDER, PAW_LATERAL, PAW_SIDE, PAW, SYLLABLE_COLORS
+    and SYLLABLE, which every function here reads at call time -- so call it once, right
+    after ps.use(). Code that copied a constant out BEFORE the call (`from paper_style
+    import PAW_STATE_COLORS`) keeps the old one; use `ps.PAW_STATE_COLORS`.
+    """
+    global PAW_STATES, PAW_STATE_COLORS, PAW_VIGOR_ORDER, PAW_LATERAL, PAW_SIDE, PAW
+    global SYLLABLE_COLORS, SYLLABLE
+    if name not in PAW_STATE_SETS:
+        raise ValueError(f'paw state set must be one of {list(PAW_STATE_SETS)}, got {name!r}')
+    s = PAW_STATE_SETS[name]
+    PAW_STATES = name
+    PAW_STATE_COLORS = list(s['colors'])
+    PAW_VIGOR_ORDER = list(s['vigor_order'])
+    PAW_LATERAL = {k: list(v) for k, v in s['lateral'].items()}
+    PAW_SIDE = {st: side for side, states in PAW_LATERAL.items() for st in states}
+    PAW = dict(zip([f'Paw {i}' for i in range(N_PAW_STATES)], PAW_STATE_COLORS))
+    SYLLABLE_COLORS = PAW_STATE_COLORS + ['#b8b8b8', '#484949']
+    SYLLABLE = dict(zip(SYLLABLE_NAMES, SYLLABLE_COLORS))
+    return s
+
 # One neutral null band, not one per state. A permutation null's width depends on the
 # sample size and the feature's own variance, which across these eight states differ by
 # 4.6% -- so eight near-identical bands in eight colours stack into a dark block that

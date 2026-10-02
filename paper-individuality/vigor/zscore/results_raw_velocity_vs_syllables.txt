@@ -1,0 +1,29 @@
+cached /home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/raw_velocity_features.npz
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+
+syllables: /home/ines/repositories/representation_learning_variability/paper-individuality/data/8_k_10_bin_syllables_02-10-2026
+cohort: 260 sessions, 56 mice, 10 labs
+
+==================================================================================================
+MOUSE vs LAB, SYLLABLES vs RAW VELOCITY   (LOSO; chance: mouse 0.018, lab ~0.100)
+==================================================================================================
+block                                         dims  mouse mouse|lab lab eta2 lab LOSO lab LOMO    ICC
+SYLLABLES
+  paw + whisk + lick (the 360)                 360  0.850     0.751    0.174    0.346    0.358  0.569
+  paw only                                     280  0.728     0.644    0.127    0.296    0.215  0.459
+RAW VELOCITY, |v| per axis (4 per bin)
+  paw + whisk + lick, global                   240  0.914     0.849    0.311    0.635    0.619  0.797
+  paw + whisk + lick, session z                240  0.904     0.841    0.251    0.577    0.608  0.542
+  paw only, global                             160  0.828     0.776    0.248    0.504    0.496  0.802
+  paw only, session z                          160  0.818     0.740    0.225    0.458    0.462  0.512
+RAW SPEED PER PAW (2 per bin)
+  paw + whisk + lick, global                   160  0.890     0.805    0.351    0.631    0.627  0.785
+  paw + whisk + lick, session z                160  0.894     0.822    0.266    0.569    0.577  0.563
+  paw only, global                              80  0.760     0.695    0.258    0.481    0.454  0.803
+  paw only, session z                           80  0.783     0.679    0.228    0.423    0.446  0.506

@@ -1,0 +1,9 @@
+per state, sorted by vigor:  vigor / L-R gap / share.   |gap| > 0.3 marked *
+C uniform + full stats       seed 2024 n_init 10  inertia 5.11282e+06  lateralised 4   -0.55/-0.01   -0.11/-0.03   +0.37/+0.48*  +0.70/-0.68*  +0.75/-0.08   +1.32/+1.03*  +1.77/-1.03*  +3.39/+0.06 
+C uniform + full stats       seed    0 n_init 10  inertia 5.11284e+06  lateralised 4   -0.55/-0.01   -0.11/-0.03   +0.36/+0.47*  +0.70/-0.68*  +0.75/-0.08   +1.32/+1.03*  +1.77/-1.03*  +3.39/+0.06 
+C uniform + full stats       seed    1 n_init 10  inertia 5.11281e+06  lateralised 4   -0.55/-0.01   -0.11/-0.03   +0.37/+0.48*  +0.71/-0.68*  +0.74/-0.08   +1.33/+1.03*  +1.77/-1.03*  +3.39/+0.06 
+C uniform + full stats       seed    2 n_init 10  inertia 5.11283e+06  lateralised 4   -0.55/-0.01   -0.11/-0.03   +0.36/+0.47*  +0.71/-0.68*  +0.75/-0.08   +1.32/+1.03*  +1.77/-1.03*  +3.39/+0.06 
+A density + subsample stats  seed 2024 n_init 10  inertia 5.45414e+06  lateralised 5   -0.61/-0.02   -0.17/+0.04   +0.25/-0.40*  +0.54/+0.69*  +0.68/+0.10   +1.18/-0.95*  +1.55/+0.97*  +3.20/-0.50*
+A density + subsample stats  seed    0 n_init 10  inertia 5.45421e+06  lateralised 5   -0.61/-0.02   -0.17/+0.04   +0.27/-0.43*  +0.53/+0.69*  +0.67/+0.10   +1.20/-0.94*  +1.53/+0.98*  +3.20/-0.48*
+C uniform + full stats       seed 2024 n_init  1  inertia 5.11673e+06  lateralised 2   -0.58/-0.01   -0.22/+0.01   +0.27/-0.10   +0.45/+0.16   +1.12/+0.17   +1.29/-1.09*  +1.39/+1.05*  +3.33/-0.21 
+C uniform + full stats       seed    0 n_init  1  inertia 5.11284e+06  lateralised 4   -0.55/-0.01   -0.11/-0.03   +0.36/+0.47*  +0.70/-0.68*  +0.75/-0.08   +1.32/+1.03*  +1.77/-1.03*  +3.39/+0.06 

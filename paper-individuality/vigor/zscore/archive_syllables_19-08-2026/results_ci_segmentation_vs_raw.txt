@@ -1,0 +1,49 @@
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+cohort: 260 sessions, 56 mice, 10 labs
+held-out predictions read from ci_segmentation_vs_raw_hits.npz
+  paw done
+  whisk + lick done
+  all done
+     channel    metric                               rep  estimate     lo     hi                  ci  dims
+         paw     mouse                         syllables     0.760  0.694  0.816 bootstrap over mice 280.0
+         paw     mouse                raw, speed per paw     0.783  0.727  0.833 bootstrap over mice  80.0
+         paw     mouse      difference (syllables - raw)    -0.023 -0.078  0.032 bootstrap over mice   NaN
+         paw mouse_lab                         syllables     0.705  0.636  0.769 bootstrap over mice 280.0
+         paw mouse_lab                raw, speed per paw     0.679  0.610  0.747 bootstrap over mice  80.0
+         paw mouse_lab      difference (syllables - raw)     0.026 -0.028  0.079 bootstrap over mice   NaN
+         paw  lab_lomo                         syllables     0.242  0.172  0.318 bootstrap over mice 280.0
+         paw  lab_lomo                raw, speed per paw     0.446  0.334  0.566 bootstrap over mice  80.0
+         paw  lab_lomo      difference (syllables - raw)    -0.204 -0.298 -0.117 bootstrap over mice   NaN
+         paw  lab_eta2                         syllables     0.131  0.094  0.167 jackknife over mice 280.0
+         paw  lab_eta2                raw, speed per paw     0.228  0.135  0.321 jackknife over mice  80.0
+         paw  lab_eta2      difference (syllables - raw)    -0.097 -0.165 -0.029 jackknife over mice   NaN
+whisk + lick     mouse                         syllables     0.699  0.629  0.764 bootstrap over mice  80.0
+whisk + lick     mouse            raw, whisker ME + lick     0.778  0.719  0.828 bootstrap over mice  80.0
+whisk + lick     mouse      difference (syllables - raw)    -0.079 -0.124 -0.034 bootstrap over mice   NaN
+whisk + lick mouse_lab                         syllables     0.642  0.570  0.714 bootstrap over mice  80.0
+whisk + lick mouse_lab            raw, whisker ME + lick     0.664  0.593  0.734 bootstrap over mice  80.0
+whisk + lick mouse_lab      difference (syllables - raw)    -0.022 -0.080  0.033 bootstrap over mice   NaN
+whisk + lick  lab_lomo                         syllables     0.427  0.321  0.533 bootstrap over mice  80.0
+whisk + lick  lab_lomo            raw, whisker ME + lick     0.542  0.421  0.655 bootstrap over mice  80.0
+whisk + lick  lab_lomo      difference (syllables - raw)    -0.115 -0.196 -0.035 bootstrap over mice   NaN
+whisk + lick  lab_eta2                         syllables     0.337  0.230  0.445 jackknife over mice  80.0
+whisk + lick  lab_eta2            raw, whisker ME + lick     0.304  0.231  0.377 jackknife over mice  80.0
+whisk + lick  lab_eta2      difference (syllables - raw)     0.034 -0.040  0.107 jackknife over mice   NaN
+         all     mouse                         syllables     0.867  0.818  0.911 bootstrap over mice 360.0
+         all     mouse raw, speed per paw + whisk + lick     0.894  0.848  0.935 bootstrap over mice 160.0
+         all     mouse      difference (syllables - raw)    -0.027 -0.069  0.013 bootstrap over mice   NaN
+         all mouse_lab                         syllables     0.767  0.703  0.825 bootstrap over mice 360.0
+         all mouse_lab raw, speed per paw + whisk + lick     0.822  0.769  0.873 bootstrap over mice 160.0
+         all mouse_lab      difference (syllables - raw)    -0.055 -0.096 -0.014 bootstrap over mice   NaN
+         all  lab_lomo                         syllables     0.350  0.261  0.438 bootstrap over mice 360.0
+         all  lab_lomo raw, speed per paw + whisk + lick     0.577  0.458  0.687 bootstrap over mice 160.0
+         all  lab_lomo      difference (syllables - raw)    -0.227 -0.309 -0.142 bootstrap over mice   NaN
+         all  lab_eta2                         syllables     0.177  0.133  0.221 jackknife over mice 360.0
+         all  lab_eta2 raw, speed per paw + whisk + lick     0.266  0.189  0.342 jackknife over mice 160.0
+         all  lab_eta2      difference (syllables - raw)    -0.089 -0.134 -0.044 jackknife over mice   NaN

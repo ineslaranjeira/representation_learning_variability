@@ -1,0 +1,68 @@
+  50/332
+  100/332
+  150/332
+  200/332
+  250/332
+  300/332
+cached /home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/compare_pipelines_features.npz
+refitting rerun_no_zscore on 332 sessions from /home/ines/repositories/representation_learning_variability/paper-individuality/data/paw_subsampled_wavelets18ago
+  [zscored] supersession (664000, 20), PCA -> 14 comps, KMeans k=8
+  [raw] supersession (664000, 20), PCA -> 14 comps, KMeans k=8
+  25/332
+  50/332
+  75/332
+  100/332
+  125/332
+  150/332
+  175/332
+  200/332
+  225/332
+  250/332
+  275/332
+  300/332
+  325/332
+  [zscored] ARI vs the states on disk: 0.974 (n=332)
+  [raw] ARI vs the states on disk: 0.594 (n=332)
+
+====================================================================================================
+1. HOW DIFFERENT ARE THE STATES?   (all sessions with a states file)
+====================================================================================================
+variant                                         n  ARI vs prod          [IQR]  state share min-max  sessions w/ a state <1%
+production (density subsample, session z)     332        1.000   [1.00, 1.00]        0.009 - 0.397                     0.59
+uniform, raw,  session z                      332        0.773   [0.74, 0.81]        0.008 - 0.377                     0.66
+uniform, log,  session z                      332        0.282   [0.26, 0.33]        0.088 - 0.171                     0.14
+uniform, raw,  global z                       332        0.612   [0.49, 0.72]        0.013 - 0.453                     0.70
+uniform, log,  global z                       332        0.293   [0.25, 0.40]        0.041 - 0.167                     0.52
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+  1 session(s) had no rig in the sheet; lab taken from the mouse
+  labs: 10 for 260 sessions
+
+LDA cohort: 260 sessions, 56 mice, 10 labs
+
+====================================================================================================
+2a. RIG IN THE 8-STATE OCCUPANCY   (frame level, LDA cohort; null shuffles lab across mice)
+====================================================================================================
+variant                                       lab eta2    null  excess       p
+production (density subsample, session z)        0.098   0.114  -0.015  0.6872
+uniform, raw,  session z                         0.097   0.107  -0.009  0.5622
+uniform, log,  session z                         0.119   0.090   0.030  0.1339
+uniform, raw,  global z                          0.111   0.115  -0.004  0.5102
+uniform, log,  global z                          0.159   0.138   0.021  0.2319
+
+====================================================================================================
+2b. THE LDA FEATURES (paw only, 280 per session)   chance: mouse 1/56, lab ~0.10
+====================================================================================================
+variant                                       mouse mouse|lab lab eta2 lab LOSO lab LOMO    ICC
+production (density subsample, session z)     0.759     0.691    0.131    0.273    0.250  0.440
+uniform, raw,  session z                      0.744     0.681    0.135    0.323    0.277  0.438
+uniform, log,  session z                      0.650     0.547    0.139    0.342    0.358  0.432
+uniform, raw,  global z                       0.723     0.685    0.117    0.296    0.165  0.658
+uniform, log,  global z                       0.742     0.729    0.152    0.362    0.312  0.785
+density subsample, session z (refit)          0.756     0.692    0.138    0.312    0.258  0.499
+density subsample, no z                       0.744     0.704    0.121    0.338    0.169  0.568

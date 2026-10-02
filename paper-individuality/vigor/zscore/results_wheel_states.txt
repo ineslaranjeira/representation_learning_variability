@@ -1,0 +1,81 @@
+fit 14 wheel models on (664000, 5)
+cached /home/ines/repositories/representation_learning_variability/paper-individuality/vigor/zscore/wheel_states_features.npz
+QC sheet: /home/ines/repositories/representation_learning_variability/paper-individuality/data/individuality-paper_data_4Sep26.csv  ->  12 proficient sessions dropped
+101 mice, 332 sessions in total
+330 sessions after the QC sheet (filtered_out)
+322 sessions after dropping 8 with > 10.0% missing bins
+56 mice with at least 3 sessions, 260 remaining sessions
+159640 trials, 56 mice, 260 sessions
+260 sessions x 360 features, 56 mice
+
+cohort: 260 sessions, 56 mice, 10 labs
+
+================================================================================================
+A. LAB SHARE OF THE SESSION AMPLITUDE LEVEL   (null shuffles lab across mice)
+================================================================================================
+signal                              lab eta2    null       p  ICC mouse
+wheel, mean log amplitude              0.142   0.107  0.2074       0.43
+paw, mean log amplitude                0.114   0.123  0.5312       0.52
+  wheel 0.5 Hz                         0.118   0.108  0.3738       0.47
+  wheel 1.0 Hz                         0.105   0.107  0.4933       0.43
+  wheel 2.0 Hz                         0.119   0.108  0.3588       0.44
+  wheel 4.0 Hz                         0.201   0.121  0.0750       0.52
+  wheel 8.0 Hz                         0.359   0.135  0.0005       0.61
+
+================================================================================================
+B. DO PAW AND WHEEL DECORRELATE?
+================================================================================================
+frame level, within session: r(log paw power, log wheel power) median 0.93 [IQR 0.88, 0.95], n=332
+session level (levels):  r = +0.84 across sessions, +0.78 across mice
+state level: NMI(production paw states, wheel states), median over sessions
+  global   K=2: 0.324  K=3: 0.380  K=4: 0.369  K=5: 0.356  K=6: 0.350  K=7: 0.340  K=8: 0.337
+  session  K=2: 0.333  K=3: 0.390  K=4: 0.377  K=5: 0.356  K=6: 0.351  K=7: 0.345  K=8: 0.337
+
+================================================================================================
+C/D. MOUSE vs LAB   (LOSO; chance: mouse 0.018, lab ~0.100)
+================================================================================================
+block                               dims  mouse mouse|lab lab eta2 lab LOMO    ICC
+paw 280 (production) alone           280  0.759     0.691    0.131    0.250  0.440
+360 syllables alone                  360  0.869     0.800    0.177    0.400  0.752
+wheel global  K=2 alone               40  0.386     0.267    0.145    0.192  0.515
+paw 280 + wheel global  K=2          320  0.773     0.699    0.132    0.273  0.434
+360 + wheel global  K=2              400  0.881     0.786    0.173    0.438  0.675
+wheel global  K=3 alone               80  0.624     0.490    0.291    0.281  0.758
+paw 280 + wheel global  K=3          360  0.805     0.742    0.166    0.358  0.605
+360 + wheel global  K=3              440  0.887     0.812    0.197    0.523  0.692
+wheel global  K=4 alone              120  0.703     0.556    0.271    0.404  0.654
+paw 280 + wheel global  K=4          400  0.821     0.751    0.173    0.404  0.618
+360 + wheel global  K=4              480  0.890     0.797    0.200    0.562  0.680
+wheel global  K=5 alone              160  0.732     0.621    0.265    0.446  0.700
+paw 280 + wheel global  K=5          440  0.833     0.762    0.179    0.442  0.609
+360 + wheel global  K=5              520  0.890     0.801    0.204    0.577  0.695
+wheel global  K=6 alone              200  0.740     0.647    0.247    0.431  0.684
+paw 280 + wheel global  K=6          480  0.833     0.768    0.179    0.450  0.618
+360 + wheel global  K=6              560  0.882     0.810    0.202    0.558  0.681
+wheel global  K=7 alone              240  0.750     0.650    0.236    0.435  0.613
+paw 280 + wheel global  K=7          520  0.837     0.765    0.179    0.450  0.586
+360 + wheel global  K=7              600  0.883     0.804    0.200    0.554  0.642
+wheel global  K=8 alone              280  0.759     0.667    0.243    0.485  0.659
+paw 280 + wheel global  K=8          560  0.847     0.773    0.187    0.496  0.605
+360 + wheel global  K=8              640  0.899     0.813    0.206    0.581  0.666
+wheel session K=2 alone               40  0.373     0.235    0.170    0.196  0.595
+paw 280 + wheel session K=2          320  0.776     0.687    0.136    0.269  0.464
+360 + wheel session K=2              400  0.871     0.791    0.176    0.427  0.662
+wheel session K=3 alone               80  0.568     0.441    0.223    0.312  0.706
+paw 280 + wheel session K=3          360  0.799     0.726    0.151    0.350  0.484
+360 + wheel session K=3              440  0.874     0.810    0.185    0.427  0.718
+wheel session K=4 alone              120  0.624     0.499    0.195    0.365  0.620
+paw 280 + wheel session K=4          400  0.792     0.710    0.150    0.369  0.515
+360 + wheel session K=4              480  0.874     0.804    0.181    0.442  0.672
+wheel session K=5 alone              160  0.671     0.545    0.203    0.438  0.500
+paw 280 + wheel session K=5          440  0.795     0.721    0.157    0.423  0.447
+360 + wheel session K=5              520  0.871     0.794    0.185    0.515  0.469
+wheel session K=6 alone              200  0.673     0.568    0.185    0.419  0.483
+paw 280 + wheel session K=6          480  0.791     0.724    0.153    0.385  0.434
+360 + wheel session K=6              560  0.871     0.799    0.180    0.458  0.445
+wheel session K=7 alone              240  0.701     0.605    0.188    0.462  0.445
+paw 280 + wheel session K=7          520  0.809     0.731    0.157    0.446  0.418
+360 + wheel session K=7              600  0.865     0.796    0.181    0.523  0.417
+wheel session K=8 alone              280  0.714     0.595    0.179    0.462  0.439
+paw 280 + wheel session K=8          560  0.805     0.731    0.155    0.415  0.415
+360 + wheel session K=8              640  0.868     0.791    0.178    0.512  0.415
