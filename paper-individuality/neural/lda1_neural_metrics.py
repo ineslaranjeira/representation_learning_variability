@@ -93,9 +93,9 @@ KEEP_48 = ['CA1', 'DG', 'MRN', 'CP', 'LP', 'CA3', 'ZI', 'PO', 'MOs', 'MOp',
            'LD', 'RSPv', 'SI', 'SUB', 'RT', 'PRM', 'RSPd', 'Eth', 'ANcr2', 'ACB', 'CENT3',
            'IC', 'IP', 'SSp-bfd', 'PB', 'LGd', 'VPL', 'VISam', 'NOT', 'NTS', 'ACAd', 'VM',
            'SPVI', 'RSPagl', 'CA2', 'LH', 'GPe', 'GRN', 'PARN', 'SCs', 'PoT']
-KEEP_48 = ['CA1', 'DG', 'MRN', 'CP', 'LP', 'CA3', 'ZI', 'PO', 'MOs', 'MOp',
-           'APN', 'SCm', 'IRN', 'VPM', 'PAG', 'VISa', 'LSr', 'CUL4', 'MD', 'VISp'] # 20
-
+# KEEP_48 = ['CA1', 'DG', 'MRN', 'CP', 'LP', 'CA3', 'ZI', 'PO', 'MOs', 'MOp',
+#            'APN', 'SCm', 'IRN', 'VPM', 'PAG', 'VISa', 'LSr', 'CUL4', 'MD', 'VISp'] # 20
+# KEPP_48 = ['CA1', 'CA2', 'CA3']
 
 def default_config():
     """A fresh copy of the parameters, so a notebook cannot mutate the module's defaults."""
@@ -104,7 +104,9 @@ def default_config():
         # and the trial meta have both moved and been re-cut, and a stale hardcoded path
         # is how these notebooks break. The pinned entry is the one the published numbers
         # came from; later entries are only fallbacks.
-        LDA_FILES=[PAPER / 'clustering/data_files/mouse_LDA_5_bins_raw_25_20-09-2026',
+        LDA_FILES=[PAPER / 'clustering/data_files/mouse_LDA_5_bins_raw_shrink0.5_wmouse_360_02-10-2026',
+                   PAPER / 'clustering/data_files/mouse_LDA_5_bins_raw_shrink0.5_360_28-09-2026',
+                   PAPER / 'clustering/data_files/mouse_LDA_5_bins_raw_25_21-09-2026',
                    PAPER / 'clustering/data_files/mouse_LDA_5_bins_labzscore_25_20-09-2026',
                    PAPER / 'clustering/data_files/mouse_LDA_5_bins_cut25_16-09-2026',
                    PAPER / 'clustering/data_files/mouse_LDA_5_bins_lab_26_17-09-2026',
@@ -130,7 +132,8 @@ def default_config():
         DROP=['void'],
         DROP_COHORT=['root', 'void'],   # additionally dropped by apply_cohort
         # DROP_COHORT=['void'],   # additionally dropped by apply_cohort
-        KEEP=list(KEEP_48),          # None = every region that passes MIN_NEURONS
+        # KEEP=list(KEEP_48),          # None = every region that passes MIN_NEURONS
+        KEEP=None,
         MIN_NEURONS=15,              # neurons per region in a session (ALL metrics)
         # r_SC's own neuron minimum, if it should be stricter than the others. It is a
         # PAIRWISE metric: 15 neurons is 105 pairs, and the estimate's noise falls with
@@ -160,9 +163,11 @@ def default_config():
         # used (0.1, 0.3); that is now unified onto the FF/FR window, and the old one is
         # computed alongside it as `r_sc_post_legacy` / `r_sc_quench_legacy` so the
         # reproduction path against the published r_SC numbers still exists.
-        PRE_WINDOW=(-0.2, 0.0),
+        # PRE_WINDOW=(-0.2, 0.0),
+        PRE_WINDOW=(-0.2, -.1),
         POST_WINDOW=(0.1, 0.3),
-        RSC_PRE_WINDOW=(-0.2, 0.0),        # = PRE_WINDOW
+        # RSC_PRE_WINDOW=(-0.2, 0.0),        # = PRE_WINDOW
+        RSC_PRE_WINDOW=(-0.2, -0.1),        # = PRE_WINDOW
         RSC_POST_WINDOW=(0.1, 0.3),        # = POST_WINDOW (was (0.0, 0.2))
         RSC_POST_WINDOW_LEGACY=(0.0, 0.2),  # noise_corr's own CORR_WINDOW, kept for the check
         # WHICH BINS A TRIAL HAS TO BE COMPLETE IN, for r_SC only. r_SC is pairwise, so it
