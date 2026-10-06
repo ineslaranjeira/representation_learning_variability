@@ -363,6 +363,85 @@ HATCH_INK_LIGHT = '#FFFFFFDD'
 HATCH_INK_SPLIT = 0.17
 
 
+# OKLCH, for the state palettes. The paw palette was built in it (lightness = vigor rank,
+# hue = side, chroma = left-right gap); these let the same rule colour any clustering.
+_OK_M1 = np.array([[0.4122214708, 0.5363325363, 0.0514459929],
+                   [0.2119034982, 0.6806995451, 0.1073969566],
+                   [0.0883024619, 0.2817188376, 0.6299787005]])
+_OK_M2 = np.array([[0.2104542553, 0.7936177850, -0.0040720468],
+                   [1.9779984951, -2.4285922050, 0.4505937099],
+                   [0.0259040371, 0.7827717662, -0.8086757660]])
+
+
+def _to_linear(c):
+    c = np.asarray(c, float)
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _to_srgb(c):
+    c = np.asarray(c, float)
+    return np.where(c <= 0.0031308, 12.92 * c, 1.055 * np.abs(c) ** (1 / 2.4) - 0.055)
+
+
+def hex_to_oklch(color):
+    """-> (L, C, h in degrees) of any matplotlib colour."""
+    L, a, b = _OK_M2 @ np.cbrt(_OK_M1 @ _to_linear(to_rgb(color)))
+    return float(L), float(np.hypot(a, b)), float(np.degrees(np.arctan2(b, a)) % 360)
+
+
+def oklch_to_hex(L, C, h):
+    """OKLCH -> hex, reducing chroma (hue and lightness kept) until the colour is in sRGB."""
+    for _ in range(300):
+        lab = np.array([L, C * np.cos(np.radians(h)), C * np.sin(np.radians(h))])
+        rgb = _to_srgb(np.linalg.inv(_OK_M1) @ (np.linalg.inv(_OK_M2) @ lab) ** 3)
+        if (rgb >= -1e-6).all() and (rgb <= 1 + 1e-6).all():
+            break
+        C *= 0.98
+    return '#' + ''.join(f'{int(round(v * 255)):02X}' for v in np.clip(rgb, 0, 1))
+
+
+# THE STATE-PALETTE RULE, for any clustering -- the one PAW_STATE_COLORS was built by:
+#   lightness  vigor RANK, on the paw palette's own ramp (OKLCH L 0.93 pale-still -> 0.30 dark)
+#   hue        which of two things the state leans to: sign of `gap`
+#   chroma     how far it leans: 0.02 + 0.22 |gap|, clipped to sRGB
+# Hue pairs in use:  left / right paw  = violet 310 / amber 90 (64 when dark, as the paw set)
+#                    left paw / wheel  = violet 310 / WHEEL_HUE
+# WHEEL_HUE = 180, teal: chosen against violet and amber with Machado-2009 CVD simulation and
+# OKLab dE x100 at the moderate and fast states' lightness (L 0.70 / 0.52) --
+#   vs violet: CVD min 14.8 / 16.1, normal 30.7 / 28.9;  vs amber: CVD min 14.1 / 11.3
+# -- so 'wheel' never reads as 'right paw'; and 91 deg clear of LD1_CMAP's poles (271, 22).
+WHEEL_HUE = 180
+_L_RAMP = [0.931, 0.787, 0.701, 0.636, 0.589, 0.523, 0.451, 0.304]   # PAW_STATE_COLORS, by vigor
+
+
+def state_palette(vigor, gap=None, hues=(310, 90), chroma=None):
+    """Colours for states by the paper's rule: lightness = vigor rank, hue = sign of `gap`,
+    chroma = |gap|.
+
+    vigor  : one number per state (any order); only the RANK is used.
+    gap    : one number per state, + leaning to hues[0], - to hues[1]; e.g. left - right paw
+             power, or paw - wheel power. None = a single signal: every state in hues[0] at a
+             constant `chroma` (default 0.06), so only lightness varies.
+    Returns hex colours in state order.
+    """
+    vigor = np.asarray(vigor, float)
+    n = len(vigor)
+    ramp = np.interp(np.linspace(0, 1, n), np.linspace(0, 1, len(_L_RAMP)), _L_RAMP)
+    L = ramp[np.argsort(np.argsort(vigor))]
+    out = []
+    for i in range(n):
+        if gap is None:
+            h, C = hues[0], 0.06 if chroma is None else chroma
+        else:
+            g = float(np.asarray(gap, float)[i])
+            h = hues[0] if g >= 0 else hues[1]
+            if h == 90 and L[i] < 0.6:      # the paw set's dark amber turns brown, not olive
+                h = 64
+            C = 0.02 + 0.22 * abs(g) if chroma is None else chroma
+        out.append(oklch_to_hex(L[i], C, h))
+    return out
+
+
 def hatch_ink(fill):
     """The hatch colour to use over `fill` -- dark ink on pale fills, light on dark."""
     r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
