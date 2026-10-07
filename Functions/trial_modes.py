@@ -185,17 +185,48 @@ def plot_watershed(res):
     return fig
 
 
-def plot_clusters(trials, res, color_points=True, max_points=100_000, seed=0):
-    """Embedding with the watershed boundaries and the cluster numbers at their centroids."""
+def umap_colors(trials, lightness=62, chroma=55):
+    """One colour per trial mode from where it sits in the embedding, so nearby modes get
+    similar colours: the mode centroids are scaled to [-1, 1] and read as the a*/b* axes of
+    CIELAB at a fixed lightness (hue = direction from the centre, saturation = distance from it).
+    Returns {mode: rgb}."""
+    from skimage.color import lab2rgb
+    cen = trials.dropna(subset=['trial_cluster']).groupby('trial_cluster')[['embedding_x', 'embedding_y']].mean()
+    xy = cen.to_numpy()
+    xy = (xy - xy.mean(axis=0)) / np.abs(xy - xy.mean(axis=0)).max()
+    lab = np.column_stack([np.full(len(xy), lightness), chroma * xy[:, 0], chroma * xy[:, 1]])
+    rgb = np.clip(lab2rgb(lab[None])[0], 0, 1)
+    return {k: tuple(c) for k, c in zip(cen.index, rgb)}
+
+
+def umap_order(trials):
+    """Modes ordered by their umap_colors hue: the angle of each mode's centroid around the
+    embedding's centre, starting after the widest angular gap, so panels laid out in this order
+    run through the colour wheel and neighbouring panels are neighbouring modes."""
+    cen = trials.dropna(subset=['trial_cluster']).groupby('trial_cluster')[['embedding_x', 'embedding_y']].mean()
+    xy = cen.to_numpy() - cen.to_numpy().mean(axis=0)
+    ang = np.arctan2(xy[:, 1], xy[:, 0])
+    order = np.argsort(ang)
+    a = ang[order]
+    gaps = np.diff(np.concatenate([a, [a[0] + 2 * np.pi]]))
+    start = (np.argmax(gaps) + 1) % len(a)
+    return [cen.index[i] for i in np.roll(order, -start)]
+
+
+def plot_clusters(trials, res, color_points=True, max_points=100_000, seed=0, colors=None):
+    """Embedding with the watershed boundaries and the cluster numbers at their centroids.
+    colors: {mode: colour} (e.g. umap_colors(trials)); default tab20."""
     xmin, xmax, ymin, ymax = res['bounds']
     d = trials.dropna(subset=['embedding_x'])
     if len(d) > max_points:
         d = d.sample(max_points, random_state=seed)
     cmap = plt.get_cmap('tab20')
     fig, ax = plt.subplots(figsize=(6, 5))
-    colors = [cmap(int(k) % cmap.N) if k == k else (.6, .6, .6, 1) for k in d['trial_cluster']] \
+    palette = colors
+    pick = (lambda k: palette[k]) if palette is not None else (lambda k: cmap(int(k) % cmap.N))
+    point_colors = [pick(k) if k == k else (.6, .6, .6, 1) for k in d['trial_cluster']] \
         if color_points else 'k'
-    ax.scatter(d['embedding_x'], d['embedding_y'], c=colors, s=1, alpha=.1 if color_points else .02,
+    ax.scatter(d['embedding_x'], d['embedding_y'], c=point_colors, s=1, alpha=.1 if color_points else .02,
                rasterized=True)
     ax.imshow(np.rot90(find_boundaries(res['labels'], mode='outer')), cmap=plt.cm.gist_earth_r,
               extent=[xmin, xmax, ymin, ymax], aspect='auto', alpha=.6)

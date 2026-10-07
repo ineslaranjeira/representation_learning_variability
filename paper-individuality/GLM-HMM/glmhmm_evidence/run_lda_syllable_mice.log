@@ -1,0 +1,94 @@
+[1/56] CSHL045: 5 sessions, converged=True (0.9 min)
+[2/56] CSHL049: 4 sessions, converged=True (1.3 min)
+[3/56] CSHL052: 5 sessions, converged=False (2.6 min)
+[4/56] CSHL053: 4 sessions, converged=True (2.9 min)
+[5/56] CSHL058: 3 sessions, converged=True (3.0 min)
+[6/56] CSHL059: 5 sessions, converged=True (3.3 min)
+[7/56] CSHL060: 5 sessions, converged=True (3.5 min)
+[8/56] CSH_ZAD_019: 4 sessions, converged=False (4.5 min)
+[9/56] CSH_ZAD_029: 7 sessions, converged=True (5.9 min)
+[10/56] DY_009: 9 sessions, converged=True (6.3 min)
+[11/56] DY_010: 5 sessions, converged=True (6.5 min)
+[12/56] DY_011: 4 sessions, converged=True (6.7 min)
+[13/56] DY_014: 7 sessions, converged=True (7.8 min)
+[14/56] DY_016: 5 sessions, converged=True (8.2 min)
+[15/56] DY_018: 3 sessions, converged=True (8.3 min)
+[16/56] DY_020: 8 sessions, converged=True (9.6 min)
+[17/56] NR_0019: 3 sessions, converged=True (9.9 min)
+[18/56] NR_0020: 4 sessions, converged=True (10.2 min)
+[19/56] NR_0021: 3 sessions, converged=True (10.5 min)
+[20/56] NR_0027: 4 sessions, converged=True (10.9 min)
+[21/56] NYU-37: 5 sessions, converged=True (11.3 min)
+[22/56] NYU-39: 5 sessions, converged=True (11.8 min)
+[23/56] NYU-40: 4 sessions, converged=True (12.2 min)
+[24/56] NYU-45: 3 sessions, converged=True (12.3 min)
+[25/56] NYU-46: 4 sessions, converged=True (12.6 min)
+[26/56] NYU-47: 3 sessions, converged=False (13.3 min)
+[27/56] NYU-48: 3 sessions, converged=True (13.5 min)
+[28/56] NYU-65: 3 sessions, converged=True (13.8 min)
+[29/56] PL015: 5 sessions, converged=True (14.3 min)
+[30/56] PL017: 7 sessions, converged=True (14.6 min)
+[31/56] PL030: 8 sessions, converged=True (15.1 min)
+[32/56] PL031: 5 sessions, converged=True (15.6 min)
+[33/56] PL033: 13 sessions, converged=False (18.2 min)
+[34/56] PL034: 3 sessions, converged=True (18.4 min)
+[35/56] SWC_043: 7 sessions, converged=True (19.1 min)
+[36/56] SWC_052: 7 sessions, converged=False (20.2 min)
+[37/56] SWC_053: 3 sessions, converged=True (20.4 min)
+[38/56] SWC_054: 6 sessions, converged=True (20.9 min)
+[39/56] SWC_058: 4 sessions, converged=True (21.3 min)
+[40/56] SWC_060: 3 sessions, converged=True (21.4 min)
+[41/56] SWC_061: 3 sessions, converged=True (21.5 min)
+[42/56] UCLA033: 3 sessions, converged=True (21.6 min)
+[43/56] UCLA034: 4 sessions, converged=True (21.8 min)
+[44/56] UCLA037: 4 sessions, converged=True (22.0 min)
+[45/56] UCLA048: 1 sessions, converged=True (22.1 min)
+[46/56] UCLA052: 1 sessions, converged=True (22.1 min)
+[47/56] ZFM-01577: 3 sessions, converged=True (22.4 min)
+[48/56] ZFM-01592: 3 sessions, converged=True (22.9 min)
+[49/56] ZFM-01935: 4 sessions, converged=True (23.3 min)
+[50/56] ZFM-01936: 5 sessions, converged=True (23.5 min)
+[51/56] ZFM-01937: 2 sessions, converged=True (23.6 min)
+[52/56] ZM_2240: 4 sessions, converged=True (23.9 min)
+[53/56] ZM_2241: 5 sessions, converged=True (24.4 min)
+[54/56] ibl_witten_26: 5 sessions, converged=True (24.9 min)
+[55/56] ibl_witten_27: 6 sessions, converged=True (25.8 min)
+[56/56] ibl_witten_29: 9 sessions, converged=False (28.2 min)
+
+refit vs stored ssm posterior: median r = 0.991 (min 0.589); label agreement median 99.0% (min 82.9%)
+
+1. CURRENT TRIAL vs OTHER TRIALS (posterior logit = others + own, exactly)
+   median |own evidence| = 0.28 nats, median |other trials| = 2.30 nats
+   labels decided by the trial's own choice (removing it flips the label): 3.81% of trials
+   ... of disengaged-labelled trials: 20.47%; of engaged-labelled: 1.26%
+   per mouse: median 3.55%, range 0.46%-8.28%
+
+2. WITHIN THE TRIAL'S OWN EVIDENCE: Shapley split (mean |phi|, nats; and share)
+              mean_abs_phi  share
+phi_stimulus         0.518  0.399
+phi_history          0.380  0.293
+phi_bias             0.401  0.308
+   own evidence by |contrast| x outcome (mean LLR, + = engaged):
+correct       False  True 
+abs_contrast              
+0.0000         0.25   0.14
+0.0625        -0.24   0.41
+0.1250        -0.86   0.58
+0.2500        -2.66   0.64
+1.0000       -14.17   0.31
+
+3. WEIGHT-LEVEL SEPARATION |w_eng - w_dis| x SD(input), median across mice
+sep_stim           6.549
+sep_prev_choice    0.619
+sep_wsls           0.292
+sep_bias           0.933
+
+4. REACH: median |change in posterior logit| at distance k when one trial is removed
+   k=+- 0: 0.709
+   k=+- 1: 0.322
+   k=+- 2: 0.193
+   k=+- 5: 0.067
+   k=+-10: 0.021
+   k=+-20: 0.004
+   k=+-30: 0.001
+   prior memory: median p_stay engaged 0.963, disengaged 0.819, half-life 2.8 trials
