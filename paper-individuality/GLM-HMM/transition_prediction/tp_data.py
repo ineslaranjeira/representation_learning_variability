@@ -45,7 +45,10 @@ CACHE_DIR = HERE / 'cache'
 STATES_FILE = GLM_HMM_DIR / 'merged_behavioral_and_states.pqt'
 ALLK_POSTERIORS = GLM_HMM_DIR / 'k2_k3_pilot' / 'all_k_posteriors.parquet'
 ALLK_WEIGHTS = GLM_HMM_DIR / 'k2_k3_pilot' / 'all_k_weights.csv'
-SYLLABLE_FILE = PREFIX / 'clustering' / 'data_files' / '8_k_10_bin_syllables_02-10-2026'
+# clustering/data_files on the Mac, data/ on the linux machine
+SYLLABLE_FILE = next((p for p in [PREFIX / 'clustering' / 'data_files' / '8_k_10_bin_syllables_02-10-2026',
+                                  PREFIX / 'data' / '8_k_10_bin_syllables_02-10-2026'] if p.exists()),
+                     PREFIX / 'clustering' / 'data_files' / '8_k_10_bin_syllables_02-10-2026')
 LDA_FILE = PREFIX / 'clustering' / 'data_files' / 'mouse_LDA_5_bins_raw_shrink0.5_wmouse_360_02-10-2026'
 TRIAL_MODES_FILE = PREFIX / '3_trial_modes' / 'trial_modes_8_k_10_bin_syllables_02-10-2026' / 'trials.pqt'
 
