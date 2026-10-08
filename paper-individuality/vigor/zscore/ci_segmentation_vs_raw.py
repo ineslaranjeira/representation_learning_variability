@@ -10,6 +10,8 @@ of their difference is paired -- same sessions, same resample.
   channel        syllables                     raw, per-session z (dimension-matched)
   paw            paw syllables          280    speed per paw          80
   whisk + lick   whisk / lick states     80    whisker ME + lick       80
+  whisk          whisk states            40    whisker ME              40
+  lick           lick states             40    lick count              40
   all            the 360 LDA features   360    speed per paw + w + l  160
 
 Metrics (as in zscore_cost.py; every block's columns standardised across sessions first):
@@ -23,6 +25,9 @@ resampling mice with replacement duplicates animals, leaves fewer distinct mice 
 inflates eta2 in every resample -- the percentile interval then sits entirely ABOVE the
 estimate (paw syllables: 0.131, "CI" [0.156, 0.244]). So eta2 and its paired difference get a
 leave-one-mouse-out JACKKNIFE interval, estimate +- 1.96 SE, SE^2 = (n-1)/n * sum (theta_-i - mean)^2.
+
+whisk and lick are the whisk + lick blocks split by column: both blocks interleave
+[whisk, lick] per timestep, so whisk = columns 0::2 and lick = columns 1::2.
 
 Reads the feature caches of those two scripts and compare_pipelines.py.
 Output: ci_segmentation_vs_raw.csv (estimates + CIs + paired differences).
@@ -41,6 +46,8 @@ from raw_vs_syllables import Z, me, lab_labels, HERE
 N_BOOT, SEED = 2000, 0
 PAIRS = [('paw', 'syllables', 'raw, speed per paw'),
          ('whisk + lick', 'syllables', 'raw, whisker ME + lick'),
+         ('whisk', 'syllables', 'raw, whisker ME'),
+         ('lick', 'syllables', 'raw, lick count'),
          ('all', 'syllables', 'raw, speed per paw + whisk + lick')]
 
 
@@ -87,6 +94,10 @@ def main():
         ('paw', 'raw, speed per paw'): stack(vel, 'spd_sessz'),
         ('whisk + lick', 'syllables'): RS.whisk_lick_only(S360),
         ('whisk + lick', 'raw, whisker ME + lick'): stack(raw, 'wl_sessz'),
+        ('whisk', 'syllables'): RS.whisk_lick_only(S360)[:, 0::2],
+        ('whisk', 'raw, whisker ME'): stack(raw, 'wl_sessz')[:, 0::2],
+        ('lick', 'syllables'): RS.whisk_lick_only(S360)[:, 1::2],
+        ('lick', 'raw, lick count'): stack(raw, 'wl_sessz')[:, 1::2],
         ('all', 'syllables'): S360,
         ('all', 'raw, speed per paw + whisk + lick'): stack(vel, 'spd_wl_sessz'),
     }
@@ -98,11 +109,14 @@ def main():
                          lab_lomo=lomo_hits(X, labs, mice))
 
     hits_file = HERE / 'ci_segmentation_vs_raw_hits.npz'
+    H = {}
     if hits_file.exists():                       # the expensive part: reuse (delete to refit)
         H = np.load(hits_file, allow_pickle=True)['hits'].item()
         print(f'held-out predictions read from {hits_file.name}', flush=True)
-    else:
-        H = dict(Parallel(n_jobs=18)(delayed(hits)(k) for k in BLOCKS))
+    todo = [k for k in BLOCKS if k not in H]     # blocks added since the cache was written
+    if todo:
+        print(f'fitting {len(todo)} block(s): {todo}', flush=True)
+        H.update(dict(Parallel(n_jobs=18)(delayed(hits)(k) for k in todo)))
         np.savez(hits_file, hits=H, mice=mice, labs=labs)
 
     # ---- bootstrap over mice, pairs resampled together
