@@ -56,6 +56,7 @@ FEATURES = {'lick_rate': 'Lick rate (bins/min)', 'whisk_me': 'Whisker motion ene
             'paw_speed': 'Left paw speed (px/s)'}
 MAX_PAW_NAN = 0.2
 N_PERM = 5000
+LAB_CONTROL = False   # figures: True = lab-residualised ranks and rho_lab; False = plain ranks and rho
 rng = np.random.default_rng(0)
 
 
@@ -235,16 +236,20 @@ for i, feat in enumerate(FEATURES):
         ax = axes[i, j]
         if len(d) >= 5:
             labs = lab.reindex(d.index)
-            rx, ry = lab_residual_ranks(d['x'], labs), lab_residual_ranks(d['y'], labs)
+            if LAB_CONTROL:
+                rx, ry = lab_residual_ranks(d['x'], labs), lab_residual_ranks(d['y'], labs)
+            else:
+                rx, ry = pd.Series(rankdata(d['x']), d.index), pd.Series(rankdata(d['y']), d.index)
             ax.scatter(rx, ry, s=14, color=COLOR[tp], edgecolor='white', linewidth=0.5)
             res = correlate(d['x'], d['y'], labs)
-            ax.set_title(f'ρ = {res["rho"]:.2f}   ρ$_{{lab}}$ = {res["rho_lab"]:.2f}\n'
-                         f'n = {res["n"]}, p$_{{lab}}$ = {res["p_lab"]:.3f}', fontsize=7)
-        ax.axhline(0, color='0.85', lw=0.6, zorder=0)
-        ax.axvline(0, color='0.85', lw=0.6, zorder=0)
+            ax.set_title(f'ρ = {res["rho"]:.2f}, p = {res["p"]:.3f}\nn = {res["n"]}' if not LAB_CONTROL else
+                         f'ρ$_{{lab}}$ = {res["rho_lab"]:.2f}, p$_{{lab}}$ = {res["p_lab"]:.3f}\nn = {res["n"]}', fontsize=7)
+        if LAB_CONTROL:
+            ax.axhline(0, color='0.85', lw=0.6, zorder=0)
+            ax.axvline(0, color='0.85', lw=0.6, zorder=0)
         ax.set_xticks([]); ax.set_yticks([])
         ax.set_xlabel(xl, fontsize=7); ax.set_ylabel(yl if j else f'{FEATURES[feat]}\n{yl}', fontsize=7)
-fig.suptitle('Habituation vs later behaviour: lab-residualised ranks across mice', fontsize=9)
+fig.suptitle('Habituation vs later behaviour: ' + ('lab-residualised ranks' if LAB_CONTROL else 'ranks') + ' across mice', fontsize=9)
 FIG.mkdir(exist_ok=True)
 fig.savefig(FIG / 'habituation_stability_raw_signals.png', dpi=200)
 plt.show()
