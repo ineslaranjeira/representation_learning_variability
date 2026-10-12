@@ -59,6 +59,7 @@ def config():
     cfg['MIN_PRESENCE_RATIO'] = 0.90        # USE_PRESENCE_RATIO = True
     cfg['MIN_NEURONS'] = 15
     cfg['MIN_NEURONS_RSC'] = None
+    cfg['LD1_SOURCE'] = 'current'          # the LDA file the behavioural figures use
     return cfg
 
 
