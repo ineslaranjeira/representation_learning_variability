@@ -15,7 +15,7 @@ keeps only what is needed to reproduce the four tests per metric that the paper 
 
     baseline    the pre-stimulus window
     post        the post-stimulus window
-    magnitude   the pre->post change (FF quench / r_SC quench / evoked rate)
+    magnitude   the pre->post change, post - pre for all three (FF, r_SC, evoked rate; negative = quench)
     onset       WHEN the change starts (Fano factor only)
 
 -- and makes one pass over the files instead of three.
@@ -963,7 +963,7 @@ def compute_tables(cfg=None, verbose=True, max_files=None):
                 for nu, a, b in zip(nu_names[keep], ff_pre[keep], ff_post[keep]):
                     ff_rows.append(dict(session=session, region=region, beryl=beryl, nuid=nu,
                                         n_trials=len(valid_idx), ff_pre=a, ff_post=b,
-                                        ff_quench=a - b))
+                                        ff_quench=b - a))      # post - pre: negative = variability quenched
 
                 # ---------------- Fano-factor quench onset (per neuron) ----------------
                 # The leading window is not a stylistic choice: the onset time is read off
@@ -1001,8 +1001,9 @@ def compute_tables(cfg=None, verbose=True, max_files=None):
             for c in cols:
                 tbl['log_' + c] = np.log(tbl[c].clip(lower=1e-6))
     if len(rsc):
-        rsc['r_sc_quench'] = rsc['r_sc_pre'] - rsc['r_sc_post']
-        rsc['r_sc_quench_legacy'] = rsc['r_sc_pre'] - rsc['r_sc_post_legacy']
+        # post - pre, like the firing-rate change: negative = correlations quenched by the stimulus
+        rsc['r_sc_quench'] = rsc['r_sc_post'] - rsc['r_sc_pre']
+        rsc['r_sc_quench_legacy'] = rsc['r_sc_post_legacy'] - rsc['r_sc_pre']
     if len(ff) and len(onset):
         ff = ff.merge(onset, on=['session', 'nuid'], how='left')
 
@@ -1317,7 +1318,7 @@ GRID = {
     ('Fano factor', 'Post-stimulus'):
         ('ff', 'log_ff_post', 'ff_post', 'FF post-stimulus', 'region', ('n_trials',)),
     ('Fano factor', 'Response magnitude'):
-        ('ff', 'ff_quench', 'ff_quench', 'FF quench (pre - post)', 'region', ('n_trials',)),
+        ('ff', 'ff_quench', 'ff_quench', 'FF change (post - pre)', 'region', ('n_trials',)),
     # C(region), like every other test in the grid. The source notebook used
     # C(functional_region) -- 12 hand-built levels (Thalamus, Hippocampus, Visual Cortex,
     # ... with a Cosmos fallback for whatever fell through, and RSP lumped into "Visual"
@@ -1336,7 +1337,7 @@ GRID = {
         ('rsc', 'r_sc_post', 'r_sc_post', r'$r_{SC}$ post-stimulus', 'region',
          ('n_trials', 'n_neurons')),
     ('Noise correlation', 'Response magnitude'):
-        ('rsc', 'r_sc_quench', 'r_sc_quench', r'$r_{SC}$ quench (pre - post)', 'region',
+        ('rsc', 'r_sc_quench', 'r_sc_quench', r'$r_{SC}$ change (post - pre)', 'region',
          ('n_trials', 'n_neurons')),
     ('Noise correlation', 'Response onset'): None,
 }
@@ -1574,6 +1575,14 @@ def load_tables(tag=None, cfg=None, verbose=True):
     out = {}
     for p in sorted(CACHE.glob(f'{stem}__*.pqt')):
         out[p.name.split('__')[1].replace('.pqt', '')] = pd.read_parquet(p)
+    # THE CHANGE MEASURES ARE POST - PRE (since 12-10-2026; they used to be pre - post). They are recomputed from
+    # the stored pre / post columns on load, so a cache written under the old sign reads back with the new one.
+    if 'ff' in out and {'ff_pre', 'ff_post'} <= set(out['ff'].columns):
+        out['ff']['ff_quench'] = out['ff']['ff_post'] - out['ff']['ff_pre']
+    if 'rsc' in out and {'r_sc_pre', 'r_sc_post'} <= set(out['rsc'].columns):
+        out['rsc']['r_sc_quench'] = out['rsc']['r_sc_post'] - out['rsc']['r_sc_pre']
+        if 'r_sc_post_legacy' in out['rsc'].columns:
+            out['rsc']['r_sc_quench_legacy'] = out['rsc']['r_sc_post_legacy'] - out['rsc']['r_sc_pre']
     if verbose:
         print(f"loaded '{stem}': " + ', '.join(f'{k} ({len(v)})' for k, v in out.items()))
     return out
