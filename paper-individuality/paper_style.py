@@ -882,7 +882,7 @@ def _mix(a, b, w):
     return tuple(A * (1 - w) + B * w)
 
 
-def grey_centered(neg='#8C5A1A', pos='#11736B', grey='#CCCCCC', name='grey_centered'):
+def grey_centered(neg='#6F7F14', pos='#E0821E', grey='#CCCCCC', name='grey_centered'):
     """Diverging map with GREY at zero. Grey rather than white because a near-zero
     cell should read as "nothing here" instead of dissolving into the page, and
     because it leaves white free to mean "not estimated" (cmap.set_bad)."""
@@ -892,9 +892,10 @@ def grey_centered(neg='#8C5A1A', pos='#11736B', grey='#CCCCCC', name='grey_cente
     return cm
 
 
-# Correlation maps (r across mice, RDMs, ...). Brown <-> teal deliberately avoids
-# blue-red, which is spoken for by LD1 -- a red/blue correlation map reads as an LD1
-# map at a glance.
+# Correlation maps (r across mice, RDMs, ...). Olive (negative) <-> orange (positive), on trial since 14-10-2026.
+# Avoids blue-red (LD1 -- a red/blue correlation map reads as an LD1 map at a glance), purple and gold/brown (paw
+# states), teal (left paw + wheel states; the old brown <-> teal collided with them in the time-horizon figure) and
+# pink/red (timepoints, LD1's red end).
 CORR_CMAP = grey_centered()
 CORR_VMAX = 1.0
 

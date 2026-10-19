@@ -1,0 +1,27 @@
+LDA: mouse_LDA_5_bins_raw_shrink0.5_wmouse_360_02-10-2026 | 260 sessions, 56 mice, 11 labs (alyx)
+neural: tables lda1_neural_pr90_fr10_sess_02-10-2026
+  Firing rate        Baseline            r = +0.039 (p 0.0455)   +lab: r = +0.026 (p 0.1259)   204 sessions, 56 mice
+  Firing rate        Post-stimulus       r = +0.011 (p 0.5187)   +lab: r = +0.015 (p 0.3393)   204 sessions, 56 mice
+  Firing rate        Response magnitude  r = +0.013 (p 0.2559)   +lab: r = +0.005 (p 0.6887)   204 sessions, 56 mice
+  Firing rate        Response onset      r = +0.077 (p 0.0035)   +lab: r = +0.038 (p 0.0485)   204 sessions, 56 mice
+  Fano factor        Baseline            r = -0.025 (p 0.2139)   +lab: r = -0.005 (p 0.7906)   204 sessions, 56 mice
+  Fano factor        Post-stimulus       r = -0.092 (p 0.0005)   +lab: r = -0.049 (p 0.0255)   204 sessions, 56 mice
+  Fano factor        Response magnitude  r = -0.093 (p 0.0005)   +lab: r = -0.047 (p 0.0200)   204 sessions, 56 mice
+  Fano factor        Response onset      r = -0.049 (p 0.0010)   +lab: r = -0.035 (p 0.0050)   204 sessions, 56 mice
+  Noise correlation  Baseline            r = -0.158 (p 0.0145)   +lab: r = -0.177 (p 0.0065)   203 sessions, 56 mice
+  Noise correlation  Post-stimulus       r = -0.223 (p 0.0010)   +lab: r = -0.205 (p 0.0005)   203 sessions, 56 mice
+  Noise correlation  Response magnitude  r = -0.141 (p 0.0135)   +lab: r = -0.062 (p 0.2654)   203 sessions, 56 mice
+
+=== neural correlates (partial r; p from session permutation, within lab for +lab) ===
+                            correlate  n_mice    rho     p  rho_lab  p_lab
+                Firing rate, Baseline      56  0.039 0.045    0.026  0.126
+           Firing rate, Post-stimulus      56  0.011 0.519    0.015  0.339
+      Firing rate, Response magnitude      56  0.013 0.256    0.005  0.689
+          Firing rate, Response onset      56  0.077 0.003    0.038  0.048
+                Fano factor, Baseline      56 -0.025 0.214   -0.005  0.791
+           Fano factor, Post-stimulus      56 -0.092 0.000   -0.049  0.025
+      Fano factor, Response magnitude      56 -0.093 0.000   -0.047  0.020
+          Fano factor, Response onset      56 -0.049 0.001   -0.035  0.005
+          Noise correlation, Baseline      56 -0.158 0.014   -0.177  0.006
+     Noise correlation, Post-stimulus      56 -0.223 0.001   -0.205  0.000
+Noise correlation, Response magnitude      56 -0.141 0.013   -0.062  0.265

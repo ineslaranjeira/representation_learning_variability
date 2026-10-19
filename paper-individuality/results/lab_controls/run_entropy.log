@@ -1,0 +1,88 @@
+fig_engagement_syllables.ipynb:16: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  "| C | how well syllable use alone tells the engagement state (per epoch) and anticipates transitions (pre-stimulus of t + trial t−1), on all trials and with outcome held fixed (held-out AUC, mice held out); GLM-HMM own-trial evidence as a positive control | here |\n",
+LDA: mouse_LDA_5_bins_raw_shrink0.5_wmouse_360_02-10-2026 | 260 sessions, 56 mice, 11 labs (alyx)
+paper_style: paper mode, spines=lb, font 8 pt, panels 3.4x2.4 in, save 400 dpi
+density families (displayed numbers): {1: [6, 7], 2: [2, 3, 4], 3: [1, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]}
+reaction times from session_trial_meta_19-08-2026: 76.8% of trials
+per-bin syllables found for 98.7% of state-table trials
+state table: 244 sessions, 56 mice, 152377 trials, 13.2% disengaged
+trial modes: 206879 trials, 332 sessions, 17 modes, 5.9% without a mode
+displayed number <- cluster id: {1: 8, 2: 2, 3: 12, 4: 15, 5: 4, 6: 17, 7: 16, 8: 5, 9: 10, 10: 1, 11: 7, 12: 14, 13: 13, 14: 11, 15: 3, 16: 6, 17: 9}
+                 n_mice     rho       p  ...  p_lab_centred  rho_within  p_within
+y                                        ...                                     
+switch_rate          56 -0.3470  0.0088  ...         0.0001      0.1096    0.0875
+frac_disengaged      56  0.0773  0.5712  ...         0.5866     -0.0259    0.6869
+
+[2 rows x 7 columns]
+
+In this LDA file the switchy end of LD1 is the LOW end.
+55 mice (raw); significant (bin, syllable) cells: 205 / 400
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_A_state_signature_13-10-2026.png, figures/fig_engagement_syllables_A_state_signature_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+disengage: 2198 transitions, 56 mice
+reengage: 880 transitions, 47 mice
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_B_transition_signature_13-10-2026.png, figures/fig_engagement_syllables_B_transition_signature_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+('state', 'all') done
+('state', 'Pre-quiescence') done
+('state', 'Quiescence') done
+('state', 'Choice') done
+('state', 'ITI') done
+('disengage', 'all') done
+('disengage', 't-1|Pre-quiescence') done
+('disengage', 't-1|Quiescence') done
+('disengage', 't-1|Choice') done
+('disengage', 't-1|ITI') done
+('disengage', 't|Pre-quiescence') done
+('disengage', 't|Quiescence') done
+('reengage', 'all') done
+('reengage', 't-1|Pre-quiescence') done
+('reengage', 't-1|Quiescence') done
+('reengage', 't-1|Choice') done
+('reengage', 't-1|ITI') done
+('reengage', 't|Pre-quiescence') done
+('reengage', 't|Quiescence') done
+/opt/anaconda3/envs/iblenv/lib/python3.10/site-packages/scipy/stats/_morestats.py:4088: UserWarning: Exact p-value calculation does not work if there are zeros. Switching to normal approximation.
+  warnings.warn("Exact p-value calculation does not work if there are "
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_C_prediction_13-10-2026.png, figures/fig_engagement_syllables_C_prediction_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_D_mode_map_13-10-2026.png, figures/fig_engagement_syllables_D_mode_map_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_E_mode_barcodes_13-10-2026.png, figures/fig_engagement_syllables_E_mode_barcodes_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+260 sessions, 56 mice
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_F_usage_by_mouse_13-10-2026.png, figures/fig_engagement_syllables_F_usage_by_mouse_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+260 sessions, 56 mice, subsampled to 372 trials
+         n_mice     rho      p  ...  p_lab_centred  rho_within  p_within
+y                               ...                                     
+H_modes      56 -0.3703  0.005  ...         0.0002     -0.0015    0.9808
+
+[1 rows x 7 columns]
+         n_mice     rho       p  ...  p_lab_centred  rho_within  p_within
+y                                ...                                     
+H_modes      56  0.2248  0.0958  ...         0.0552     -0.0453    0.4813
+
+[1 rows x 7 columns]
+SESSION level (what the panels draw; sessions of one mouse are not independent): H_modes vs lda_1: rho = -0.241, p = 8.7e-05, n = 260 sessions
+SESSION level (what the panels draw; sessions of one mouse are not independent): H_modes vs switch_rate: rho = 0.119, p = 0.063, n = 244 sessions
+         n_mice     rho       p  ...  p_lab_centred  rho_within  p_within
+y                                ...                                     
+H_modes      56  0.2248  0.0958  ...         0.0552     -0.0453    0.4813
+
+[1 rows x 7 columns]
+mouse level, partial on lda_1: rho = 0.059, p = 0.664
+mouse level, partial on frac_disengaged: rho = 0.197, p = 0.145
+mouse level, partial on accuracy: rho = 0.191, p = 0.159
+not saved (ps.SAVE_FIGURES is False): figures/fig_engagement_syllables_H_entropy_vs_switching_13-10-2026.png, figures/fig_engagement_syllables_H_entropy_vs_switching_13-10-2026.svg   -- ps.saving(True) to write, or pass save=True
+          H_syl  I_between  H_within  frac_between
+count  260.0000   260.0000  260.0000      260.0000
+mean     0.7074     0.1043    0.6031        0.1475
+std      0.0437     0.0220    0.0424        0.0293
+min      0.5826     0.0498    0.4864        0.0768
+25%      0.6788     0.0893    0.5760        0.1277
+50%      0.7115     0.1028    0.6101        0.1458
+75%      0.7428     0.1142    0.6314        0.1635
+max      0.8009     0.1865    0.6929        0.2577
+Traceback (most recent call last):
+  File "/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/paper-individuality/lab_controls.py", line 672, in <module>
+    q = col.replace('p', 'q', 1)
+  File "/Users/ineslaranjeira/Documents/Repositories/representation_learning_variability/paper-individuality/lab_controls.py", line 470, in section_entropy
+    show(rows, 'syllable-entropy decomposition')
+  File "/opt/anaconda3/envs/iblenv/lib/python3.10/site-packages/matplotlib/pyplot.py", line 613, in show
+    return _get_backend_mod().show(*args, **kwargs)
+TypeError: _Backend.show() takes 1 positional argument but 3 were given
