@@ -35,8 +35,8 @@ feedback on are blanked; in the feedback window, samples before stimulus onset a
 (intervals_1). No sample shows a neighbouring trial, and the two windows never share a sample.
 
 Syllable codes are read at the nearest 30 Hz bin of each photometry sample, no time-warping:
-code = paw + n_paw * whisking + 2 * n_paw * licking. Checked against the cached notebook-6 maps
-(corr_factored_raw, session 813e8682): identical z at every sample.
+code = paw + n_paw * whisking + 2 * n_paw * licking. Masks and nearest-bin ties follow event_psth.py exactly, so
+correlation_maps reproduces the cached notebook-6 maps (corr_factored_raw) on every session checked.
 """
 import json
 import pathlib
@@ -47,10 +47,15 @@ import pandas as pd
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 DATA = REPO / 'paper-individuality' / 'data' / 'neuromodulators'
-ARCHIVE = DATA / 'pose_qc_hmm_k4'
+# the export sits under data/ on the laptop and under neuromodulators/ on the analysis machine (as in ddm_hmm.py)
+ARCHIVE = next((p for p in (DATA / 'pose_qc_hmm_k4', REPO / 'neuromodulators' / 'pose_qc_hmm_k4') if p.exists()),
+               DATA / 'pose_qc_hmm_k4')
 RUN = 'left_paw_wheel_k8_own_lick-100ms'
 STATES_DIR = DATA / f'states_files_{RUN}'
-PALETTE_FILE = DATA / 'state_palette.csv'
+PALETTE_FILE = next((p for p in (DATA / 'state_palette.csv',
+                                 DATA / 'left_paw_wheel_states_uniform_raw_sessionz' / 'state_palette.csv') if p.exists()),
+                    DATA / 'state_palette.csv')
+MIN_COVERAGE = 0.25  # fraction of the session's trials inside the states file; below it the fiber is dropped
 N_PAW = 8
 FS = 30.
 WINDOWS = ('stim', 'fb')
@@ -64,12 +69,46 @@ sys.path.insert(0, str(ARCHIVE))
 import h5_loaders  # noqa: E402  (ships with the archive)
 
 
-def load_recordings(with_states=True):
-    """recordings.csv, optionally only fibers whose session has a states file."""
+def load_recordings(with_states=True, min_coverage=MIN_COVERAGE):
+    """recordings.csv, optionally only fibers whose session has a states file covering at least min_coverage of
+    its trials (see states_coverage). Adds the column 'coverage'."""
     rec = pd.read_csv(ARCHIVE / 'recordings.csv')
     if with_states:
         rec = rec[rec['eid'].isin(states_files())]
+        cov = states_coverage()
+        rec = rec.assign(coverage=rec['eid'].map(cov['coverage']))
+        rec = rec[rec['coverage'] >= min_coverage]
     return rec.reset_index(drop=True)
+
+
+def states_coverage(cache=True):
+    """Per eid: how much of the session the states file spans. One row per session with the file's first and last
+    bin, the session's trial span, and coverage = fraction of trials (intervals_0..intervals_1) inside the file.
+
+    A file stops early when the video does: the design matrix is cut to the shortest of camera, wheel and licks.
+    Known cases (2026-10-26): 813e8682 (ZFM-08828) recorded only 11142 frames (6 of 83 min) -> coverage .07;
+    e637617d (ZFM-04392) has a full-length video (155709 frames) but camera times, pose and motion energy were only
+    extracted for the first 61901 frames (camera_times QC: 93808 missing) -> coverage .40, recoverable upstream.
+    """
+    path = STATES_DIR / '_coverage.csv'
+    files = states_files()
+    if cache and path.exists():
+        cov = pd.read_csv(path, index_col='eid')
+        if set(cov.index) == set(files):
+            return cov
+    rows = []
+    for eid, f in files.items():
+        b = pd.read_parquet(f, columns=['Bin'])['Bin']
+        tr = h5_loaders.load_trials(eid) if (ARCHIVE / 'sessions' / f'{eid}.h5').exists() else None
+        row = {'eid': eid, 'subject': f.name.split('_', 4)[4], 'first_bin': b.min(), 'last_bin': b.max()}
+        if tr is not None:
+            inside = (tr['intervals_0'] >= b.min()) & (tr['intervals_1'] <= b.max())
+            row.update(session_start=tr['intervals_0'].min(), session_end=tr['intervals_1'].max(),
+                       n_trials=len(tr), coverage=inside.mean())
+        rows.append(row)
+    cov = pd.DataFrame(rows).set_index('eid')
+    cov.to_csv(path)
+    return cov
 
 
 def states_files():
@@ -102,21 +141,27 @@ def trial_table(eid):
 
 
 def window_masks(tr, time):
-    """(n_trials x T) boolean keep-masks for the stimulus and feedback windows."""
+    """(n_trials x T) boolean keep-masks for the stimulus and feedback windows.
+
+    Written as event_psth.window_masks (offsets relative to the event, a NaN bound masks nothing) so both give the
+    same samples, including trials without feedback_times and samples exactly on a bound."""
     stim = tr['stimOnTrigger_times'].to_numpy()[:, None]
     fb = tr['feedback_times'].to_numpy()[:, None]
     t0, t1 = tr['intervals_0'].to_numpy()[:, None], tr['intervals_1'].to_numpy()[:, None]
-    ts, tf = stim + time, fb + time
-    return {'stim': (ts >= t0) & (ts < fb), 'fb': (tf >= stim) & (tf <= t1)}
+    t = time[None]
+    return {'stim': ~((t >= fb - stim) | (t < t0 - stim)), 'fb': ~((t < stim - fb) | (t > t1 - fb))}
 
 
 def on_grid(states, columns, event_times, time):
-    """Values of states[columns] at the bin nearest event_times + time; NaN outside the file."""
+    """Values of states[columns] at the bin nearest event_times + time; NaN outside the file.
+
+    Nearest bin as in event_psth.syllable_windows (searchsorted on the bin times; an exact tie goes to the later
+    bin): in some sessions the photometry grid sits half a bin off the states grid, so ties do occur."""
     b = states['Bin'].to_numpy()
     t = event_times[:, None] + time
-    i = np.round((t - b[0]) * FS)
-    outside = np.isnan(i) | (i < 0) | (i > len(b) - 1)
-    i = np.where(outside, 0, i).astype(int)
+    j = np.clip(np.searchsorted(b, t), 1, len(b) - 1)
+    i = np.where(np.abs(b[j - 1] - t) < np.abs(b[j] - t), j - 1, j)
+    outside = np.isnan(t) | (np.abs(b[i] - t) > 0.5 / FS)
     out = {}
     for c in columns:
         x = states[c].to_numpy(dtype=float)[i]
@@ -136,11 +181,12 @@ def lick_rate(states, window=LICK_WINDOW):
     return states['Lick count'].rolling(window, center=True, min_periods=1).mean() * FS
 
 
-def load_session(eid, movement=True):
+def load_session(eid, movement=True, mask=True):
     """One dict per fiber of the session: region, meta, time, and per window photometry / code / movement.
 
     meta: one row per go trial that has a photometry snippet, with fiber and task columns. Arrays are
-    (n_trials x T) and row-aligned with meta. Masked samples are NaN in every array.
+    (n_trials x T) and row-aligned with meta. Masked samples are NaN in every array; mask=False keeps the full
+    -1..+1 s snippets (the trial-shape analyses, which need every trial on the same samples).
     """
     rec = pd.read_csv(ARCHIVE / 'recordings.csv')
     rec = rec[rec['eid'] == eid]
@@ -164,7 +210,7 @@ def load_session(eid, movement=True):
         for w in WINDOWS:
             P = R.sel(event=EVENTS[w]).values[rows]
             g = on_grid(states, cols, t[EVENTS[w]].to_numpy(), time)
-            m = keep[w]
+            m = keep[w] if mask else np.ones_like(keep[w])
             out[w] = {'photometry': np.where(m, P, np.nan), 'code': np.where(m, g['most_likely_states'], np.nan)}
             if movement:
                 out[w]['movement'] = {name: np.where(m, g[c], np.nan) for name, c in MOVEMENT.items()}
@@ -238,12 +284,19 @@ def correlation_maps(fiber, features=factored_features, min_trials=20, min_event
 # to r ~ 0.997); 'extended' adds what dopamine is expected to track besides the movement.
 COVARIATES = {'task': ['log response RT', '|contrast| level', 'trial position', 'trial position²'],
               'extended': ['log response RT', '|contrast| level', 'trial position', 'trial position²',
-                           'previous outcome', 'choice side', 'block congruence']}
+                           'previous outcome', 'choice side', 'block congruence'],
+              'full': ['log response RT', '|contrast| level', 'trial position', 'trial position²',
+                       'previous outcome', 'choice side', 'block congruence', 'outcome']}
+# covariate -> group, for the unique variance of each task variable (task_vs_movement)
+TASK_GROUPS = {'log response RT': 'RT', '|contrast| level': 'contrast', 'trial position': 'trial position',
+               'trial position²': 'trial position', 'previous outcome': 'previous outcome', 'choice side': 'choice',
+               'block congruence': 'block congruence', 'outcome': 'outcome'}
 
 
-def covariate_matrix(meta, kind='task'):
-    """(n_trials x k) covariates, without intercept; rows with any NaN are dropped by the fits."""
-    cols = {}
+def covariate_matrix(meta, kind='task', groups=False):
+    """(n_trials x k) covariates, without intercept; rows with any NaN are dropped by the fits.
+    groups=True also returns the TASK_GROUPS name of each column."""
+    cols, group = {}, []
     for c in COVARIATES[kind]:
         if c == 'log response RT':
             cols[c] = np.log(meta['response_rt'].where(meta['response_rt'] > 0))
@@ -263,7 +316,11 @@ def covariate_matrix(meta, kind='task'):
             side = np.sign(meta['signed_contrast'])
             favoured = np.sign(0.5 - meta['probabilityLeft'])  # pLeft 0.8 -> left (-1) favoured
             cols[c] = (side * favoured).fillna(0.)
-    return pd.DataFrame(cols, index=meta.index).to_numpy(dtype=float)
+        elif c == 'outcome':
+            cols[c] = meta['correct']
+        group += [TASK_GROUPS[c]] * (len(cols) - len(group))
+    X = pd.DataFrame(cols, index=meta.index).to_numpy(dtype=float)
+    return (X, group) if groups else X
 
 
 def _ols(X, y):
@@ -366,8 +423,16 @@ def joint_maps(fiber, covariates='task', min_trials=20, min_events=5, n_paw=N_PA
 VIGOR = ['paw speed', 'wheel speed', 'whisker ME', 'lick rate']
 
 
+ALPHAS = np.logspace(-1, 5, 13)  # ridge penalties searched on each training fold (standardised predictors)
+# CV fits need min_trials = 60 at a sample: with 30, the few long-RT trials left early in the feedback window gave
+# single sessions an R² of -1000 % or worse, which dragged whole mouse means down
+
+
 def _ridge_cv_r2(X, y, folds, alpha):
-    """Cross-validated R² of a ridge fit (standardised predictors, unpenalised intercept)."""
+    """Cross-validated R² of a ridge fit (standardised predictors, unpenalised intercept).
+
+    alpha: a number, or 'auto' to pick it per training fold from ALPHAS by leave-one-out error (closed form from
+    the SVD), so a model with nothing to add shrinks to the intercept instead of paying for overfitting."""
     pred = np.empty_like(y)
     for test in folds:
         train = np.ones(len(y), bool); train[test] = False
@@ -375,12 +440,23 @@ def _ridge_cv_r2(X, y, folds, alpha):
         sd[sd == 0] = 1
         Xt, Xs = (X[train] - mu) / sd, (X[test] - mu) / sd
         ym = y[train].mean()
-        b = np.linalg.solve(Xt.T @ Xt + alpha * np.eye(X.shape[1]), Xt.T @ (y[train] - ym))
+        yc = y[train] - ym
+        U, s, Vt = np.linalg.svd(Xt, full_matrices=False)
+        Uy = U.T @ yc
+        if alpha == 'auto':
+            shrink = s ** 2 / (s ** 2 + ALPHAS[:, None])                 # (n_alpha x p)
+            fit = (U[None] * (shrink * Uy)[:, None, :]).sum(-1)           # (n_alpha x n_train)
+            hat = (U[None] ** 2 * shrink[:, None, :]).sum(-1) + 1 / len(yc)
+            loo = (((yc - fit) / (1 - hat)) ** 2).mean(1)
+            a = ALPHAS[np.argmin(loo)]
+        else:
+            a = alpha
+        b = Vt.T @ (s / (s ** 2 + a) * Uy)
         pred[test] = ym + Xs @ b
     return 1 - np.sum((y - pred) ** 2) / np.sum((y - y.mean()) ** 2)
 
 
-def variance_partition(fiber, covariates='task', n_folds=5, alpha=1., min_trials=30, n_paw=N_PAW, seed=0):
+def variance_partition(fiber, covariates='task', n_folds=5, alpha='auto', min_trials=60, n_paw=N_PAW, seed=0):
     """Per outcome, window and sample: cross-validated R² of four nested models of the photometry,
     covariates only / + vigor / + syllables / + vigor + syllables.
 
@@ -391,7 +467,7 @@ def variance_partition(fiber, covariates='task', n_folds=5, alpha=1., min_trials
     meta, rows = fiber['meta'], []
     C = covariate_matrix(meta, covariates)
     rng = np.random.default_rng(seed)
-    models = ['covariates', '+ vigor', '+ syllables', '+ both']
+    models = ['task variables', '+ vigor', '+ syllables', '+ both']
     for outcome, g in meta.groupby('correct'):
         idx = g.index.to_numpy()
         row = {'eid': meta['eid'].iat[0], 'region': fiber['region'], 'outcome': outcome,
@@ -417,6 +493,195 @@ def variance_partition(fiber, covariates='task', n_folds=5, alpha=1., min_trials
     res = pd.DataFrame(rows)
     res.attrs.update(models=models, covariates=covariates, vigor=VIGOR)
     return res
+
+
+def task_vs_movement(fiber, covariates='full', movement='vigor', pool_outcomes=True, n_folds=5, alpha='auto',
+                     min_trials=60, n_paw=N_PAW, seed=0):
+    """Cross-validated R² per window and sample of: task only, movement only, task + movement, and task + movement
+    without each task group in turn, then without each movement component in turn (their unique variance).
+    movement = 'vigor' (the continuous signals, components = VIGOR; the syllables add nothing beyond them, see
+    variance_partition) or 'vigor + syllables' (components = vigor, paw state, whisking, licking).
+
+    pool_outcomes=True fits rewarded and error trials together (one row per fiber, outcome = 'all'), so the outcome
+    can be a task variable; otherwise one row per outcome (and 'outcome' is dropped as it is constant).
+    Columns r2_<w>: (n_models x T), model names in attrs['models']. Like variance_partition, this is variance across
+    trials at a fixed sample: the mean time course (the PSTH) is not in it.
+    """
+    meta, rows = fiber['meta'], []
+    C, group = covariate_matrix(meta, covariates, groups=True)
+    group = np.array(group)
+    names = list(dict.fromkeys(group))
+    rng = np.random.default_rng(seed)
+    splits = [('all', meta.index.to_numpy())] if pool_outcomes else \
+        [(o, g.index.to_numpy()) for o, g in meta.groupby('correct')]
+    parts = list(VIGOR) if movement == 'vigor' else ['vigor', 'paw state', 'whisking', 'licking']
+    models = ['task', 'movement', 'task + movement'] + [f'without {n}' for n in names + parts]
+    for outcome, idx in splits:
+        keep_cols = np.ones(len(group), bool) if pool_outcomes else group != 'outcome'
+        row = {'eid': meta['eid'].iat[0], 'region': fiber['region'], 'outcome': outcome,
+               'subject': meta['subject'].iat[0], 'target_NM': meta['target_NM'].iat[0], 'n_trials': len(idx)}
+        for w in WINDOWS:
+            P = fiber[w]['photometry'][idx]
+            _, F = factored_features(fiber[w]['code'][idx], n_paw)
+            V = np.stack([np.log1p(np.abs(fiber[w]['movement'][v][idx])) for v in VIGOR])
+            R2 = np.full((len(models), P.shape[1]), np.nan)
+            for j in range(P.shape[1]):
+                ok = (~np.isnan(P[:, j]) & ~np.isnan(F[0, :, j]) & ~np.isnan(V[:, :, j]).any(0)
+                      & np.isfinite(C[idx]).all(1))
+                n = ok.sum()
+                if n < min_trials:
+                    continue
+                folds = np.array_split(rng.permutation(n), n_folds)
+                task = C[idx][ok][:, keep_cols]
+                vig, syl = V[:, ok, j].T, np.delete(F[:, ok, j].T, 0, axis=1)   # syllables: paw 1..7, whisk, lick
+                if movement == 'vigor':
+                    move, part = vig, np.arange(len(VIGOR))
+                else:
+                    move = np.hstack([vig, syl])
+                    part = np.r_[np.zeros(len(VIGOR)), np.ones(n_paw - 1), 2, 3].astype(int)
+                Xs = [task, move, np.hstack([task, move])]
+                Xs += [np.hstack([task[:, group[keep_cols] != g], move]) if (group[keep_cols] == g).any() else None
+                       for g in names]
+                Xs += [np.hstack([task, move[:, part != k]]) for k in range(len(parts))]
+                for k, X in enumerate(Xs):
+                    if X is not None:
+                        R2[k, j] = _ridge_cv_r2(X, P[ok, j], folds, alpha)
+            row[f'r2_{w}'] = R2
+        rows.append(row)
+    res = pd.DataFrame(rows)
+    res.attrs.update(models=models, groups=names, parts=parts, covariates=covariates, movement=movement)
+    return res
+
+
+# ------------------------------------------------------------------------------------------------
+# Trial shapes: CCA and reduced-rank regression between the vigor and photometry time courses
+# ------------------------------------------------------------------------------------------------
+# Unmasked windows (s) and downsampling: every trial is one vector of photometry samples and one of vigor samples
+SHAPE_WINDOWS = {'stim': (-0.5, 0.5), 'fb': (-0.5, 1.0)}
+SHAPE_BIN = 3  # 30 Hz samples per bin -> 10 Hz
+
+
+def trial_shapes(fiber, windows=SHAPE_WINDOWS, bin=SHAPE_BIN):
+    """Per trial, the photometry and the four vigor signals over the shape windows, binned.
+
+    fiber must come from load_session(..., mask=False). Returns (Y, X, meta, labels): Y (n x q) photometry,
+    X (n x 4q) log(1 + vigor), trials with any NaN dropped; labels give (window, signal, bin centre) per column.
+    """
+    T = fiber['time']
+    Ys, Xs, ylab, xlab = [], [], [], []
+    for w, (a, b) in windows.items():
+        m = np.nonzero((T >= a - 1e-9) & (T < b - 1e-9))[0]
+        m = m[:len(m) // bin * bin]
+        centres = T[m].reshape(-1, bin).mean(1)
+        binned = lambda A: A[:, m].reshape(len(A), -1, bin).mean(2)
+        Ys.append(binned(fiber[w]['photometry']))
+        ylab += [(w, 'photometry', c) for c in centres]
+        for v in VIGOR:
+            Xs.append(binned(np.log1p(np.abs(fiber[w]['movement'][v]))))
+            xlab += [(w, v, c) for c in centres]
+    Y, X = np.hstack(Ys), np.hstack(Xs)
+    ok = np.isfinite(Y).all(1) & np.isfinite(X).all(1)
+    return Y[ok], X[ok], fiber['meta'][ok].reset_index(drop=True), (ylab, xlab)
+
+
+def _pca(A, k):
+    """Centre, then the top-k principal axes (k x p) and whitened scores' scale."""
+    mu = A.mean(0)
+    U, s, Vt = np.linalg.svd(A - mu, full_matrices=False)
+    k = min(k, (s > s[0] * 1e-8).sum())
+    return mu, Vt[:k], s[:k] / np.sqrt(len(A) - 1)
+
+
+def _cca_fit(X, Y, kx, ky):
+    """CCA after PCA to kx / ky dims (the PCA is the regularisation). Returns a projector per side,
+    x -> canonical variates (n x d) and y -> (n x d), with d = min(kx, ky)."""
+    mx, Vx, sx = _pca(X, kx)
+    my, Vy, sy = _pca(Y, ky)
+    Zx = (X - mx) @ Vx.T / sx
+    Zy = (Y - my) @ Vy.T / sy
+    U, rho, Wt = np.linalg.svd(Zx.T @ Zy / (len(X) - 1), full_matrices=False)
+    ax = Vx.T @ (U / sx[:, None])                      # p_x x d
+    ay = Vy.T @ (Wt.T / sy[:, None])                   # p_y x d
+    return (mx, ax), (my, ay), rho
+
+
+def cca_cv(X, Y, kx=10, ky=10, n_folds=5, n_shuffles=20, seed=0):
+    """Cross-validated canonical correlations: fit on k-1 folds, correlate the held-out variates.
+
+    Returns dict(r = (d,) held-out canonical correlations, r_null = (n_shuffles x d) the same with the trial
+    pairing of X and Y shuffled, x_load / y_load = structure coefficients on all trials (corr of each original
+    column with each canonical variate; sign set so the photometry loading has a positive sum)."""
+    rng = np.random.default_rng(seed)
+
+    def held_out(X, Y):
+        folds = np.array_split(rng.permutation(len(X)), n_folds)
+        d = min(kx, ky)
+        U, V = np.full((len(X), d), np.nan), np.full((len(X), d), np.nan)
+        for test in folds:
+            train = np.ones(len(X), bool); train[test] = False
+            (mx, ax), (my, ay), _ = _cca_fit(X[train], Y[train], kx, ky)
+            U[test, :ax.shape[1]], V[test, :ay.shape[1]] = (X[test] - mx) @ ax, (Y[test] - my) @ ay
+        return np.array([np.corrcoef(U[:, i], V[:, i])[0, 1] for i in range(d)])
+
+    r = held_out(X, Y)
+    r_null = np.stack([held_out(X[rng.permutation(len(X))], Y) for _ in range(n_shuffles)])
+    (mx, ax), (my, ay), rho = _cca_fit(X, Y, kx, ky)
+    U, V = (X - mx) @ ax, (Y - my) @ ay
+    corr = lambda A, B: ((A - A.mean(0)) / A.std(0)).T @ ((B - B.mean(0)) / B.std(0)) / len(A)
+    x_load, y_load = np.nan_to_num(corr(X, U)), np.nan_to_num(corr(Y, V))  # a constant column (no licks) -> 0
+    sign = np.sign(y_load.sum(0)); sign[sign == 0] = 1
+    return {'r': r, 'r_null': r_null, 'rho_train': rho, 'x_load': x_load * sign, 'y_load': y_load * sign}
+
+
+def rrr_cv(X, Y, kx=10, max_rank=5, n_folds=5, n_shuffles=20, seed=0):
+    """Reduced-rank regression of the photometry shape (Y) on the vigor shape (X, PCA to kx dims).
+
+    Rank-r prediction = OLS prediction projected on its top r principal axes. Returns dict(r2 = (max_rank,)
+    held-out R² of Y (summed over its columns, so the whole trace), r2_null = (n_shuffles x max_rank) with the
+    trial pairing shuffled, y_axes = (max_rank x q) the photometry patterns X predicts, fitted on all trials,
+    x_weights = (q_x x max_rank) the vigor pattern that drives each)."""
+    rng = np.random.default_rng(seed)
+
+    def fit(X, Y):
+        mx, Vx, sx = _pca(X, kx)
+        Z = (X - mx) @ Vx.T / sx
+        my = Y.mean(0)
+        B = np.linalg.lstsq(Z, Y - my, rcond=None)[0]       # kx x q
+        _, _, At = np.linalg.svd(Z @ B, full_matrices=False)
+        return mx, Vx, sx, my, B, At[:max_rank]
+
+    def held_out(X, Y):
+        folds = np.array_split(rng.permutation(len(X)), n_folds)
+        sse, sst = np.zeros(max_rank), 0.
+        for test in folds:
+            train = np.ones(len(X), bool); train[test] = False
+            mx, Vx, sx, my, B, A = fit(X[train], Y[train])
+            pred_full = ((X[test] - mx) @ Vx.T / sx) @ B
+            for r in range(max_rank):
+                P = A[:r + 1]
+                sse[r] += np.sum((Y[test] - my - pred_full @ P.T @ P) ** 2)
+            sst += np.sum((Y[test] - Y[train].mean(0)) ** 2)
+        return 1 - sse / sst
+
+    r2 = held_out(X, Y)
+    r2_null = np.stack([held_out(X[rng.permutation(len(X))], Y) for _ in range(n_shuffles)])
+    mx, Vx, sx, my, B, A = fit(X, Y)
+    A = A * np.sign(A.sum(1, keepdims=True))
+    x_weights = Vx.T @ ((B @ A.T) / sx[:, None])
+    return {'r2': r2, 'r2_null': r2_null, 'y_axes': A, 'x_weights': x_weights}
+
+
+def shape_analyses(fiber, **kw):
+    """cca_cv and rrr_cv of one fiber (from load_session(..., mask=False)), one row."""
+    Y, X, meta, (ylab, xlab) = trial_shapes(fiber)
+    row = {'eid': meta['eid'].iat[0], 'region': fiber['region'], 'subject': meta['subject'].iat[0],
+           'target_NM': meta['target_NM'].iat[0], 'n_trials': len(Y)}
+    if len(Y) < 100:
+        return None
+    c, r = cca_cv(X, Y, **kw), rrr_cv(X, Y, **kw.get('rrr', {}))
+    row.update({f'cca_{k}': v for k, v in c.items()})
+    row.update({f'rrr_{k}': v for k, v in r.items()})
+    return row, (ylab, xlab)
 
 
 # ------------------------------------------------------------------------------------------------
