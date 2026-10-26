@@ -151,24 +151,28 @@ def log_prior_trans(log_Ps, alpha, kappa):
 
 def fit_glmhmm(inputs, datas, num_states=2, seed=None, num_iters=N_EM_ITERS,
                tolerance=TOLERANCE, prior_sigma=PRIOR_SIGMA,
-               alpha=TRANSITION_ALPHA, kappa=TRANSITION_KAPPA):
+               alpha=TRANSITION_ALPHA, kappa=TRANSITION_KAPPA, masks=None):
     """EM fit with parameters shared across all sequences in `inputs`/`datas`.
 
     inputs: list of (T_i, M) design matrices; datas: list of (T_i,) 0/1 choices.
+    masks: optional list of (T_i,) 0/1, 0 = violation (no-go) trial: it stays in the chain but adds no
+    likelihood and no weight to the M-step, as ssm's `masks` (engaged.py's create_violation_mask).
     Returns a dict with pi0, log_Ps, W, per-sequence posteriors, loglik, and
     convergence info.
     """
     X_all = np.concatenate(inputs)
     y_all = np.concatenate(datas).astype(float)
     datas = [np.asarray(d, dtype=float).ravel() for d in datas]
+    masks = [np.ones(len(d)) for d in datas] if masks is None else [np.asarray(m, float).ravel() for m in masks]
+    mask_all = np.concatenate(masks)
 
     pi0, log_Ps, W = init_params(num_states, seed=seed)
     lp_prev, converged, n_iter = -np.inf, False, 0
 
     for n_iter in range(1, num_iters + 1):
         gammas, xi_total, loglik = [], np.zeros((num_states, num_states)), 0.0
-        for X, y in zip(inputs, datas):
-            gamma, xi_sum, ll = forward_backward(log_likelihoods(X, y, W), pi0, log_Ps)
+        for X, y, m in zip(inputs, datas, masks):
+            gamma, xi_sum, ll = forward_backward(log_likelihoods(X, y, W) * m[:, None], pi0, log_Ps)
             gammas.append(gamma)
             xi_total += xi_sum
             loglik += ll
@@ -186,12 +190,12 @@ def fit_glmhmm(inputs, datas, num_states=2, seed=None, num_iters=N_EM_ITERS,
         counts = xi_total + (alpha - 1.0) + kappa * np.eye(num_states) + 1e-8
         log_Ps = np.log(counts / counts.sum(axis=1, keepdims=True))
 
-        W = m_step_observations(X_all, y_all, np.concatenate(gammas), W, prior_sigma)
+        W = m_step_observations(X_all, y_all, np.concatenate(gammas) * mask_all[:, None], W, prior_sigma)
 
     # Final E-step so the returned posteriors match the returned parameters.
     gammas, loglik = [], 0.0
-    for X, y in zip(inputs, datas):
-        gamma, _, ll = forward_backward(log_likelihoods(X, y, W), pi0, log_Ps)
+    for X, y, m in zip(inputs, datas, masks):
+        gamma, _, ll = forward_backward(log_likelihoods(X, y, W) * m[:, None], pi0, log_Ps)
         gammas.append(gamma)
         loglik += ll
 

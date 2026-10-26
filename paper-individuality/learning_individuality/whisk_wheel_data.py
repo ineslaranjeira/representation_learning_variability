@@ -32,7 +32,14 @@ DATA = os.path.join(PI, 'data')
 # legacy left-paw+wheel syllables (k = 8, 100 ms lick HMM), one session per mouse
 SYL_FILES = {'Early': os.path.join(DATA, 'training', 'paw_wheel_session_1_8_k_10_bin_syllables_04-09-2026'),
              'Late': os.path.join(DATA, 'training', 'paw_wheel_last_training_8_k_10_bin_syllables_04-09-2026')}
-DM_DIR = os.path.join(DATA, 'training', 'training_design_matrices')
+# raw (unwarped) design matrices: the Mac's training_design_matrices/ when present, else the per-timepoint
+# folders on the linux machine (same columns; they also hold the LAST training sessions)
+_DM_CANDIDATES = {'Early': [os.path.join(DATA, 'training', 'training_design_matrices'),
+                            os.path.join(DATA, 'design_matrices', '1_camera_setup', 'session_1')],
+                  'Late': [os.path.join(DATA, 'training', 'training_design_matrices'),
+                           os.path.join(DATA, 'design_matrices', '1_camera_setup', 'last_training')]}
+DM_DIRS = {tp: next((d for d in c if os.path.isdir(d)), c[0]) for tp, c in _DM_CANDIDATES.items()}
+DM_DIR = DM_DIRS['Early']
 TRIALS_DIR = os.path.join(DATA, 'training', 'training_data')
 
 PHASES = ['Pre-quiescence', 'Quiescence', 'Choice', 'ITI']
@@ -90,12 +97,12 @@ def session_trials(mouse, session):
     return t[t['session'] == session].reset_index(drop=True)
 
 
-def warp_wheel(mouse, session, trial_ids):
+def warp_wheel(mouse, session, trial_ids, dm_dir=None):
     """|wheel velocity| on the 40-bin grid for the given trial ids (row index in the trial table),
     plus the trial table rows so the caller can check the alignment."""
     out = np.full((len(trial_ids), len(PHASES) * N_PER_PHASE), np.nan)
     tt = session_trials(mouse, session)
-    f = os.path.join(DM_DIR, f'design_matrix_{session}_{mouse}')
+    f = os.path.join(dm_dir or DM_DIR, f'design_matrix_{session}_{mouse}')
     if not os.path.exists(f) or not len(tt):  # no wheel or no trial table for this session -> all NaN
         return out, tt
     dm = pd.read_parquet(f, columns=['Bin', 'avg_wheel_vel'])
@@ -126,7 +133,7 @@ def build(timepoint='Early', verbose=True):
     for (mouse, session), idx in trials.groupby(['mouse_name', 'session']).groups.items():
         idx = np.asarray(idx)
         tids = trials.loc[idx, 'trial_id'].to_numpy()
-        V[idx], tt = warp_wheel(mouse, session, tids)
+        V[idx], tt = warp_wheel(mouse, session, tids, dm_dir=DM_DIRS.get(timepoint))
         lab = trials.loc[idx, 'trial_type'].str.split().str[0].map({'correct': 1.0, 'incorrect': -1.0}).to_numpy()
         fb = tt['feedbackType'].reindex(tids).to_numpy(float) if len(tt) else np.full(len(tids), np.nan)
         ok = np.isfinite(lab)
