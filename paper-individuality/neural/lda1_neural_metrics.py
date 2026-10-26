@@ -163,11 +163,15 @@ def default_config():
         # used (0.1, 0.3); that is now unified onto the FF/FR window, and the old one is
         # computed alongside it as `r_sc_post_legacy` / `r_sc_quench_legacy` so the
         # reproduction path against the published r_SC numbers still exists.
-        # PRE_WINDOW=(-0.2, 0.0),
-        PRE_WINDOW=(-0.2, -.1),
+        # PRE AND POST MUST BE THE SAME LENGTH. FF and r_SC are computed on spike counts summed
+        # over the window, and both grow with the counting window (slow rate fluctuations add
+        # variance and shared variance), so a 100 ms pre against a 200 ms post makes post - pre
+        # positive with no stimulus effect at all. That is what (-0.2, -0.1) did from 02-10-2026
+        # to 19-10-2026: FF post - pre median +0.17 (34% of neurons quenched) against -0.08
+        # (60%) with matched windows.
+        PRE_WINDOW=(-0.2, 0.0),
         POST_WINDOW=(0.1, 0.3),
-        # RSC_PRE_WINDOW=(-0.2, 0.0),        # = PRE_WINDOW
-        RSC_PRE_WINDOW=(-0.2, -0.1),        # = PRE_WINDOW
+        RSC_PRE_WINDOW=(-0.2, 0.0),         # = PRE_WINDOW
         RSC_POST_WINDOW=(0.1, 0.3),        # = POST_WINDOW (was (0.0, 0.2))
         RSC_POST_WINDOW_LEGACY=(0.0, 0.2),  # noise_corr's own CORR_WINDOW, kept for the check
         # WHICH BINS A TRIAL HAS TO BE COMPLETE IN, for r_SC only. r_SC is pairwise, so it

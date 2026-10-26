@@ -31,7 +31,9 @@ Sections (run one with `--only <name>`; each writes results/lab_controls/<name>.
   syllable  syllable-use summaries (whisking, licking, idle paw) -- needs the syllable file
   neural    fig_neural grid
   horizon   fig_time_horizon: each earlier timepoint vs Proficient, per feature
-  ldvar     lab variance per LD (for the figure), not a correlate
+  ldvar     lab variance per LD (for the figure), not a correlate. Two statistics: eta^2 of lab on the mouse means
+            (chance floor ~0.18), and the nested mixed model LD ~ 1 + (1|lab) + (1|lab:mouse) on the session scores,
+            lab share = s2_lab / (s2_lab + s2_mouse) (chance 0; lab/variance_partition.py, REML as a cross-check)
 `--only all` (default) runs every section whose inputs exist and assembles results/lab_controls_<date>.csv.
 """
 import sys
@@ -47,7 +49,7 @@ from statsmodels.stats.multitest import multipletests
 
 PI = pathlib.Path(__file__).resolve().parent
 REPO = PI.parent
-for p in [PI, PI / 'neural', PI / 'learning_individuality']:
+for p in [PI, PI / 'neural', PI / 'learning_individuality', PI / 'lab']:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
@@ -710,6 +712,84 @@ def section_ldvar(rng, n_perm=5000):
     print(f"weighted by each LD's share of between-mouse variance: lab share {np.sum(w * t['eta2_lab']):.3f} "
           f"(shuffled labs: {np.sum(w * t['null_mean']):.3f}); first 10 LDs: "
           f"{np.sum(w[:10] * t['eta2_lab'][:10]) / w[:10].sum():.3f}")
+    return t.merge(ldvar_mixed(rng, n_perm), on='LD')
+
+
+def ldvar_mixed(rng, n_perm=5000, n_boot=N_BOOT):
+    """The same question as a nested linear mixed model on the SESSION scores, LD ~ 1 + (1|lab) + (1|lab:mouse):
+    lab share of an LD's inter-individual variance = s2_lab / (s2_lab + s2_mouse). Unlike eta^2 its chance level is 0
+    (the components are unbiased, Henderson I -- variance_partition.py), and session noise sits in its own component
+    instead of inflating the mouse means. Per LD the raw share can go negative (a lab component near 0); the figure
+    clips it, the p and the pooled number use the raw one. Pooled: sum s2_lab over LDs / sum (s2_lab + s2_mouse), the
+    trace, so each LD weighs by the variance it carries. Null: lab labels shuffled across mice (lab sizes kept).
+    CI: labs resampled with replacement (the unit that limits precision, 11 labs). REML (statsmodels) per LD as a
+    cross-check: it is non-negative by construction and weights unbalanced mice differently, so it can differ."""
+    import variance_partition as vp
+    import statsmodels.formula.api as smf
+    cols = ['LD1'] + [c for c in LDA.columns if isinstance(c, (int, np.integer))]
+    Y, labs, mice = LDA[cols].to_numpy(float), LDA['lab'].to_numpy(), LDA['mouse_name'].to_numpy()
+    def comps(lab_vec, m=mice, Yv=Y):
+        vc, _ = vp.nested_variance_components(Yv, lab_vec, m)
+        return vc['sigma2_lab'].to_numpy(), vc['sigma2_mouse'].to_numpy(), vc['sigma2_session'].to_numpy()
+    def shares(s_lab, s_mouse):
+        return s_lab / (s_lab + s_mouse), s_lab.sum() / (s_lab + s_mouse).sum()
+    s_lab, s_mouse, s_sess = comps(labs)
+    obs, obs_tot = shares(s_lab, s_mouse)
+
+    mouse_lab = MOUSE_LAB.loc[pd.unique(mice)]
+    null, null_tot = [], []
+    for _ in range(n_perm):
+        sh = pd.Series(rng.permutation(mouse_lab.to_numpy()), index=mouse_lab.index)
+        a, b = shares(*comps(sh[mice].to_numpy())[:2])
+        null.append(a); null_tot.append(b)
+    null, null_tot = np.stack(null), np.array(null_tot)
+
+    boot, boot_tot, uniq = [], [], pd.unique(labs)
+    for _ in range(n_boot):
+        idx, bl, bm = [], [], []
+        for rep, l in enumerate(rng.choice(uniq, len(uniq), replace=True)):
+            where = np.flatnonzero(labs == l)       # a lab drawn twice becomes two labs with distinct mice
+            idx.extend(where); bl.extend([f'{l}#{rep}'] * len(where)); bm.extend(f'{m}#{rep}' for m in mice[where])
+        try:
+            sl, sm, _ = comps(np.array(bl), np.array(bm), Y[idx])
+        except (ValueError, AssertionError):        # fewer than 2 distinct labs drawn
+            continue
+        boot.append(shares(np.clip(sl, 0, None), sm)[0])       # per LD: as the figure draws it (clipped)
+        boot_tot.append(shares(sl, sm)[1])                      # pooled: raw, as observed
+    boot, boot_tot = np.stack(boot), np.array(boot_tot)
+
+    reml = []
+    for j in range(len(cols)):
+        d = pd.DataFrame({'y': Y[:, j], 'lab': labs, 'mouse': mice})
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            f = smf.mixedlm('y ~ 1', d, groups='lab', re_formula='1', vc_formula={'mouse': '0 + C(mouse)'}).fit(reml=True)
+        sl, sm = float(f.cov_re.iloc[0, 0]), float(f.vcomp[0])
+        reml.append(sl / (sl + sm))
+
+    p = (1 + (null >= obs).sum(0)) / (1 + n_perm)
+    # s2_mouse <= 0: the LD carries no inter-individual variance, the share is undefined (not 'all lab')
+    undefined = s_mouse <= 0
+    obs, p = np.where(undefined, np.nan, obs), np.where(undefined, np.nan, p)
+    q = np.full(len(p), np.nan); q[~undefined] = multipletests(p[~undefined], method='fdr_bh')[1]
+    t = pd.DataFrame({'LD': np.arange(1, len(cols) + 1), 'sigma2_lab': s_lab, 'sigma2_mouse': s_mouse,
+                      'sigma2_session': s_sess, 'mixed_share': obs,
+                      'mixed_share_clipped': np.where(undefined, np.nan,
+                                                      np.clip(s_lab, 0, None) / (np.clip(s_lab, 0, None) + s_mouse)),
+                      'mixed_ci_lo': np.percentile(boot, 2.5, axis=0), 'mixed_ci_hi': np.percentile(boot, 97.5, axis=0),
+                      'mixed_null_mean': null.mean(0), 'mixed_null_95': np.percentile(null, 95, axis=0),
+                      'mixed_p': p, 'mixed_q': q, 'mixed_share_reml': reml,
+                      'mouse_over_session': s_mouse / s_sess})     # < 1: mice differ less than a mouse's sessions do
+    p_tot = (1 + (null_tot >= obs_tot).sum()) / (1 + n_perm)
+    pd.DataFrame({'null': null_tot}).assign(observed=obs_tot, ci_lo=np.percentile(boot_tot, 2.5),
+                                            ci_hi=np.percentile(boot_tot, 97.5), p=p_tot
+                                            ).to_csv(LDVAR_DIR / 'ldvar_mixed_total_null.csv', index=False)
+    print(f'\n=== mixed model: lab share of each LD\'s inter-individual variance, s2_lab / (s2_lab + s2_mouse) ===')
+    print(t.head(20).drop(columns=['sigma2_lab', 'sigma2_mouse', 'sigma2_session']).round(3).to_string(index=False))
+    print(f'whole space (trace): lab share {obs_tot:.3f} [{np.percentile(boot_tot, 2.5):.3f}, '
+          f'{np.percentile(boot_tot, 97.5):.3f}], shuffled labs {null_tot.mean():.3f} '
+          f'(95%: {np.percentile(null_tot, 95):.3f}), p = {p_tot:.4f}; session share of all variance '
+          f'{s_sess.sum() / (s_lab.clip(0) + s_mouse + s_sess).sum():.3f}')
     return t
 
 
@@ -723,7 +803,9 @@ SECTIONS = {'trial': section_trial, 'engage': section_engage, 'entropy': section
 # lapses, posterior uncertainty) and the time-horizon rows, which are not LD1 tests (each timepoint against
 # Proficient). 'all': literally every row of the table. 'section': within each section, as each figure corrects its
 # own tests. The figure fills its dots by the 'paper' family, separately for each column (sessions, mice, lab removed).
-NOT_PAPER = lambda t: (t['section'].isin(['syllable', 'horizon']) | t['correlate'].str.endswith('Response onset')
+# neural_mouse is out too: it re-tests the neural rows with the mouse as the unit (a robustness check, same names), so
+# counting it would put every neural test in the family twice.
+NOT_PAPER = lambda t: (t['section'].isin(['syllable', 'horizon', 'neural_mouse']) | t['correlate'].str.endswith('Response onset')
                        | t['correlate'].isin(['Short disengaged bouts (<=2 trials)', 'Posterior uncertainty',
                                              # panel I's split of syllable entropy: dropped from the paper (13-10-2026)
                                              'Syllable entropy, between modes', 'Syllable entropy, within modes',
