@@ -3,7 +3,11 @@ Which dopamine mice have photometry during TRAINING, and from which session on?
 ==============================================================================
 Queries Alyx (mainenlab, DAT-Cre lines) for every session of every DA mouse, and per session
 whether it has photometry datasets (processed `photometry.signal.pqt`, raw
-`_neurophotometrics_fpData.raw.pqt`) and the wheel (`_ibl_wheel.position.npy`). The fibre target
+`_neurophotometrics_fpData.raw.pqt`), the wheel (extracted `_ibl_wheel.position.npy`, and the raw
+rotary-encoder log `_iblrig_encoderPositions.raw.ssv`; habituation sessions have only the raw log,
+the extractor doesn't produce a wheel for them) and the left camera
+(raw `_iblrig_leftCamera.raw.mp4`, `_ibl_leftCamera.times.npy`, Lightning Pose output
+`_ibl_leftCamera.lightningPose.pqt`; training rigs have the left camera only). The fibre target
 is read from `photometryROI.locations.pqt` of one session per mouse (2 KB download).
 
 Outputs (next to this file):
@@ -49,12 +53,15 @@ def session_table(one):
         dsets = []
         for pattern in ('photometry', 'fpData'):
             dsets += one.alyx.rest('datasets', 'list', subject=nick, django=f'name__icontains,{pattern}') or []
+        dsets += one.alyx.rest('datasets', 'list', subject=nick, django='name__icontains,leftCamera') or []
         wheel = one.alyx.rest('datasets', 'list', subject=nick, name='_ibl_wheel.position.npy') or []
+        raw_wheel = one.alyx.rest('datasets', 'list', subject=nick, name='_iblrig_encoderPositions.raw.ssv') or []
         eid = lambda d: d['session'].split('/')[-1] if d.get('session') else None
         names = {}
         for d in dsets:
             names.setdefault(eid(d), set()).add(d['name'])
         has_wheel = {eid(d) for d in wheel}
+        has_raw_wheel = {eid(d) for d in raw_wheel}
         for x in sessions:
             n = names.get(x['id'], set())
             rows.append(dict(subject=nick, line=s['line'], eid=x['id'], date=x['start_time'][:10],
@@ -62,7 +69,11 @@ def session_table(one):
                              session_class=session_class(x['task_protocol']),
                              signal='photometry.signal.pqt' in n,
                              raw='_neurophotometrics_fpData.raw.pqt' in n,
-                             wheel=x['id'] in has_wheel))
+                             wheel=x['id'] in has_wheel,
+                             raw_wheel=x['id'] in has_raw_wheel,
+                             video='_iblrig_leftCamera.raw.mp4' in n,
+                             video_times='_ibl_leftCamera.times.npy' in n,
+                             lightning_pose='_ibl_leftCamera.lightningPose.pqt' in n))
     return pd.DataFrame(rows).sort_values(['subject', 'date', 'number']).reset_index(drop=True)
 
 
@@ -86,6 +97,8 @@ def mouse_table(sessions, one=None):
             first_training=tr['date'].min(), last_training=tr['date'].max(),
             n_training=len(tr), n_training_signal=int(tr['signal'].sum()),
             n_training_signal_wheel=int((tr['signal'] & tr['wheel']).sum()),
+            n_training_signal_video=int((tr['signal'] & tr['video']).sum()),
+            n_training_signal_lp=int((tr['signal'] & tr['lightning_pose']).sum()),
             first_signal_training_session=int(with_ph[0]) + 1 if len(with_ph) else None,
             n_biased=int((g['session_class'] == 'biased').sum()),
             n_biased_signal=int(((g['session_class'] == 'biased') & g['signal']).sum()),

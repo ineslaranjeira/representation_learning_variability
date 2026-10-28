@@ -66,8 +66,9 @@ handful of mice is enough.
 
 ## Data availability: DA mice with photometry during training
 
-From `da_inventory.py` (Alyx query, 26 Oct 2026; outputs `da_inventory_mice.csv`,
-`da_inventory_sessions.csv`). "With signal" = training sessions with the processed continuous
+From `dopamine/da_inventory.py` (Alyx query, 26–27 Oct 2026; outputs `dopamine/da_inventory_mice.csv`,
+`dopamine/da_inventory_sessions.csv`). Video and Lightning Pose availability, with video QC, are in
+`dopamine/0_data_availability.ipynb`. "With signal" = training sessions with the processed continuous
 `alf/photometry/photometry.signal.pqt`; all but a few of these also have the wheel. "First" = the
 first training session that has it.
 
@@ -102,6 +103,12 @@ session 13 (7/19 each). ZFM-08551 and the 2018 Dat-Cre mice have no photometry.
   comparison, and the slow learners have long pre-onset phases, which is what test 3 needs.
 - **SNc, complete from session 1:** 4 that reached criterion and 2 long non-learners
   (ZFM-09346/09350), useful as a movement-heavy comparison.
+- **DA + wheel counts** (`dopamine/0_data_availability.ipynb`): 22 mice have DA + wheel in training (10 VTA,
+  12 SNc; 672 sessions). 14 are covered from training session 1–2 at ≥ 70 % (6 VTA, 8 SNc). Habituation
+  sessions have DA in 19 mice (52 sessions) but only the raw encoder log, not an extracted wheel.
+- **Video:** every training session with photometry also has the left-camera video, but Lightning Pose
+  has been run on only 5–11 sessions per 2025–26 mouse. Video QC (from the collaborators' LP sheet) is
+  fine in most sessions; focus failures are the main loss (`dopamine/0_data_availability.ipynb`).
 - Not yet checked: signal quality in training sessions (the pose-QC table covers biased/ephys only),
   whether the signal spans the whole session, and the behavioural onset of stimulus use in these
   mice (from their trial tables, as `choice_strategy.py`).
