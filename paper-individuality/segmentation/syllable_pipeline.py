@@ -49,6 +49,16 @@ DATASETS = {
 # wheel inside already.
 MOVEMENTS = {'both_paws': 'paw', 'left_paw': 'left_paw', 'left_paw_wheel': 'left_paw_wheel'}
 WHEEL_VAR = 'wheel'
+# which wheel states WHEEL = True adds:
+#   'wavelet'   3.3's wheel wavelet clusters (VAR = 'wheel'), in the STATE_SPACE folder (the original wheel digit)
+#   'movement'  3.4's wheel MOVEMENT clusters (wheel_movement_clusters.py): 0 = still, 1.. = the movement's
+#               cluster / group, in <dataset root>/wheel_movement_states/ (one state space: K_WHEEL picks the set)
+WHEEL_SEGMENTATIONS = {'wavelet': None, 'movement': 'wheel_movement_states/'}
+# how the wheel enters the syllables:
+#   'joint'     a LAST digit of the identifiable state, so binned inside the packed code (the original)
+#   'separate'  its own column: states files get 'wheel_states', syllable files 'wheel_binned_sequence'
+#               (binned with the same mode per bin, on its own); the paw / whisker / lick code is untouched
+WHEEL_BINNINGS = ('joint', 'separate')
 # which clustering defined them (3.3_wavelet_clusters_uniform's output folders; every k it was run
 # with sits in the same folder, as most_likely_states_<k>_<mouse><eid>.npy)
 STATE_SPACES = {'own': '{var}_states_uniform_raw_sessionz/',                 # fitted on this dataset
@@ -103,30 +113,40 @@ def default_lick(dataset):
     return '100ms' if DATASETS[dataset]['cameras'] == 1 else 'standard'
 
 
-def run_names(dataset, movement, state_space, lick_hmm='auto', k=8, wheel=False, k_wheel=8):
+def _wheel_tag(wheel_segmentation, wheel_binning):
+    """'+wheel' for the original wheel digit; the movement clusters / separate binning are marked so
+    their outputs never share a name with it."""
+    return ('+wheel' + ('mov' if wheel_segmentation == 'movement' else '')
+            + ('-sep' if wheel_binning == 'separate' else ''))
+
+
+def run_names(dataset, movement, state_space, lick_hmm='auto', k=8, wheel=False, k_wheel=8,
+              wheel_segmentation='wavelet', wheel_binning='joint'):
     """(states folder, file-name tag) of a run, relative to the dataset root -- no checks, so
     readers can find outputs without the inputs being on disk."""
     lick_hmm = default_lick(dataset) if lick_hmm == 'auto' else lick_hmm
     if (dataset, movement, int(k), bool(wheel), state_space, lick_hmm) == DEFAULT_RUN:
         return 'states_files/', ''
-    name = (f'{movement}{"+wheel" if wheel else ""}_k{k}{f"-{k_wheel}" if wheel else ""}'
+    name = (f'{movement}{_wheel_tag(wheel_segmentation, wheel_binning) if wheel else ""}_k{k}{f"-{k_wheel}" if wheel else ""}'
             f'_{state_space}_lick-{lick_hmm}')
     return f'states_files_{name}/' + DATASETS[dataset]['sub'], f'{name}_{dataset}_'
 
 
 def syllables_glob(dataset, movement, state_space, lick_hmm='auto', k=8, wheel=False, k_wheel=8,
-                   target_length=10):
+                   target_length=10, wheel_segmentation='wavelet', wheel_binning='joint'):
     """Glob pattern of a run's syllable files (any date)."""
-    _, tag = run_names(dataset, movement, state_space, lick_hmm, k, wheel, k_wheel)
+    _, tag = run_names(dataset, movement, state_space, lick_hmm, k, wheel, k_wheel, wheel_segmentation, wheel_binning)
     return f"{DATASETS[dataset]['root']}{tag}{k}_k_{target_length}_bin_syllables_*"
 
 
 def resolve(dataset, movement, state_space, lick_hmm='auto', k=8, wheel=False, k_wheel=8,
-            states_root=None, out_root=None):
+            states_root=None, out_root=None, wheel_segmentation='wavelet', wheel_binning='joint'):
     """The full configuration of one run, checked. `states_root` / `out_root` redirect where the
     clustering states are read / the outputs are written (tests); default: the dataset's root."""
     for name, val, opts in (('DATASET', dataset, DATASETS), ('MOVEMENT', movement, MOVEMENTS),
-                            ('STATE_SPACE', state_space, STATE_SPACES), ('LICK_HMM', lick_hmm, [*LICK_HMMS, 'auto'])):
+                            ('STATE_SPACE', state_space, STATE_SPACES), ('LICK_HMM', lick_hmm, [*LICK_HMMS, 'auto']),
+                            ('WHEEL_SEGMENTATION', wheel_segmentation, WHEEL_SEGMENTATIONS),
+                            ('WHEEL_BINNING', wheel_binning, WHEEL_BINNINGS)):
         if val not in opts:
             raise ValueError(f'{name} must be one of {list(opts)}, got {val!r}')
     ds = DATASETS[dataset]
@@ -139,22 +159,32 @@ def resolve(dataset, movement, state_space, lick_hmm='auto', k=8, wheel=False, k
         segs['wheel'] = (WHEEL_VAR, int(k_wheel))
     dirs = {}
     for seg, (var, kk) in segs.items():
-        d = _states_dir(states_root or ds['root'], var, state_space)
+        if seg == 'wheel' and wheel_segmentation == 'movement':
+            d = (states_root or ds['root']) + WHEEL_SEGMENTATIONS['movement']
+        else:
+            d = _states_dir(states_root or ds['root'], var, state_space)
         if kk not in _ks(d):
             have = _ks(d)
             raise FileNotFoundError(f'no {var} states with k = {kk} for ({dataset}, {state_space}) in {d}; '
                                     + (f'that folder has k = {have}' if have else 'that folder does not exist')
-                                    + ' (run 3.3 with this VAR / K first)\navailable:\n' + available().to_string())
+                                    + (' (run 3.4 first: wheel_movement_clusters.write_states)'
+                                       if seg == 'wheel' and wheel_segmentation == 'movement'
+                                       else ' (run 3.3 with this VAR / K first)\navailable:\n' + available().to_string()))
         dirs[seg] = d
     if lick_hmm == 'auto':
         lick_hmm = default_lick(dataset)
     run = (dataset, movement, int(k), bool(wheel), state_space, lick_hmm)
-    out_sub, tag = run_names(dataset, movement, state_space, lick_hmm, k, wheel, k_wheel)
+    out_sub, tag = run_names(dataset, movement, state_space, lick_hmm, k, wheel, k_wheel, wheel_segmentation, wheel_binning)
     root = out_root or ds['root']
     hmm = ds['root'] + 'hmm/most_likely_states/'
     cfg = dict(dataset=dataset, movement=movement, k=int(k), wheel=bool(wheel), k_wheel=int(k_wheel) if wheel else None,
+               wheel_segmentation=wheel_segmentation if wheel else None, wheel_binning=wheel_binning if wheel else None,
                state_space=state_space, lick_hmm=lick_hmm,
-               relabel=PAW_RELABEL_19AUG2026 if run[:5] == DEFAULT_RUN[:5] else None,
+               # the production relabelling: the default run, and the default run + a SEPARATE wheel column
+               # (its paw / whisker / lick code is the default run's, so it must stay identical to it)
+               relabel=PAW_RELABEL_19AUG2026 if (run[:5] == DEFAULT_RUN[:5] or (
+                   wheel and wheel_binning == 'separate' and run[:3] + run[4:5] == DEFAULT_RUN[:3] + DEFAULT_RUN[4:5]))
+               else None,
                design_matrices=ds['design_matrices'], wavelets=ds['wavelets'],
                states_dir=dirs['movement'], wheel_states_dir=dirs.get('wheel'),
                whisker_dir=hmm + WHISKER_FIT + '/', lick_dir=hmm + LICK_HMMS[lick_hmm] + '/',
@@ -166,12 +196,16 @@ def resolve(dataset, movement, state_space, lick_hmm='auto', k=8, wheel=False, k
             raise FileNotFoundError(f'{key}: {cfg[key]} does not exist')
     # digits of an identifiable state, in the original's order: movement, whisker, lick[, wheel];
     # its integer code counts through them with the movement fastest (the original's mapping loops)
-    cfg['digits'] = [('movement', cfg['k']), ('whisker_me', 2), ('Lick count', 2)] + ([('wheel', cfg['k_wheel'])] if wheel else [])
+    # (with WHEEL_BINNING = 'separate' the wheel is not a digit: it is binned as its own column)
+    cfg['digits'] = ([('movement', cfg['k']), ('whisker_me', 2), ('Lick count', 2)]
+                     + ([('wheel', cfg['k_wheel'])] if wheel and wheel_binning == 'joint' else []))
+    cfg['wheel_column'] = bool(wheel) and wheel_binning == 'separate'
     return cfg
 
 
 def describe(cfg):
-    keys = ['dataset', 'movement', 'k', 'wheel', 'k_wheel', 'state_space', 'lick_hmm', 'relabel', 'design_matrices',
+    keys = ['dataset', 'movement', 'k', 'wheel', 'k_wheel', 'wheel_segmentation', 'wheel_binning', 'state_space',
+            'lick_hmm', 'relabel', 'design_matrices',
             'wavelets', 'states_dir', 'wheel_states_dir', 'whisker_dir', 'lick_dir', 'out_states', 'out_root', 'tag']
     w = max(map(len, keys))
     return '\n'.join(f'{k:<{w}}  {cfg[k]}' for k in keys)
@@ -332,7 +366,7 @@ def make_states_file(cfg, mouse, eid):
 
     # whisker / lick states: 1 = the state with the larger signal
     session_states = state_identifiability(session_states, ['whisker_me', 'Lick count'])
-    state_cols = [beh, 'whisker_me_states', 'Lick count_states'] + (['wheel_states'] if cfg['wheel'] else [])
+    state_cols = [beh, 'whisker_me_states', 'Lick count_states'] + (['wheel_states'] if cfg['wheel'] and not cfg['wheel_column'] else [])
     valid = session_states[state_cols].notna().all(axis=1).to_numpy()
     ints = session_states.loc[valid, state_cols].to_numpy().astype(int)
     for j, (name, n) in enumerate(cfg['digits']):
@@ -368,7 +402,7 @@ def make_states_file(cfg, mouse, eid):
     final['mouse_name'] = mouse
     final['session'] = eid
     final = broader_label(final)
-    return final[STATES_FILE_COLUMNS]
+    return final[STATES_FILE_COLUMNS + (['wheel_states'] if cfg['wheel_column'] else [])]
 
 
 def _quiet(f):
@@ -399,11 +433,14 @@ def check_provenance(cfg):
     os.makedirs(cfg['out_states'], exist_ok=True)
     rec = {k: cfg[k] for k in ('dataset', 'movement', 'k', 'wheel', 'k_wheel', 'state_space', 'lick_hmm', 'states_dir',
                                'wheel_states_dir', 'whisker_dir', 'lick_dir', 'wavelets', 'design_matrices')}
+    if cfg['wheel']:        # recorded only with a wheel, so the folders written before these options still match
+        rec.update(wheel_segmentation=cfg['wheel_segmentation'], wheel_binning=cfg['wheel_binning'])
     rec['relabel'] = None if cfg['relabel'] is None else {str(a): b for a, b in cfg['relabel'].items()}
     path = cfg['out_states'] + '_config.json'
     if os.path.exists(path):
         old = json.load(open(path))
-        diff = {k: (old.get(k), v) for k, v in rec.items() if old.get(k) != v}
+        defaults = dict(wheel_segmentation='wavelet', wheel_binning='joint')     # folders written before these options
+        diff = {k: (old.get(k, defaults.get(k)), v) for k, v in rec.items() if old.get(k, defaults.get(k)) != v}
         if diff:
             raise RuntimeError(f"{cfg['out_states']} was filled with a different configuration: {diff}. "
                                'Use another folder, or delete it to start over.')
@@ -476,13 +513,15 @@ def bin_groups(df, value_cols, estimators, target_length):
 
 
 @_quiet
-def _syllables_job(path, target_length):
+def _syllables_job(path, target_length, wheel_column=False):
+    wheel = ['wheel_states'] if wheel_column else []
     st = pd.read_parquet(path, columns=['mouse_name', 'session', 'correct', 'contrast', 'block', 'choice',
-                                        'trial_id', 'broader_label', 'most_likely_states', 'goCueTrigger_times'])
+                                        'trial_id', 'broader_label', 'most_likely_states', 'goCueTrigger_times'] + wheel)
     st = trial_types(st.dropna(subset=['goCueTrigger_times']))
-    out = bin_groups(st, ['most_likely_states'], ['mode'], target_length)
-    return out.rename(columns={'most_likely_states': 'binned_sequence'})[
-        ['mouse_name', 'sample', 'trial_type', 'broader_label', 'binned_sequence']]
+    out = bin_groups(st, ['most_likely_states'] + wheel, ['mode'] * (1 + len(wheel)), target_length)
+    out = out.rename(columns={'most_likely_states': 'binned_sequence', 'wheel_states': 'wheel_binned_sequence'})
+    return out[['mouse_name', 'sample', 'trial_type', 'broader_label', 'binned_sequence']
+               + (['wheel_binned_sequence'] if wheel_column else [])]
 
 
 @_quiet
@@ -491,8 +530,10 @@ def run_syllables(cfg, sessions, target_length, n_jobs=4):
     for p in paths:
         if not os.path.exists(p):
             print(p + ' not available')
-    parts = Parallel(n_jobs=n_jobs)(delayed(_syllables_job)(p, target_length) for p in paths if os.path.exists(p))
-    head = pd.DataFrame(columns=['mouse_name', 'trial_type', 'broader_label', 'binned_sequence'])
+    parts = Parallel(n_jobs=n_jobs)(delayed(_syllables_job)(p, target_length, cfg['wheel_column'])
+                                    for p in paths if os.path.exists(p))
+    head = pd.DataFrame(columns=['mouse_name', 'trial_type', 'broader_label', 'binned_sequence']
+                        + (['wheel_binned_sequence'] if cfg['wheel_column'] else []))
     return pd.concat([head] + parts, ignore_index=True)
 
 
