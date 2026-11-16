@@ -19,7 +19,9 @@ Lab stays a level of the model (so "mouse" is within lab); the per-lab breakdown
 lab its CIs are uninformative (session_variance_partition.py still writes it to csv).
 
 Writes figures/session_partition.{png,pdf}; `python fig_session_partition.py paw_wheel` uses the left paw + wheel
-syllables instead and writes figures/session_partition_paw_wheel.{png,pdf}.
+syllables instead and writes figures/session_partition_paw_wheel.{png,pdf}; `... wheel13` adds the 13 wheel states
+(6 no-split clusters x CW / CCW + still) to the production profile as a fourth channel (40 x 23 features) and writes
+figures/session_partition_wheel13.{png,pdf}.
 """
 import sys
 import pathlib
@@ -38,8 +40,12 @@ from session_filters import find_csv          # noqa: E402
 C = svp.COLORS                                 # Lab, Mouse, Session, Noise
 SYLLABLES = sys.argv[1] if len(sys.argv) > 1 else 'production'   # or 'paw_wheel'
 N_PERM_CONS = 1000
-CHANNELS = {'Paw states' if SYLLABLES == 'production' else 'Left paw + wheel': slice(0, 8), 'Whisking': slice(8, 9), 'Licking': slice(9, 10)}
+CHANNELS = {'Paw states' if SYLLABLES in ('production', 'wheel13') else 'Left paw + wheel': slice(0, 8), 'Whisking': slice(8, 9),
+            'Licking': slice(9, 10)}
 B, S = 40, 10
+if SYLLABLES == 'wheel13':                     # production + the 13 wheel states as a fourth channel
+    CHANNELS['Wheel (13 states)'] = slice(10, 23)
+    S = 23
 
 
 def main():
@@ -222,7 +228,7 @@ def draw_days(ax, DAYS, DIST, fs):
 
 def draw_reliability(ax, names, est, lo, hi, ns, fs):
     styles = {'Whole profile': ('0.15', '-'), list(CHANNELS)[0]: ('#7A5C9E', '--'), 'Whisking': (C['Mouse'], '-'),
-              'Licking': ('#C9A13B', ':')}
+              'Licking': ('#C9A13B', ':'), 'Wheel (13 states)': ('#0C9292', '-.')}
     for j, n in enumerate(names):
         col, ls = styles[n]
         ax.fill_between(ns, np.clip(lo[6:, j], 0, 1), np.clip(hi[6:, j], 0, 1), color=col, alpha=0.12, lw=0)
@@ -271,7 +277,7 @@ def figure(share, names, est_full, DIST, DAYS, est, lo, hi, ns, CONS):
     G = fig.add_gridspec(1, 2, width_ratios=[1, 3.2], wspace=0.3, left=0.09, right=0.98, top=0.78, bottom=0.2)
     r = fig.add_subplot(G[0])
     draw_reliability(r, names, est, lo, hi, ns, fs)
-    g = G[1].subgridspec(1, 3, wspace=0.1)
+    g = G[1].subgridspec(1, len(CHANNELS), wspace=0.1)
     comp = est_full.reshape(4, B, S)
     first = None
     for k, (ch, sl) in enumerate(CHANNELS.items()):

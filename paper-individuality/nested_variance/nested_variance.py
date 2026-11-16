@@ -51,10 +51,13 @@ LEVELS = ['lab', 'mouse', 'session']  # coarse -> fine; the trial is the residua
 
 
 # ------------------------------------------------------------------------- data
-def load_trials(qc_strictness='filtered_out', max_session_missing=0.1, min_sessions=3, syllable_file=None):
+def load_trials(qc_strictness='filtered_out', max_session_missing=0.1, min_sessions=3, syllable_file=None,
+                extra=None):
     """-> (codes [trials x 40], meta DataFrame). lda_shrinkage's filters, in its order:
     QC sheet, sessions with > 10% missing bins, mice with < 3 sessions; then incomplete trials.
-    syllable_file: another file with the same layout (default SYLLABLE_FILE, the LDA's)."""
+    syllable_file: another file with the same layout (default SYLLABLE_FILE, the LDA's).
+    extra: another per-bin column of that file (e.g. 'wheel_binned_sequence'); then returns (codes, extra codes,
+    meta), row-aligned, and trials with a missing bin in either are dropped."""
     from session_filters import exclusions_by_timepoint, find_csv
     from functions import lab_labels
 
@@ -71,9 +74,17 @@ def load_trials(qc_strictness='filtered_out', max_session_missing=0.1, min_sessi
                    values='binned_sequence').reset_index().dropna(subset=EPOCHS))
     codes = np.vstack([np.hstack(r) for r in t[EPOCHS].to_numpy()]).astype(float)
     complete = ~np.isnan(codes).any(axis=1)
+    if extra is not None:
+        tx = (seq.pivot(index=['mouse_name', 'session', 'sample', 'trial_type'], columns='broader_label', values=extra)
+              .reindex(pd.MultiIndex.from_frame(t[['mouse_name', 'session', 'sample', 'trial_type']])))
+        xcodes = np.vstack([np.hstack(r) if all(np.ndim(v) for v in r) else np.full(codes.shape[1], np.nan)
+                            for r in tx[EPOCHS].to_numpy()]).astype(float)
+        complete &= ~np.isnan(xcodes).any(axis=1)
     print(f'{len(codes)} trials, {t["session"].nunique()} sessions, {t["mouse_name"].nunique()} mice; '
           f'dropping {1 - complete.mean():.1%} with a missing bin')
     codes, t = codes[complete], t[complete].reset_index(drop=True)
+    if extra is not None:
+        xcodes = xcodes[complete]
 
     meta = t[['mouse_name', 'session', 'trial_type']].copy()
     meta['trial'] = t['sample'].str[37:].astype(float).astype(int)
@@ -87,10 +98,19 @@ def load_trials(qc_strictness='filtered_out', max_session_missing=0.1, min_sessi
     meta['date'] = pd.to_datetime(meta['session'].map(sheet['date']), errors='coerce')
     meta = meta.sort_values(['lab', 'mouse_name', 'session', 'trial'])
     codes = codes[meta.index.to_numpy()]
+    if extra is not None:
+        xcodes = xcodes[meta.index.to_numpy()]
     meta = meta.reset_index(drop=True)
     print(f'kept {len(meta)} trials, {meta.session.nunique()} sessions, {meta.mouse_name.nunique()} mice, '
           f'{meta.lab.nunique()} labs')
-    return codes, meta
+    return (codes, xcodes, meta) if extra is not None else (codes, meta)
+
+
+def one_hot_states(codes, n):
+    """[trials x bins] state numbers 0..n-1 -> [trials x bins x n] float32 indicators (e.g. the wheel states)."""
+    out = np.zeros(codes.shape + (n,), dtype=np.float32)
+    np.put_along_axis(out, codes.astype(int)[..., None], 1, axis=-1)
+    return out
 
 
 def one_hot(codes, n_paw=N_PAW_STATES):

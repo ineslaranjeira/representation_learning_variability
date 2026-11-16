@@ -58,14 +58,24 @@ SYLLABLE_SETS = {
     # left paw + wheel states (both standardised per session, like the paw states); its paw digits are relabelled
     # and NOT in vigor order, and the map is not on this machine -- so only channel totals are meaningful
     'paw_wheel': (PI / 'data' / 'paw_wheel_8_k_10_bin_syllables_28-08-2026', False),
+    # production paw / whisk / lick (the same code) + the 13 wheel states (6 no-split clusters x CW / CCW + still)
+    # as a fourth channel: 23 indicators per bin; the file is resolved lazily in build()
+    'wheel13': ('both_paws+wheelmov-sep_k8-13_own_lick-standard_proficient_8_k_10_bin_syllables_*', True),
 }
+WHEEL_K = {'wheel13': 13}
 
 
 def build(syllables='production'):
     ps.use_paw_states('uniform')
     path, remap = SYLLABLE_SETS[syllables]
-    codes, meta = nv.load_trials(syllable_file=path)
-    OH = nv.one_hot(ps.paw_codes(codes) if remap else codes)      # trials x 40 x 10
+    if syllables in WHEEL_K:
+        import glob
+        path = sorted(glob.glob(str(PI / 'data' / path)))[-1]
+        codes, wheel, meta = nv.load_trials(syllable_file=path, extra='wheel_binned_sequence')
+        OH = np.concatenate([nv.one_hot(ps.paw_codes(codes)), nv.one_hot_states(wheel, WHEEL_K[syllables])], axis=-1)
+    else:
+        codes, meta = nv.load_trials(syllable_file=path)
+        OH = nv.one_hot(ps.paw_codes(codes) if remap else codes)  # trials x 40 x 10
     n_tr, B, S = OH.shape
 
     # per-trial summary features, then the whole profile
