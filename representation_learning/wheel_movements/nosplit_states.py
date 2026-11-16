@@ -21,6 +21,13 @@ saved no-split model (run without --sided first); writes most_likely_states_<2K+
 model_k<2K+1>_nosplit_sided.pkl (the no-split model with sided = True, for names / colours).
 
     python nosplit_states.py 6 --sided [states|syllables]
+
+FIRST-HALF variant (--sided --first-half): as --sided, but the direction is the sign of the FIRST HALF of the movement
+(sum of the time-normalised velocity over its first NT / 2 bins, >= 0 = CCW), i.e. the direction the movement starts
+in. Same file names as --sided (K_WHEEL = 2K + 1): run only one of the two per K. The model pickle records
+sided = 'first_half'.
+
+    python nosplit_states.py 4 --sided --first-half [states|syllables]
 """
 import os
 os.environ.setdefault('OMP_NUM_THREADS', '1')
@@ -92,7 +99,14 @@ def write_states(k):
     print(wmc.write_states(DATASET, model, sessions, groupings=(None,), n_jobs=8), 'files per session: count')
 
 
-def _sided_one(model, mouse, eid, kw):
+def _ccw(S, rule):
+    """Direction of each movement: 'whole' = sign of the travel balance, 'first_half' = of its first half."""
+    if rule == 'first_half':
+        return np.asarray(S)[:, :np.asarray(S).shape[1] // 2].sum(1) >= 0
+    return wmc.balance(S) > 0
+
+
+def _sided_one(model, mouse, eid, kw, rule='whole'):
     f = wmc.states_dir(DATASET) + f'most_likely_states_{kw}_{mouse}{eid}.npy'
     if os.path.exists(f):
         return 0
@@ -101,7 +115,7 @@ def _sided_one(model, mouse, eid, kw):
     out = np.zeros(len(t), int)
     if len(info):
         c = wmc.predict(model, S, info.duration)
-        st = 1 + 2 * c + (wmc.balance(S) > 0)
+        st = 1 + 2 * c + _ccw(S, rule)
         for on, off, s_ in zip(info.onset, info.offset, st):
             i0, i1 = np.searchsorted(t, [on, off])
             out[i0:i1] = s_
@@ -109,19 +123,23 @@ def _sided_one(model, mouse, eid, kw):
     return 1
 
 
-def write_states_sided(k):
+def write_states_sided(k, rule='whole'):
     model = load(k)
     kw = 2 * k + 1
     path = wmc.states_dir(DATASET) + f'model_k{kw}_nosplit_sided.pkl'
-    if not os.path.exists(path):
+    if os.path.exists(path):
+        with open(path, 'rb') as f:
+            old = pickle.load(f)['sided']
+        assert old == (True if rule == 'whole' else rule), f'K_WHEEL = {kw} was already made with sided = {old}'
+    else:
         with open(path, 'wb') as f:
-            pickle.dump(dict(model, sided=True, K_WHEEL=kw), f)
+            pickle.dump(dict(model, sided=True if rule == 'whole' else rule, K_WHEEL=kw), f)
     taken = [f for f in os.listdir(wmc.states_dir(DATASET)) if f.startswith(f'most_likely_states_{kw}_')]
     assert not taken, f'K_WHEEL = {kw} states files already exist ({len(taken)})'
     cfg = sp.resolve(DATASET, 'both_paws', 'own')
     sessions = [s for s in sp.sessions_with_inputs(cfg) if wmc.has_movements(DATASET, *s)]
-    n = Parallel(n_jobs=8)(delayed(_sided_one)(model, m, e, kw) for m, e in sessions)
-    print(f'{sum(n)} sided states files written (K_WHEEL = {kw})')
+    n = Parallel(n_jobs=8)(delayed(_sided_one)(model, m, e, kw, rule) for m, e in sessions)
+    print(f'{sum(n)} sided states files written (K_WHEEL = {kw}, direction = {rule})')
 
 
 def syllables(k, k_wheel=None):
@@ -140,9 +158,9 @@ def syllables(k, k_wheel=None):
 if __name__ == '__main__':
     k = int(sys.argv[1])
     if '--sided' in sys.argv:
-        steps = [a for a in sys.argv[2:] if a != '--sided'] or ['states', 'syllables']
+        steps = [a for a in sys.argv[2:] if a not in ('--sided', '--first-half')] or ['states', 'syllables']
         if 'states' in steps:
-            write_states_sided(k)
+            write_states_sided(k, 'first_half' if '--first-half' in sys.argv else 'whole')
         if 'syllables' in steps:
             syllables(k, k_wheel=2 * k + 1)
         sys.exit()
