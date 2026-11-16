@@ -280,22 +280,21 @@ def correlation_maps(fiber, features=factored_features, min_trials=20, min_event
 # ------------------------------------------------------------------------------------------------
 # Effect sizes
 # ------------------------------------------------------------------------------------------------
-# Covariates held fixed in the partial β. 'task' is notebook 6's set (it reproduces the cached partial maps
-# to r ~ 0.997); 'extended' adds what dopamine is expected to track besides the movement.
-COVARIATES = {'task': ['log response RT', '|contrast| level', 'trial position', 'trial position²'],
-              'extended': ['log response RT', '|contrast| level', 'trial position', 'trial position²',
-                           'previous outcome', 'choice side', 'block congruence'],
-              'full': ['log response RT', '|contrast| level', 'trial position', 'trial position²',
-                       'previous outcome', 'choice side', 'block congruence', 'outcome']}
+# Covariates held fixed in the partial β and in the CV R² models. One set: 'task' (split by outcome) and 'full' =
+# 'task' + outcome (outcomes pooled). Until 2026-11-09 'task' was notebook 6's set (RT, contrast, position,
+# position²) with a separate 'extended' set; they were merged, and position² dropped (it added <= 0.3 % CV R²).
+COVARIATES = {'task': ['log response RT', '|contrast| level', 'trial position', 'previous outcome', 'choice side',
+                       'block congruence']}
+COVARIATES['full'] = COVARIATES['task'] + ['outcome']
 # covariate -> group, for the unique variance of each task variable (task_vs_movement)
 TASK_GROUPS = {'log response RT': 'RT', '|contrast| level': 'contrast', 'trial position': 'trial position',
-               'trial position²': 'trial position', 'previous outcome': 'previous outcome', 'choice side': 'choice',
+               'previous outcome': 'previous outcome', 'choice side': 'choice',
                'block congruence': 'block congruence', 'outcome': 'outcome'}
 
 
-def covariate_matrix(meta, kind='task', groups=False):
+def covariate_matrix(meta, kind='task', groups=False, names=False):
     """(n_trials x k) covariates, without intercept; rows with any NaN are dropped by the fits.
-    groups=True also returns the TASK_GROUPS name of each column."""
+    groups=True also returns the TASK_GROUPS name of each column; names=True the column names (after groups)."""
     cols, group = {}, []
     for c in COVARIATES[kind]:
         if c == 'log response RT':
@@ -305,8 +304,6 @@ def covariate_matrix(meta, kind='task', groups=False):
                 cols[f'contrast {v:g}'] = (meta['contrast'] == v).astype(float)
         elif c == 'trial position':
             cols[c] = meta['trial_frac']
-        elif c == 'trial position²':
-            cols[c] = meta['trial_frac'] ** 2
         elif c == 'previous outcome':
             cols[c] = meta['prev_correct']
         elif c == 'choice side':
@@ -320,7 +317,8 @@ def covariate_matrix(meta, kind='task', groups=False):
             cols[c] = meta['correct']
         group += [TASK_GROUPS[c]] * (len(cols) - len(group))
     X = pd.DataFrame(cols, index=meta.index).to_numpy(dtype=float)
-    return (X, group) if groups else X
+    out = (X,) + ((group,) if groups else ()) + ((list(cols),) if names else ())
+    return out if len(out) > 1 else X
 
 
 def _ols(X, y):
@@ -456,9 +454,12 @@ def _ridge_cv_r2(X, y, folds, alpha):
     return 1 - np.sum((y - pred) ** 2) / np.sum((y - y.mean()) ** 2)
 
 
-def variance_partition(fiber, covariates='task', n_folds=5, alpha='auto', min_trials=60, n_paw=N_PAW, seed=0):
+def variance_partition(fiber, covariates='task', n_folds=5, alpha='auto', min_trials=60, n_paw=N_PAW, seed=0,
+                       pool_outcomes=False):
     """Per outcome, window and sample: cross-validated R² of four nested models of the photometry,
     covariates only / + vigor / + syllables / + vigor + syllables.
+    pool_outcomes=True fits rewarded and error trials together (one row, outcome = 'all'); pass covariates='full'
+    then, so the outcome is among the covariates.
 
     vigor = log(1 + paw speed, wheel speed, whisker ME, lick rate) at that sample; syllables = the factored
     one-hots (paw states without paw 0, whisking, licking). Unique syllable variance = R²(all) - R²(cov + vigor):
@@ -468,10 +469,11 @@ def variance_partition(fiber, covariates='task', n_folds=5, alpha='auto', min_tr
     C = covariate_matrix(meta, covariates)
     rng = np.random.default_rng(seed)
     models = ['task variables', '+ vigor', '+ syllables', '+ both']
-    for outcome, g in meta.groupby('correct'):
-        idx = g.index.to_numpy()
+    splits = [('all', meta.index.to_numpy())] if pool_outcomes else \
+        [(o, g.index.to_numpy()) for o, g in meta.groupby('correct')]
+    for outcome, idx in splits:
         row = {'eid': meta['eid'].iat[0], 'region': fiber['region'], 'outcome': outcome,
-               'subject': meta['subject'].iat[0], 'target_NM': meta['target_NM'].iat[0], 'n_trials': len(g)}
+               'subject': meta['subject'].iat[0], 'target_NM': meta['target_NM'].iat[0], 'n_trials': len(idx)}
         for w in WINDOWS:
             P = fiber[w]['photometry'][idx]
             _, F = factored_features(fiber[w]['code'][idx], n_paw)
@@ -550,6 +552,49 @@ def task_vs_movement(fiber, covariates='full', movement='vigor', pool_outcomes=T
         rows.append(row)
     res = pd.DataFrame(rows)
     res.attrs.update(models=models, groups=names, parts=parts, covariates=covariates, movement=movement)
+    return res
+
+
+
+def task_movement_betas(fiber, covariates='full', min_trials=60):
+    """Sign and size of each predictor in the task + movement model of task_vs_movement (outcomes pooled).
+
+    Per window and sample: OLS of the photometry on all task covariates and the four movement signals
+    (log(1 + ·)), every predictor z-scored across the trials at that sample, so β = Δz GCaMP per s.d. of the
+    predictor with all the others held fixed. Columns beta_<w>: (n_predictors x T), names in attrs['predictors'].
+    The contrast one-hots are each against 0 % contrast; 'choice side' is the IBL choice (+1 = CW = left
+    stimulus reported), not recoded to the fiber's hemisphere.
+    """
+    meta = fiber['meta']
+    C, cnames = covariate_matrix(meta, covariates, names=True)
+    names = cnames + list(VIGOR)
+    contrasts = [f'contrast {c:g}' for c in (6.25, 12.5, 25, 100)]
+    canon = [n for n in names if not n.startswith('contrast')]
+    canon = canon[:1] + contrasts + canon[1:]
+    row = {'eid': meta['eid'].iat[0], 'region': fiber['region'], 'outcome': 'all', 'subject': meta['subject'].iat[0],
+           'target_NM': meta['target_NM'].iat[0], 'hemisphere': meta['hemisphere'].iat[0], 'n_trials': len(meta)}
+    for w in WINDOWS:
+        P = fiber[w]['photometry']
+        _, F = factored_features(fiber[w]['code'], N_PAW)
+        V = np.stack([np.log1p(np.abs(fiber[w]['movement'][v])) for v in VIGOR])
+        B = np.full((len(names), P.shape[1]), np.nan)
+        for j in range(P.shape[1]):
+            # same trials as task_vs_movement
+            ok = ~np.isnan(P[:, j]) & ~np.isnan(F[0, :, j]) & ~np.isnan(V[:, :, j]).any(0) & np.isfinite(C).all(1)
+            if ok.sum() < min_trials:
+                continue
+            X = np.column_stack([C[ok], V[:, ok, j].T])
+            sd = X.std(0)
+            keep = sd > 0
+            Z = (X[:, keep] - X[:, keep].mean(0)) / sd[keep]
+            b = np.linalg.lstsq(np.column_stack([np.ones(ok.sum()), Z]), P[ok, j], rcond=None)[0][1:]
+            B[keep, j] = b
+        # fixed predictor order across sessions (a session can miss a contrast level: its row stays NaN)
+        out = np.full((len(canon), B.shape[1]), np.nan)
+        out[[canon.index(n) for n in names]] = B
+        row[f'beta_{w}'] = out
+    res = pd.DataFrame([row])
+    res.attrs.update(predictors=canon, covariates=covariates)
     return res
 
 
