@@ -74,10 +74,27 @@ def wheel6_colours():
     return [ps.oklch_to_hex(l, 0.075, WHEEL6_HUE) for l in L]
 
 
+def wheel13_colours():
+    """The 12 sided states (U1 CW, U1 CCW, ..., U6 CCW): lightness = cluster vigor, hue = direction (teal CW, orange
+    CCW), as lda_wheel_correlates_wheel13 / fig_segmentation_wheel13."""
+    import pickle
+    import wheel_movement_clusters as wmc
+    try:
+        with open(wmc.states_dir('proficient') + 'model_k13_nosplit_sided.pkl', 'rb') as f:
+            peaks = pickle.load(f)['desc'].peak_rad_s.values
+    except Exception:
+        peaks = np.array([0.29, 0.64, 1.8, 2.75, 2.97, 3.97])
+    return list(ps.state_palette(np.log(np.repeat(peaks, 2)), gap=-wmc.CHROMA_SCALE * np.tile([-1, 1], len(peaks)),
+                                 hues=wmc.WHEEL_HUES))
+
+
 def wheel_colours(variant='8'):
-    """still + the state colours: the paper's 8-state set (wheel_movement_clusters) or the 6 no-split states."""
+    """still + the state colours: the paper's 8-state set (wheel_movement_clusters), the 6 no-split states, or the
+    13-state set (the 6 no-split clusters x CW / CCW)."""
     if variant == '6':
         return [WHEEL_STILL] + list(wheel6_colours())
+    if variant == '13':
+        return [WHEEL_STILL] + wheel13_colours()
     try:
         import wheel_movement_clusters as wmc
         return [WHEEL_STILL] + wmc.colours(wmc.load_model('proficient', 21), 'small_side_vigor')[1:]
@@ -86,6 +103,7 @@ def wheel_colours(variant='8'):
 
 
 MOCK6 = {1: 1, 6: 3, 5: 5, 3: 6}   # the mock movements in the 6-state set: twitch U1, push U3, back-and-forth U5, fast turn U6
+MOCK13 = {1: 2, 6: 6, 5: 10, 3: 11}  # 13-state set (1 + 2 cluster + CCW): twitch U1 CCW, push U3 CCW, U5 CCW, fast turn U6 CW
 
 
 def mock_wheel(seed=3, variant='8'):
@@ -101,7 +119,7 @@ def mock_wheel(seed=3, variant='8'):
             v[a:a + n] += amp * np.sin(2 * np.pi * 3 * x) * np.sin(np.pi * x)
         else:                                          # one-sided: a bell-shaped push
             v[a:a + n] += sign * amp * np.sin(np.pi * x) ** 2
-        state[a:a + n] = MOCK6[s] if variant == '6' else s
+        state[a:a + n] = MOCK6[s] if variant == '6' else MOCK13[s] if variant == '13' else s
     return v, state
 
 
@@ -171,7 +189,7 @@ def draw(fig, spec, seed=3, variant='8'):
         if state[a]:
             seg = v[a:b]
             y = np.interp(np.linspace(0, 1, 60), np.linspace(0, 1, len(seg)), seg)
-            ax.plot(xs, _y('wheel', 0.5 + 0.45 * y / lim), color=wcol[state[a]] if (state[a] != 1 or variant == '6') else '0.6',
+            ax.plot(xs, _y('wheel', 0.5 + 0.45 * y / lim), color=wcol[state[a]] if (state[a] != 1 or variant in ('6', '13')) else '0.6',
                     lw=0.8, zorder=3)
     ax.plot(COL['wav'], [_y('wheel', 0.5)] * 2, color='0.7', lw=0.3, zorder=2)
     ax.text(np.mean(COL['wav']), _y('wheel', 0.0) - 0.3, 'time-normalised', ha='center', va='top',
@@ -182,6 +200,10 @@ def draw(fig, spec, seed=3, variant='8'):
     if variant == '6':                             # one mixture, blobs ordered by vigor, no direction groups
         blobs = list(zip(range(1, 7), [(0.15, 0.3), (0.3, 0.7), (0.47, 0.3), (0.62, 0.72), (0.78, 0.3), (0.9, 0.75)]))
         label = 'one GMM\n(no split)'
+    elif variant == '13':                          # the same six clusters, each split by direction afterwards
+        blobs = [(1 + 2 * c + d, (fx + (0.035 if d else -0.035), fy)) for c, (fx, fy) in
+                 enumerate([(0.15, 0.3), (0.3, 0.7), (0.47, 0.3), (0.62, 0.72), (0.78, 0.3), (0.9, 0.75)]) for d in (0, 1)]
+        label = 'one GMM,\nthen CW / CCW'
     else:
         blobs = list(zip(range(1, 8), [(0.5, 0.15), (0.12, 0.55), (0.25, 0.85), (0.5, 0.55), (0.5, 0.88),
                                        (0.88, 0.55), (0.75, 0.85)]))
@@ -201,7 +223,7 @@ def draw(fig, spec, seed=3, variant='8'):
             cs._arrow(ax, x_a, x_b, ROW['wheel'][0])
     finally:
         cs.ROW.clear(); cs.ROW.update(rows)
-    ax.text(np.mean(COL['state']), _y('wheel', 0.25) - 0.3, f'{len(wcol) - 1} wheel states' if variant == '6' else '8 wheel states',
+    ax.text(np.mean(COL['state']), _y('wheel', 0.25) - 0.3, f'{len(wcol) - 1} wheel states' if variant in ('6', '13') else '8 wheel states',
             ha='center', va='top', fontsize=small,
             color='0.35')
     _syllables(ax, m, state, wcol, small)
