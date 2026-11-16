@@ -4,10 +4,12 @@ Every fiber of the export through Functions/nm_syllables.py, cached for 7_nm_syl
     python neuromodulators/run_nm_syllable_effects.py [n_jobs] [comma-separated analyses, default all]
 
 Writes to paper-individuality/data/neuromodulators/syllables_photometry/ (pickles: the cells hold arrays):
-    effects_task_<RUN>.pkl, effects_extended_<RUN>.pkl   ns.effect_maps
+    effects_task_<RUN>.pkl                               ns.effect_maps (covariates 'task')
     joint_<RUN>.pkl                                      ns.joint_maps
-    variance_<RUN>.pkl                                   ns.variance_partition
+    variance_<RUN>.pkl                                   ns.variance_partition (per outcome)
+    variance_pooled_<RUN>.pkl                            ns.variance_partition (outcomes pooled, outcome a covariate)
     task_vs_vigor_<RUN>.pkl                              ns.task_vs_movement (vigor only, outcomes pooled)
+    task_movement_betas_<RUN>.pkl                        ns.task_movement_betas (signs of the task + movement model)
     shapes_<RUN>.pkl                                     ns.shape_analyses (CCA + RRR, unmasked trial shapes)
 """
 import pathlib
@@ -22,10 +24,11 @@ from Functions import nm_syllables as ns  # noqa: E402
 
 CACHE = ns.DATA / 'syllables_photometry'
 ANALYSES = {'effects_task': lambda f: ns.effect_maps(f, covariates='task'),
-            'effects_extended': lambda f: ns.effect_maps(f, covariates='extended'),
             'joint': ns.joint_maps,
             'variance': ns.variance_partition,
-            'task_vs_vigor': ns.task_vs_movement}
+            'variance_pooled': lambda f: ns.variance_partition(f, covariates='full', pool_outcomes=True),
+            'task_vs_vigor': ns.task_vs_movement,
+            'task_movement_betas': ns.task_movement_betas}
 
 
 def one_session(eid, only):
