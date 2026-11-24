@@ -113,6 +113,19 @@ def fix_lab(mouse, lab):
 LDA['lab'] = [fix_lab(m, l) for m, l in zip(LDA['mouse_name'], LDA['lab'])]
 MOUSE_LAB = LDA.drop_duplicates('mouse_name').set_index('mouse_name')['lab']
 SESSION_LD1 = LDA.set_index('session')['LD1']
+_LD1_SCORES = LDA['LD1'].copy()
+LD = 1                       # which discriminant is tested (--ld); every section reads it as 'LD1'
+
+
+def use_ld(k):
+    """Test LD k instead of LD1: its scores are put in the 'LD1' column, so every section runs unchanged.
+    The sign of a discriminant is arbitrary. Outputs go to their own folder / file (see __main__)."""
+    global LD, SESSION_LD1
+    LDA['LD1'] = _LD1_SCORES if k == 1 else LDA[k - 1]      # k = 1 restores LD1 (re-use in one kernel)
+    LD = k
+    SESSION_LD1 = LDA.set_index('session')['LD1']
+
+
 SESSION_MOUSE = LDA.set_index('session')['mouse_name']
 
 
@@ -435,14 +448,22 @@ def section_syllable(rng):
     paw_occ = SO[:, :, :ps.N_PAW_STATES]
     with np.errstate(invalid='ignore'):
         vigor = np.nanmean((paw_occ * vig_rank).sum(-1) / paw_occ.sum(-1), axis=1)
+    # paw laterality: (left - right) / (left + right) occupancy of the lateralised paw states (ps.PAW_LATERAL), per
+    # session over all 40 bins; + = more time in the LEFT-paw states
+    occ_tot = np.nanmean(paw_occ, axis=1)                                             # sessions x paw states
+    L, R = occ_tot[:, ps.PAW_LATERAL['left']].sum(1), occ_tot[:, ps.PAW_LATERAL['right']].sum(1)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        lateral = (L - R) / (L + R)
     q = slice(10, 20)                                                                  # the Quiescence epoch's bins
     s = pd.DataFrame({'session': order, 'mouse_name': SESSION_MOUSE.reindex(order).to_numpy(),
                       'LD1': SESSION_LD1.reindex(order).to_numpy(),
                       'whisk': np.nanmean(SO[:, :, 8], 1), 'whisk_q': np.nanmean(SO[:, q, 8], 1),
-                      'lick': np.nanmean(SO[:, :, 9], 1), 'paw_idle': np.nanmean(SO[:, :, 0], 1), 'paw_vigor_rank': vigor})
+                      'lick': np.nanmean(SO[:, :, 9], 1), 'paw_idle': np.nanmean(SO[:, :, 0], 1), 'paw_vigor_rank': vigor,
+                      'paw_lateral': lateral})
     rows = [correlate(s, c, lab, 'syllable', rng) for c, lab in
             [('whisk', 'Whisking (whole trial)'), ('whisk_q', 'Whisking (quiescence)'), ('lick', 'Licking (whole trial)'),
-             ('paw_idle', 'Idle paw state (0)'), ('paw_vigor_rank', 'Mean paw-state vigor rank')]]
+             ('paw_idle', 'Idle paw state (0)'), ('paw_vigor_rank', 'Mean paw-state vigor rank'),
+             ('paw_lateral', 'Paw laterality (L - R)')]]
     show(rows, 'syllable-use summaries')
     return rows
 
@@ -836,7 +857,8 @@ def assemble():
         t[q] = t[f'{q}_paper']                       # the default: the paper family
     t['in_paper_family'] = paper
     t['survives_lab'] = (t['q_lab'] < 0.05) & (np.sign(t['rho_lab']) == np.sign(t['rho']))
-    out = PI / 'results' / f'lab_controls{"" if METHOD == "spearman" else "_" + METHOD}_{date.today().strftime("%d-%m-%Y")}.csv'
+    ld_tag = '' if LD == 1 else f'_LD{LD}'      # NOT lab_controls_pearson_*: fig_lab_controls globs that for LD1
+    out = PI / 'results' / f'lab_controls{ld_tag}{"" if METHOD == "spearman" else "_" + METHOD}_{date.today().strftime("%d-%m-%Y")}.csv'
     t.to_csv(out, index=False)
     print(f'\nwrote {out.relative_to(PI)} ({len(t)} rows; paper family {paper.sum()} tests)')
     print('lab-removed tests with q < 0.05:  ' + ' | '.join(
@@ -849,21 +871,28 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--only', default='all', choices=['all', 'ldvar', 'assemble'] + list(SECTIONS))
     ap.add_argument('--method', default='pearson', choices=['pearson', 'spearman'])
+    ap.add_argument('--ld', type=int, default=1, help='test this discriminant instead of LD1 (own output folder / file; '
+                                                      'ldvar and horizon are LD1-only and skipped)')
     a = ap.parse_args()
     METHOD = a.method
+    use_ld(a.ld)
     if METHOD != 'spearman':     # its own folder; the neural rows are Pearson partial r either way
         OUT_DIR = PI / 'results' / f'lab_controls_{METHOD}'
         ENTROPY_CACHE = PI / 'results' / 'lab_controls' / 'entropy_sessions.csv'   # data, the same for both
+    if LD != 1:
+        OUT_DIR = OUT_DIR.parent / f'{OUT_DIR.name}_LD{LD}'
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f'LDA: {LDA_FILE.name} | {LDA["session"].nunique()} sessions, {LDA["mouse_name"].nunique()} mice, '
           f'{LDA["lab"].nunique()} labs ({LAB_SCHEME})')
     rng = np.random.default_rng(SEED)
     todo = list(SECTIONS) if a.only == 'all' else [a.only] if a.only in SECTIONS else []
+    if LD != 1:                  # horizon does not involve LD1; ldvar is about every LD at once
+        todo = [s for s in todo if s != 'horizon']
     for s in todo:
         rows = SECTIONS[s](rng)
         if rows:
             pd.DataFrame(rows).to_csv(OUT_DIR / f'{s}.csv', index=False)
-    if a.only in ('all', 'ldvar'):
+    if a.only in ('all', 'ldvar') and LD == 1:
         section_ldvar(rng).to_csv(LDVAR_DIR / 'ldvar.csv', index=False)
     if a.only in ('all', 'assemble'):
         assemble()
